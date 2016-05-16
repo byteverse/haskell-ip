@@ -16,7 +16,8 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
-import qualified Data.Attoparsec.Text as Attoparsec
+import qualified Data.Attoparsec.Text as AT
+import Net.Internal (attoparsecParseJSON)
 
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic)
@@ -32,10 +33,7 @@ instance ToJSON IPv4 where
   toJSON addr = Aeson.String (toDotDecimalText addr)
 
 instance FromJSON IPv4 where
-  parseJSON (Aeson.String t) = 
-    case fromDotDecimalText' t of
-      Left err  -> fail err
-      Right res -> return res
+  parseJSON = attoparsecParseJSON (dotDecimalParser <* AT.endOfInput)
 
 instance ToJSON IPv4Range where
   toJSON addrRange = Aeson.String (rangeToDotDecimalText addrRange)
@@ -54,23 +52,23 @@ rightToMaybe = either (const Nothing) Just
 
 fromDotDecimalText' :: Text -> Either String IPv4
 fromDotDecimalText' t = 
-  Attoparsec.parseOnly (dotDecimalParser <* Attoparsec.endOfInput) t
+  AT.parseOnly (dotDecimalParser <* AT.endOfInput) t
 
 fromDotDecimalText :: Text -> Maybe IPv4
 fromDotDecimalText = rightToMaybe . fromDotDecimalText'
 
 rangeFromDotDecimalText' :: Text -> Either String IPv4Range
 rangeFromDotDecimalText' t = 
-  Attoparsec.parseOnly (dotDecimalRangeParser <* Attoparsec.endOfInput) t
+  AT.parseOnly (dotDecimalRangeParser <* AT.endOfInput) t
 
 rangeFromDotDecimalText :: Text -> Maybe IPv4Range
 rangeFromDotDecimalText = rightToMaybe . rangeFromDotDecimalText'
 
-dotDecimalRangeParser :: Attoparsec.Parser IPv4Range
+dotDecimalRangeParser :: AT.Parser IPv4Range
 dotDecimalRangeParser = IPv4Range
   <$> dotDecimalParser
-  <*  Attoparsec.char '/'
-  <*> (Attoparsec.decimal >>= limitSize)
+  <*  AT.char '/'
+  <*> (AT.decimal >>= limitSize)
   where
   limitSize i = 
     if i > 32
@@ -79,15 +77,15 @@ dotDecimalRangeParser = IPv4Range
 
 -- | This does not do an endOfInput check because it is
 -- reused in the range parser implementation.
-dotDecimalParser :: Attoparsec.Parser IPv4
+dotDecimalParser :: AT.Parser IPv4
 dotDecimalParser = fromOctets'
-  <$> (Attoparsec.decimal >>= limitSize)
-  <*  Attoparsec.char '.'
-  <*> (Attoparsec.decimal >>= limitSize)
-  <*  Attoparsec.char '.'
-  <*> (Attoparsec.decimal >>= limitSize)
-  <*  Attoparsec.char '.'
-  <*> (Attoparsec.decimal >>= limitSize)
+  <$> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
   where
   limitSize i = 
     if i > 255 

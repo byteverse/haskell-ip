@@ -7,20 +7,24 @@ import Data.Text (Text)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Word 
+import Data.Aeson (ToJSON(..),FromJSON(..))
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
+import Net.Internal (attoparsecParseJSON)
 
 data Mac = Mac
-  { macA :: Word16
-  , macB :: Word32
+  { macA :: {-# UNPACK #-} !Word16
+  , macB :: {-# UNPACK #-} !Word32
   }
   deriving (Eq,Ord,Show,Read,Generic)
 
 instance Hashable Mac
 
--- This does not do an endOfInput check because it is
--- reused in the range parser implementation.
+instance FromJSON Mac where
+  parseJSON = attoparsecParseJSON (textParser <* AT.endOfInput)
+
+-- | This does not do an endOfInput check
 textParser :: AT.Parser Mac
 textParser = fromOctets'
   <$> (AT.hexadecimal >>= limitSize)
