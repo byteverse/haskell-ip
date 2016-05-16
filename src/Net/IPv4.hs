@@ -10,6 +10,7 @@ import Data.Text.Lazy.Builder.Int (decimal)
 import Data.Monoid ((<>))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Data.Word
+import Data.Int
 import Data.Hashable
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
@@ -22,7 +23,7 @@ newtype IPv4 = IPv4 { getIPv4 :: Word32 }
 
 data IPv4Range = IPv4Range 
   { ipv4RangeBase   :: {-# UNPACK #-} !IPv4
-  , ipv4RangeLength :: {-# UNPACK #-} !Int
+  , ipv4RangeLength :: {-# UNPACK #-} !Int8
   } deriving (Eq,Ord,Show,Read,Generic)
 
 instance Hashable IPv4Range
@@ -76,7 +77,7 @@ dotDecimalRangeParser = IPv4Range
       then fail "An IP range length must be between 0 and 32"
       else return i
 
--- This does not do an endOfInput check because it is
+-- | This does not do an endOfInput check because it is
 -- reused in the range parser implementation.
 dotDecimalParser :: Attoparsec.Parser IPv4
 dotDecimalParser = fromOctets'
@@ -101,8 +102,7 @@ fromOctets a b c d = fromOctets'
 --   dotDecimalParser probably perform better.
 fromOctets' :: Word32 -> Word32 -> Word32 -> Word32 -> IPv4
 fromOctets' a b c d = IPv4 
-    ( 0
-  .|. shiftL a 24
+    ( shiftL a 24
   .|. shiftL b 16
   .|. shiftL c 8
   .|. d

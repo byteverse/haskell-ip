@@ -14,7 +14,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     
+  exposed-modules:
+    Net.Mac
     Net.IPv4
     Net.IPv4.Text
   build-depends:       
