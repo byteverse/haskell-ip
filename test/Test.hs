@@ -21,21 +21,23 @@ main = defaultMain tests
 
 tests :: [Test]
 tests =
-    [ testGroup "Naive IPv4 encode/decode" 
-      [ testProperty "Isomorphism" 
-          $ propEncodeDecodeIso ipv4ToTextNaive ipv4FromTextNaive
-      ]
-    , testGroup "Performant IPv4 Text encode/decode"
-      [ testProperty "Isomorphism" 
-          $ propEncodeDecodeIso IPv4_Text.encode IPv4_Text.decode
-      , testProperty "Identical to Naive"
-          $ propMatching IPv4_Text.encode ipv4ToTextNaive
-      ]
-    , testGroup "Performant MAC Text encode/decode"
-      [ testProperty "Isomorphism" 
-          $ propEncodeDecodeIso Mac_Text.encode Mac_Text.decode
-      ]
+  [ testGroup "Naive IPv4 encode/decode" 
+    [ testProperty "Isomorphism" 
+        $ propEncodeDecodeIso ipv4ToTextNaive ipv4FromTextNaive
     ]
+  , testGroup "Text Builder IPv4 Text encode/decode"
+    [ testProperty "Identical to Naive"
+        $ propMatching toDotDecimalText ipv4ToTextNaive
+    ]
+  , testGroup "Raw byte array IPv4 Text encode/decode"
+    [ testProperty "Identical to Naive"
+        $ propMatching toTextPreAllocated ipv4ToTextNaive
+    ]
+  , testGroup "Performant MAC Text encode/decode"
+    [ testProperty "Isomorphism" 
+        $ propEncodeDecodeIso Mac_Text.encode Mac_Text.decode
+    ]
+  ]
 
 deriving instance Arbitrary IPv4
 
