@@ -53,7 +53,9 @@ ipv4FromTextNaive t =
 -- This implementation operates directly on
 -- a mutable array. It is the fastest one so far.
 -- On a 2012 laptop, it can serialize an IPv4
--- address to Text in 35ns.
+-- address to Text in 35ns. It is somewhat wasteful
+-- of space. It allocates a full 30 bytes in case it
+-- needs it, but it may need as few as 14 bytes.
 ------------------------
 toTextPreAllocated :: IPv4 -> Text
 toTextPreAllocated (IPv4 w) =
