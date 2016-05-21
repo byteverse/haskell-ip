@@ -3,9 +3,8 @@
 
 module Main (main) where
 
-import Data.Function                        (on)
+import Naive
 import Data.List                            (intercalate)
-import Control.Monad                        ((>=>))
 import Test.QuickCheck                      (Gen, Arbitrary(..), choose)
 import Test.Framework                       (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -24,13 +23,13 @@ tests :: [Test]
 tests =
     [ testGroup "Naive IPv4 encode/decode" 
       [ testProperty "Isomorphism" 
-          $ propEncodeDecodeIso IPv4.toDotDecimalTextNaive IPv4.fromDotDecimalTextNaive
+          $ propEncodeDecodeIso ipv4ToTextNaive ipv4FromTextNaive
       ]
     , testGroup "Performant IPv4 Text encode/decode"
       [ testProperty "Isomorphism" 
           $ propEncodeDecodeIso IPv4_Text.encode IPv4_Text.decode
       , testProperty "Identical to Naive"
-          $ propMatching IPv4_Text.encode IPv4.toDotDecimalTextNaive
+          $ propMatching IPv4_Text.encode ipv4ToTextNaive
       ]
     , testGroup "Performant MAC Text encode/decode"
       [ testProperty "Isomorphism" 
@@ -40,7 +39,7 @@ tests =
 
 deriving instance Arbitrary IPv4
 
-instance Arbitrary Mac
+instance Arbitrary Mac where
   arbitrary = fmap fromTuple arbitrary
     where fromTuple (a,b) = Mac a b
 

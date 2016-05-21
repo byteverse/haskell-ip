@@ -19,6 +19,7 @@ module Net.IPv4
     -- * Conversion Functions
   , fromOctets
   , fromOctets'
+  , toOctets
     -- * Encoding and Decoding Functions
   , fromDotDecimalText
   , fromDotDecimalText'
@@ -29,8 +30,6 @@ module Net.IPv4
   , toDotDecimalBuilder
   , rangeToDotDecimalText
   , rangeToDotDecimalBuilder
-  , toDotDecimalTextNaive
-  , fromDotDecimalTextNaive
   ) where
 
 import Data.Text (Text)
@@ -147,6 +146,7 @@ toOctets (IPv4 w) =
 
 toDotDecimalText :: IPv4 -> Text
 toDotDecimalText = LText.toStrict . TBuilder.toLazyText . toDotDecimalBuilder
+{-# INLINE toDotDecimalText #-}
 
 -- It should be possible to write a more efficient version that initially
 -- allocates a block of strict text of length 15 and then starts filling 
@@ -161,6 +161,7 @@ toDotDecimalBuilder (IPv4 w) =
   <> dot
   <> decimal (255 .&. w)
   where dot = TBuilder.singleton '.'
+{-# INLINE toDotDecimalBuilder #-}
 
 rangeToDotDecimalText :: IPv4Range -> Text
 rangeToDotDecimalText = LText.toStrict . TBuilder.toLazyText . rangeToDotDecimalBuilder
@@ -170,22 +171,4 @@ rangeToDotDecimalBuilder (IPv4Range addr len) =
   toDotDecimalBuilder addr
   <> TBuilder.singleton '/'
   <> decimal len
-
-toDotDecimalTextNaive :: IPv4 -> Text
-toDotDecimalTextNaive i = Text.pack $ concat
-  [ show a
-  , "."
-  , show b
-  , "."
-  , show c
-  , "."
-  , show d
-  ]
-  where (a,b,c,d) = toOctets i
-
-fromDotDecimalTextNaive :: Text -> Maybe IPv4
-fromDotDecimalTextNaive t = 
-  case mapM (readMaybe . Text.unpack) (Text.splitOn (Text.pack ".") t) of
-    Just [a,b,c,d] -> Just (fromOctets a b c d)
-    _ -> Nothing
 
