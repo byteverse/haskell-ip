@@ -11,3 +11,7 @@ attoparsecParseJSON p v =
         Left err  -> fail err
         Right res -> return res
     _ -> fail "expected a String"
+
+rightToMaybe :: Either a b -> Maybe b
+rightToMaybe = either (const Nothing) Just
+

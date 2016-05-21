@@ -11,7 +11,7 @@ import Data.Aeson (ToJSON(..),FromJSON(..))
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
-import Net.Internal (attoparsecParseJSON)
+import Net.Internal (attoparsecParseJSON,rightToMaybe)
 import qualified Data.Text.Lazy.Builder as TBuilder
 import Data.Text.Lazy.Builder.Int (hexadecimal)
 import Data.Monoid ((<>))
@@ -34,6 +34,12 @@ instance FromJSON Mac where
 
 toText :: Mac -> Text
 toText = LText.toStrict . TBuilder.toLazyText . toTextBuilder
+
+fromText :: Text -> Maybe Mac
+fromText = rightToMaybe . fromText'
+
+fromText' :: Text -> Either String Mac
+fromText' t = AT.parseOnly (textParser <* AT.endOfInput) t
 
 toTextBuilder :: Mac -> TBuilder.Builder
 toTextBuilder (Mac a b) = 

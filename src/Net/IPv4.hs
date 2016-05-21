@@ -1,9 +1,40 @@
  {-# LANGUAGE DeriveGeneric #-}
  {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Net.IPv4 where
+{-| An IPv4 data type
+    
+    This module provides the IPv4 data type and functions for working
+    with it. There are also encoding and decoding functions provided
+    in this module, but they should be imported from 
+    @Net.IPv4.Text@ and @Net.IPv4.ByteString.Char8@ instead. They are
+    defined here so that the 'FromJSON' and 'ToJSON' instances can
+    use them.
+
+-}
+    
+module Net.IPv4 
+  ( -- * Types
+    IPv4(..)
+  , IPv4Range(..)
+    -- * Conversion Functions
+  , fromOctets
+  , fromOctets'
+    -- * Encoding and Decoding Functions
+  , fromDotDecimalText
+  , fromDotDecimalText'
+  , rangeFromDotDecimalText'
+  , dotDecimalRangeParser
+  , dotDecimalParser
+  , toDotDecimalText
+  , toDotDecimalBuilder
+  , rangeToDotDecimalText
+  , rangeToDotDecimalBuilder
+  , toDotDecimalTextNaive
+  , fromDotDecimalTextNaive
+  ) where
 
 import Data.Text (Text)
+import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Text.Lazy.Builder as TBuilder
 import Data.Text.Lazy.Builder.Int (decimal)
@@ -17,7 +48,9 @@ import GHC.Generics (Generic)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.Text as AT
-import Net.Internal (attoparsecParseJSON)
+import Net.Internal (attoparsecParseJSON,rightToMaybe)
+import Text.Read (readMaybe)
+import Control.Monad
 
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic)
@@ -43,9 +76,7 @@ instance FromJSON IPv4Range where
     case rangeFromDotDecimalText' t of
       Left err  -> fail err
       Right res -> return res
-
-rightToMaybe :: Either a b -> Maybe b
-rightToMaybe = either (const Nothing) Just
+  parseJSON _ = mzero
 
 -- mask :: Int -> IPv4
 -- mask w = IPv4 $ complement $ 0xffffffff `shiftR` w
@@ -106,6 +137,14 @@ fromOctets' a b c d = IPv4
   .|. d
     )
 
+toOctets :: IPv4 -> (Word8,Word8,Word8,Word8)
+toOctets (IPv4 w) =
+  ( fromIntegral (shiftR w 24)
+  , fromIntegral (shiftR w 16)
+  , fromIntegral (shiftR w 8)
+  , fromIntegral w
+  )
+
 toDotDecimalText :: IPv4 -> Text
 toDotDecimalText = LText.toStrict . TBuilder.toLazyText . toDotDecimalBuilder
 
@@ -132,5 +171,21 @@ rangeToDotDecimalBuilder (IPv4Range addr len) =
   <> TBuilder.singleton '/'
   <> decimal len
 
+toDotDecimalTextNaive :: IPv4 -> Text
+toDotDecimalTextNaive i = Text.pack $ concat
+  [ show a
+  , "."
+  , show b
+  , "."
+  , show c
+  , "."
+  , show d
+  ]
+  where (a,b,c,d) = toOctets i
 
+fromDotDecimalTextNaive :: Text -> Maybe IPv4
+fromDotDecimalTextNaive t = 
+  case mapM (readMaybe . Text.unpack) (Text.splitOn (Text.pack ".") t) of
+    Just [a,b,c,d] -> Just (fromOctets a b c d)
+    _ -> Nothing
 
