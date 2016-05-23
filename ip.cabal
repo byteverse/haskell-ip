@@ -1,5 +1,5 @@
 name:                ip
-version:             0.5
+version:             0.6.0
 synopsis:            Library for IP and MAC addresses
 description:         Please see README.md
 homepage:            https://github.com/andrewthad/ip#readme
@@ -44,6 +44,11 @@ test-suite ip-test
     , QuickCheck
     , text
     , bytestring
+  other-modules:
+    Naive
+    IPv4Text1
+    IPv4Text2
+    IPv4ByteString1
   ghc-options:         -Wall -O2
   default-language:    Haskell2010
 
