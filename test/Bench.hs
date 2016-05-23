@@ -20,6 +20,7 @@ import qualified Net.IPv4.Text as IPv4_Text
 import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
+import qualified IPv4ByteString1
 
 import qualified Net.IPv4.ByteString.Char8 as NIPBS
 
@@ -34,6 +35,7 @@ main = do
       ]
     , bgroup "IPv4 to ByteString" 
       [ bench "Naive" $ whnf Naive.encodeByteString ipAddr
+      , bench "Preallocated: No Lookup Tables" $ whnf IPv4ByteString1.encode ipAddr
       , bench "Preallocated" $ whnf NIPBS.encode ipAddr
       ]
     ]

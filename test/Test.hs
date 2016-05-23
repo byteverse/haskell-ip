@@ -13,12 +13,14 @@ import Net.IPv4 (IPv4(..),IPv4Range(..))
 import Net.Mac (Mac(..))
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv4.Text as IPv4_Text
+import qualified Net.IPv4.ByteString.Char8 as IPv4_ByteString
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as Mac_Text
 
 import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
+import qualified IPv4ByteString1
 
 main :: IO ()
 main = defaultMain tests
@@ -37,7 +39,15 @@ tests =
     [ testProperty "Identical to Naive"
         $ propMatching IPv4Text1.encode Naive.encodeText
     ]
-  , testGroup "Performant MAC Text encode/decode"
+  , testGroup "Raw byte array (without lookup table) IPv4 ByteString encode/decode"
+    [ testProperty "Identical to Naive"
+        $ propMatching IPv4ByteString1.encode Naive.encodeByteString
+    ]
+  , testGroup "Raw byte array (with lookup table) IPv4 ByteString encode/decode"
+    [ testProperty "Identical to Naive"
+        $ propMatching IPv4_ByteString.encode Naive.encodeByteString
+    ]
+  , testGroup "Raw byte array MAC Text encode/decode"
     [ testProperty "Isomorphism" 
         $ propEncodeDecodeIso Mac_Text.encode Mac_Text.decode
     ]

@@ -1,4 +1,4 @@
-module IPv4BS where
+module IPv4ByteString1 where
 
 import Net.IPv4
 
@@ -8,8 +8,8 @@ import Foreign.Ptr
 import Foreign.Storable
 import Data.Word
 
-toBSPreAllocatedOld :: IPv4 -> ByteString
-toBSPreAllocatedOld (IPv4 w) = I.unsafeCreateUptoN 15 (\ptr1 ->
+encode :: IPv4 -> ByteString
+encode (IPv4 w) = I.unsafeCreateUptoN 15 (\ptr1 ->
   do (len1,ptr2) <- writeWord ptr1 w1
      poke ptr2 dot
      (len2,ptr3) <- writeWord (ptr2 `plusPtr` 1) w2
