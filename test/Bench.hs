@@ -21,6 +21,8 @@ import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
 
+import qualified Net.IPv4.ByteString.Char8 as NIPBS
+
 main :: IO ()
 main = do
   let ipAddr = IPv4 1000000009
@@ -32,5 +34,6 @@ main = do
       ]
     , bgroup "IPv4 to ByteString" 
       [ bench "Naive" $ whnf Naive.encodeByteString ipAddr
+      , bench "Preallocated" $ whnf NIPBS.encode ipAddr
       ]
     ]

@@ -16,6 +16,10 @@ import qualified Net.IPv4.Text as IPv4_Text
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as Mac_Text
 
+import qualified Naive
+import qualified IPv4Text1
+import qualified IPv4Text2
+
 main :: IO ()
 main = defaultMain tests
 
@@ -23,15 +27,15 @@ tests :: [Test]
 tests =
   [ testGroup "Naive IPv4 encode/decode" 
     [ testProperty "Isomorphism" 
-        $ propEncodeDecodeIso ipv4ToTextNaive ipv4FromTextNaive
+        $ propEncodeDecodeIso Naive.encodeText Naive.decodeText
     ]
   , testGroup "Text Builder IPv4 Text encode/decode"
     [ testProperty "Identical to Naive"
-        $ propMatching toDotDecimalText ipv4ToTextNaive
+        $ propMatching IPv4Text2.encode Naive.encodeText
     ]
   , testGroup "Raw byte array IPv4 Text encode/decode"
     [ testProperty "Identical to Naive"
-        $ propMatching toTextPreAllocated ipv4ToTextNaive
+        $ propMatching IPv4Text1.encode Naive.encodeText
     ]
   , testGroup "Performant MAC Text encode/decode"
     [ testProperty "Isomorphism" 

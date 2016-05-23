@@ -36,8 +36,8 @@ encodeText i = Text.pack $ concat
   ]
   where (a,b,c,d) = IPv4.toOctets i
 
-ipv4FromTextNaive :: Text -> Maybe IPv4
-ipv4FromTextNaive t = 
+decodeText :: Text -> Maybe IPv4
+decodeText t = 
   case mapM (readMaybe . Text.unpack) (Text.splitOn (Text.pack ".") t) of
     Just [a,b,c,d] -> Just (IPv4.fromOctets a b c d)
     _ -> Nothing
