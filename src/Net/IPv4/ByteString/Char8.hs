@@ -14,7 +14,7 @@ import Net.Internal (rightToMaybe)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8')
 import Data.ByteString (ByteString)
 import Data.Attoparsec.ByteString.Char8 (Parser)
-import Data.ByteString.Lazy.Builder (Builder)
+import Data.ByteString.Builder (Builder)
 
 -- | This should be rewritten to not create 'Text' as an 
 --   intermediate step.
