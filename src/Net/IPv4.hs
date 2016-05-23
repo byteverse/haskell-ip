@@ -9,7 +9,10 @@
     @Net.IPv4.Text@ and @Net.IPv4.ByteString.Char8@ instead. They are
     defined here so that the 'FromJSON' and 'ToJSON' instances can
     use them.
-
+    
+    At some point, a highly efficient IPv4-to-ByteString function needs
+    to be added to this module to take advantage of @aeson@'s new
+    @toEncoding@ method.
 -}
     
 module Net.IPv4 
@@ -153,9 +156,6 @@ toDotDecimalText :: IPv4 -> Text
 toDotDecimalText = toTextPreAllocated
 {-# INLINE toDotDecimalText #-}
 
--- It should be possible to write a more efficient version that initially
--- allocates a block of strict text of length 15 and then starts filling 
--- it in.
 toDotDecimalBuilder :: IPv4 -> TBuilder.Builder
 toDotDecimalBuilder = TBuilder.fromText . toTextPreAllocated
 {-# INLINE toDotDecimalBuilder #-}
@@ -169,6 +169,10 @@ rangeToDotDecimalBuilder (IPv4Range addr len) =
   <> TBuilder.singleton '/'
   <> decimal len
 
+-- | I think that this function can be improved. Right now, it
+--   always allocates enough space for a fifteen-character text
+--   rendering of an IP address. I think that it should be possible
+--   to do more of the math upfront and allocate less space.
 toTextPreAllocated :: IPv4 -> Text
 toTextPreAllocated (IPv4 w) =
   let w1 = fromIntegral $ 255 .&. shiftR w 24

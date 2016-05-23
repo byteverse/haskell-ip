@@ -1,6 +1,5 @@
 module Main (main) where
 
-import Naive
 import Criterion.Main
 import Net.IPv4 (IPv4(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
@@ -18,16 +17,20 @@ import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Array        as TArray
 import qualified Net.IPv4.Text as IPv4_Text
 
+import qualified Naive
+import qualified IPv4Text1
+import qualified IPv4Text2
+
 main :: IO ()
 main = do
   let ipAddr = IPv4 1000000009
   defaultMain 
     [ bgroup "IPv4 to Text" 
-      [ bench "Naive" $ whnf ipv4ToTextNaive ipAddr
-      , bench "Text Builder" $ whnf toDotDecimalText ipAddr
-      , bench "Preallocated" $ whnf toTextPreAllocated ipAddr
+      [ bench "Naive" $ whnf Naive.encodeText ipAddr
+      , bench "Text Builder" $ whnf IPv4Text2.encode ipAddr
+      , bench "Preallocated" $ whnf IPv4Text1.encode ipAddr
       ]
     , bgroup "IPv4 to ByteString" 
-      [ bench "Naive" $ whnf ipv4ToByteStringChar8Naive ipAddr
+      [ bench "Naive" $ whnf Naive.encodeByteString ipAddr
       ]
     ]

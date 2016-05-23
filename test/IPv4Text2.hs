@@ -1,4 +1,4 @@
-module Naive where
+module IPv4Text2 where
 
 import Net.IPv4 (IPv4(..))
 import Data.Text (Text)
@@ -21,24 +21,23 @@ import qualified Data.Text.Lazy         as LText
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Array        as TArray
 
-encodeByteString :: IPv4 -> ByteString
-encodeByteString = encodeUtf8 . encodeText
+-----------------------------------------
+-- Text Builder implementation. This ends
+-- up performing worse than the naive
+-- implementation.
+-----------------------------------------
+encode :: IPv4 -> Text
+encode = LText.toStrict . TBuilder.toLazyText . toDotDecimalBuilder
 
-encodeText :: IPv4 -> Text
-encodeText i = Text.pack $ concat
-  [ show a
-  , "."
-  , show b
-  , "."
-  , show c
-  , "."
-  , show d
-  ]
-  where (a,b,c,d) = IPv4.toOctets i
-
-ipv4FromTextNaive :: Text -> Maybe IPv4
-ipv4FromTextNaive t = 
-  case mapM (readMaybe . Text.unpack) (Text.splitOn (Text.pack ".") t) of
-    Just [a,b,c,d] -> Just (IPv4.fromOctets a b c d)
-    _ -> Nothing
+toDotDecimalBuilder :: IPv4 -> TBuilder.Builder
+toDotDecimalBuilder (IPv4 w) = 
+  decimal (255 .&. shiftR w 24 )
+  <> dot
+  <> decimal (255 .&. shiftR w 16 )
+  <> dot
+  <> decimal (255 .&. shiftR w 8 )
+  <> dot
+  <> decimal (255 .&. w)
+  where dot = TBuilder.singleton '.'
+{-# INLINE toDotDecimalBuilder #-}
 
