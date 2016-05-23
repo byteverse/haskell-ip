@@ -20,3 +20,11 @@ should export either a function named `encode` or a function named `decode`.
 Then, in `test/Bench.hs`, add your implementation. You can run `stack bench`
 to see how it compares with the others.
 
+After doing this, just PR those changes and mention that you've added a better
+implementation that what is currently being used. I'll copy the implementation
+into the actual library if it's better.
+
+# Other
+
+If this readme is confusing in any way, please open up an issue.
+
