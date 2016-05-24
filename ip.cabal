@@ -2,7 +2,7 @@ name:                ip
 version:             0.6.0
 synopsis:            Library for IP and MAC addresses
 description:         Please see README.md
-homepage:            https://github.com/andrewthad/ip#readme
+homepage:            https://github.com/andrewthad/haskell-ip#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Andrew Martin
@@ -72,4 +72,4 @@ benchmark criterion
 
 source-repository head
   type:     git
-  location: https://github.com/andrewthad/ip
+  location: https://github.com/andrewthad/haskell-ip
