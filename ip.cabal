@@ -1,5 +1,5 @@
 name:                ip
-version:             0.6.1
+version:             0.6.2
 synopsis:            Library for IP and MAC addresses
 description:         Please see README.md
 homepage:            https://github.com/andrewthad/haskell-ip#readme
@@ -19,6 +19,7 @@ library
     Net.Mac.Text
     Net.Mac.ByteString.Char8
     Net.IPv4
+    Net.IPv4.String
     Net.IPv4.Text
     Net.IPv4.ByteString.Char8
     Net.Internal
