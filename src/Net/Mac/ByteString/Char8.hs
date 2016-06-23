@@ -41,8 +41,8 @@ parser = fromOctets'
   <*  AB.char ':'
   <*> (AB.hexadecimal >>= limitSize)
   where
-  limitSize i = 
-    if i > 255 
+  limitSize i =
+    if i > 255
       then fail "All octets in a mac address must be between 00 and FF"
       else return i
 

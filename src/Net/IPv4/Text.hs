@@ -1,4 +1,4 @@
-module Net.IPv4.Text 
+module Net.IPv4.Text
   ( encode
   , decode
   , decodeEither

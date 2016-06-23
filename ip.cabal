@@ -22,7 +22,7 @@ library
     Net.IPv4.Text
     Net.IPv4.ByteString.Char8
     Net.Internal
-  build-depends:       
+  build-depends:
       base        >= 4.8  && < 5
     , attoparsec
     , aeson       >= 0.9  && < 0.12
@@ -36,7 +36,7 @@ test-suite ip-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Test.hs
-  build-depends:       
+  build-depends:
       base
     , ip
     , test-framework

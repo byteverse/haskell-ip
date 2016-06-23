@@ -30,7 +30,7 @@ encode :: IPv4 -> Text
 encode = LText.toStrict . TBuilder.toLazyText . toDotDecimalBuilder
 
 toDotDecimalBuilder :: IPv4 -> TBuilder.Builder
-toDotDecimalBuilder (IPv4 w) = 
+toDotDecimalBuilder (IPv4 w) =
   decimal (255 .&. shiftR w 24 )
   <> dot
   <> decimal (255 .&. shiftR w 16 )

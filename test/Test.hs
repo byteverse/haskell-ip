@@ -27,8 +27,8 @@ main = defaultMain tests
 
 tests :: [Test]
 tests =
-  [ testGroup "Naive IPv4 encode/decode" 
-    [ testProperty "Isomorphism" 
+  [ testGroup "Naive IPv4 encode/decode"
+    [ testProperty "Isomorphism"
         $ propEncodeDecodeIso Naive.encodeText Naive.decodeText
     ]
   , testGroup "Text Builder IPv4 Text encode/decode"
@@ -48,7 +48,7 @@ tests =
         $ propMatching IPv4_ByteString.encode Naive.encodeByteString
     ]
   , testGroup "Raw byte array MAC Text encode/decode"
-    [ testProperty "Isomorphism" 
+    [ testProperty "Isomorphism"
         $ propEncodeDecodeIso Mac_Text.encode Mac_Text.decode
     ]
   ]

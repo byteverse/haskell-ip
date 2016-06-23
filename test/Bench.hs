@@ -27,13 +27,13 @@ import qualified Net.IPv4.ByteString.Char8 as NIPBS
 main :: IO ()
 main = do
   let ipAddr = IPv4 1000000009
-  defaultMain 
-    [ bgroup "IPv4 to Text" 
+  defaultMain
+    [ bgroup "IPv4 to Text"
       [ bench "Naive" $ whnf Naive.encodeText ipAddr
       , bench "Text Builder" $ whnf IPv4Text2.encode ipAddr
       , bench "Preallocated" $ whnf IPv4Text1.encode ipAddr
       ]
-    , bgroup "IPv4 to ByteString" 
+    , bgroup "IPv4 to ByteString"
       [ bench "Naive" $ whnf Naive.encodeByteString ipAddr
       , bench "Preallocated: No Lookup Tables" $ whnf IPv4ByteString1.encode ipAddr
       , bench "Preallocated" $ whnf NIPBS.encode ipAddr

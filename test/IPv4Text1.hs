@@ -54,7 +54,7 @@ encode (IPv4 w) =
         theArr <- TArray.unsafeFreeze marr
         return (theArr,i4 + n3')
   in Text arr 0 len
-    
+
 putAndCount :: Int -> Word8 -> TArray.MArray s -> ST s Int
 putAndCount pos w marr
   | w < 10 = TArray.unsafeWrite marr pos (i2w w) >> return 1
@@ -92,7 +92,7 @@ twoDigits = BC8.pack
   \8081828384858687888990919293949596979899"
 
 threeDigits :: ByteString
-threeDigits = 
+threeDigits =
   ByteString.replicate 300 0 <> BC8.pack
   "100101102103104105106107108109110111112\
   \113114115116117118119120121122123124125\

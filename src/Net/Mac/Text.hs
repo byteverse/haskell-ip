@@ -1,4 +1,4 @@
-module Net.Mac.Text 
+module Net.Mac.Text
   ( encode
   , decode
   , decodeEither

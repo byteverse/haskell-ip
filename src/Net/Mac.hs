@@ -6,7 +6,7 @@ module Net.Mac where
 import Data.Text (Text)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
-import Data.Word 
+import Data.Word
 import Data.Aeson (ToJSON(..),FromJSON(..))
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString.Char8 as AB
@@ -42,7 +42,7 @@ fromText' :: Text -> Either String Mac
 fromText' t = AT.parseOnly (textParser <* AT.endOfInput) t
 
 toTextBuilder :: Mac -> TBuilder.Builder
-toTextBuilder (Mac a b) = 
+toTextBuilder (Mac a b) =
   hexadecimal (255 .&. shiftR a 8 )
   <> colon
   <> hexadecimal (255 .&. a )
@@ -71,8 +71,8 @@ textParser = fromOctets'
   <*  AT.char ':'
   <*> (AT.hexadecimal >>= limitSize)
   where
-  limitSize i = 
-    if i > 255 
+  limitSize i =
+    if i > 255
       then fail "All octets in a mac address must be between 00 and FF"
       else return i
 
@@ -90,8 +90,8 @@ bytestringParser = fromOctets'
   <*  AB.char ':'
   <*> (AB.hexadecimal >>= limitSize)
   where
-  limitSize i = 
-    if i > 255 
+  limitSize i =
+    if i > 255
       then fail "All octets in a mac address must be between 00 and FF"
       else return i
 
