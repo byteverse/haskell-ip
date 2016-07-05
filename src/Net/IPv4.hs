@@ -23,6 +23,8 @@ module Net.IPv4
   , mask
   , normalize
   , member
+  , lowerInclusive
+  , upperInclusive
     -- * Conversion Functions
   , fromOctets
   , fromOctets'
@@ -66,9 +68,13 @@ import qualified Data.Text.Array        as TArray
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic)
 
+-- | The length should be between 0 and 32. These bounds are inclusive.
+--   This expectation is not in any way enforced by this library because
+--   it does not cause errors. A mask length greater than 32 will be
+--   treated as if it were 32.
 data IPv4Range = IPv4Range
   { ipv4RangeBase   :: {-# UNPACK #-} !IPv4
-  , ipv4RangeLength :: {-# UNPACK #-} !Int8
+  , ipv4RangeLength :: {-# UNPACK #-} !Word8
   } deriving (Eq,Ord,Show,Read,Generic)
 
 instance Hashable IPv4Range
@@ -92,17 +98,30 @@ instance FromJSON IPv4Range where
 mask :: Word8 -> Word32
 mask = complement . shiftR 0xffffffff . fromIntegral
 
-normalizeInternal :: Word8 -> Word32 -> Word32
-normalizeInternal len w = w .&. mask len
+-- normalizeInternal :: Word8 -> Word32 -> Word32
+-- normalizeInternal len w = w .&. mask len
 
 normalize :: IPv4Range -> IPv4Range
-normalize (IPv4Range (IPv4 w) len) = IPv4Range (IPv4 (normalizeInternal len w)) len
+normalize (IPv4Range (IPv4 w) len) =
+  let len' = min len 32
+      w' = w .&. mask len'
+   in IPv4Range (IPv4 w') len'
 
 member :: IPv4Range -> IPv4 -> Bool
 member (IPv4Range (IPv4 wsubnet) len) =
   let theMask = mask len
       wsubnetNormalized = wsubnet .&. theMask
    in \(IPv4 w) -> (w .&. theMask) == wsubnetNormalized
+
+lowerInclusive :: IPv4Range -> IPv4
+lowerInclusive (IPv4Range (IPv4 w) len) =
+  IPv4 (w .&. mask len)
+
+upperInclusive :: IPv4Range -> IPv4
+upperInclusive (IPv4Range (IPv4 w) len) =
+  let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
+      theMask = complement theInvertedMask
+   in IPv4 ((w .&. theMask) .|. theInvertedMask)
 
 fromDotDecimalText' :: Text -> Either String IPv4
 fromDotDecimalText' t =
