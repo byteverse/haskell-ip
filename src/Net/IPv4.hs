@@ -1,5 +1,9 @@
- {-# LANGUAGE DeriveGeneric #-}
- {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-| An IPv4 data type
 
@@ -66,7 +70,12 @@ import Net.Internal (attoparsecParseJSON,rightToMaybe)
 import Control.Monad
 import Data.Text.Internal (Text(..))
 import Control.Monad.ST
+import Data.Coerce (coerce)
+import Unsafe.Coerce (unsafeCoerce)
 import Data.ByteString (ByteString)
+import Data.Vector.Generic.Mutable      (MVector(..))
+import Control.Monad.Primitive          (PrimMonad,PrimState)
+import qualified Data.Vector.Unboxed    as UVector
 import qualified Data.ByteString.Char8  as BC8
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Unsafe as ByteString
@@ -112,6 +121,30 @@ instance FromJSON IPv4Range where
       Left err  -> fail err
       Right res -> return res
   parseJSON _ = mzero
+
+newtype instance UVector.MVector s IPv4 = MV_IPv4 (UVector.MVector s Word32)
+
+instance MVector UVector.MVector IPv4 where
+  basicLength = coerce (basicLength :: UVector.MVector s Word32 -> Int)
+  basicUnsafeSlice = coerce (basicUnsafeSlice :: Int -> Int -> UVector.MVector s Word32 -> UVector.MVector s Word32)
+  basicInitialize :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> m ()
+  basicInitialize = coerce (basicInitialize :: PrimMonad m => UVector.MVector (PrimState m) Word32 -> m ())
+  basicUnsafeReplicate :: forall m. PrimMonad m => Int -> IPv4 -> m (UVector.MVector (PrimState m) IPv4)
+  basicUnsafeReplicate i (IPv4 w) = fmap coerce (basicUnsafeReplicate i w :: m (UVector.MVector (PrimState m) Word32))
+  basicUnsafeRead :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> Int -> m IPv4
+  basicUnsafeRead v i = fmap coerce (basicUnsafeRead (coerce v :: UVector.MVector (PrimState m) Word32) i :: m Word32)
+  basicUnsafeWrite :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> Int -> IPv4 -> m ()
+  basicUnsafeWrite = coerce (basicUnsafeWrite :: UVector.MVector (PrimState m) Word32 -> Int -> Word32 -> m ())
+  basicClear :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> m ()
+  basicClear = coerce (basicClear :: UVector.MVector (PrimState m) Word32 -> m ())
+  basicSet :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> IPv4 -> m ()
+  basicSet = coerce (basicSet :: UVector.MVector (PrimState m) Word32 -> Word32 -> m ())
+  basicUnsafeCopy :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> UVector.MVector (PrimState m) IPv4 -> m ()
+  basicUnsafeCopy = coerce (basicUnsafeCopy :: UVector.MVector (PrimState m) Word32 -> UVector.MVector (PrimState m) Word32 -> m ())
+  basicUnsafeMove :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> UVector.MVector (PrimState m) IPv4 -> m ()
+  basicUnsafeMove = coerce (basicUnsafeMove :: UVector.MVector (PrimState m) Word32 -> UVector.MVector (PrimState m) Word32 -> m ())
+  basicUnsafeGrow :: forall m. PrimMonad m => UVector.MVector (PrimState m) IPv4 -> Int -> m (UVector.MVector (PrimState m) IPv4)
+  basicUnsafeGrow (MV_IPv4 v) i = fmap coerce (basicUnsafeGrow v i)
 
 mask :: Word8 -> Word32
 mask = complement . shiftR 0xffffffff . fromIntegral
