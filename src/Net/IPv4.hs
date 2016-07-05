@@ -19,6 +19,10 @@ module Net.IPv4
   ( -- * Types
     IPv4(..)
   , IPv4Range(..)
+    -- * Range functions
+  , mask
+  , normalize
+  , member
     -- * Conversion Functions
   , fromOctets
   , fromOctets'
@@ -85,8 +89,20 @@ instance FromJSON IPv4Range where
       Right res -> return res
   parseJSON _ = mzero
 
--- mask :: Int -> IPv4
--- mask w = IPv4 $ complement $ 0xffffffff `shiftR` w
+mask :: Word8 -> Word32
+mask = complement . shiftR 0xffffffff . fromIntegral
+
+normalizeInternal :: Word8 -> Word32 -> Word32
+normalizeInternal len w = w .&. mask len
+
+normalize :: IPv4Range -> IPv4Range
+normalize (IPv4Range (IPv4 w) len) = IPv4Range (IPv4 (normalizeInternal len w)) len
+
+member :: IPv4Range -> IPv4 -> Bool
+member (IPv4Range (IPv4 wsubnet) len) =
+  let theMask = mask len
+      wsubnetNormalized = wsubnet .&. theMask
+   in \(IPv4 w) -> (w .&. theMask) == wsubnetNormalized
 
 fromDotDecimalText' :: Text -> Either String IPv4
 fromDotDecimalText' t =
