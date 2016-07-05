@@ -25,11 +25,18 @@ module Net.IPv4
   , member
   , lowerInclusive
   , upperInclusive
+    -- * Private Ranges
+  , private24
+  , private20
+  , private16
     -- * Conversion Functions
   , fromOctets
   , fromOctets'
   , toOctets
-    -- * Encoding and Decoding Functions
+    -- * Internal Functions
+    -- $internal
+  , prAddr
+  , prRange
   , fromDotDecimalText
   , fromDotDecimalText'
   , rangeFromDotDecimalText'
@@ -42,6 +49,7 @@ module Net.IPv4
   ) where
 
 import qualified Data.Text.Lazy         as LText
+import qualified Data.Text.IO           as Text
 import qualified Data.Text.Lazy.Builder as TBuilder
 import Data.Text.Lazy.Builder.Int (decimal)
 import Data.Monoid ((<>))
@@ -65,6 +73,16 @@ import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Array        as TArray
 
+-- $setup
+--
+-- These are here to get doctest's property checking to work
+--
+-- >>> import Test.QuickCheck (Arbitrary(..))
+-- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
+-- >>> instance Arbitrary IPv4Range where { arbitrary = IPv4Range <$> arbitrary <*> arbitrary }
+--
+
+-- | A 32-bit Internet Protocol address.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic)
 
@@ -101,17 +119,66 @@ mask = complement . shiftR 0xffffffff . fromIntegral
 -- normalizeInternal :: Word8 -> Word32 -> Word32
 -- normalizeInternal len w = w .&. mask len
 
+-- | Normalize an 'IPv4Range'. The first result of this is that the
+-- 'IPv4' inside the 'IPv4Range' is changed so that the insignificant
+-- bits are zeroed out. For example:
+--
+-- >>> prRange $ normalize $ IPv4Range (fromOctets 192 168 1 19) 24
+-- 192.168.1.0/24
+-- >>> prRange $ normalize $ IPv4Range (fromOctets 192 168 1 163) 28
+-- 192.168.1.160/28
+--
+-- The second effect of this is that the mask length is lowered to
+-- be 32 or smaller. Working with 'IPv4Range's that have not been
+-- normalized does not cause any issues for this library, although
+-- other applications may reject such ranges (especially those with
+-- a mask length above 32).
+--
+-- Note that 'normalize' is idempotent, that is:
+--
+-- prop> normalize r == (normalize . normalize) r
 normalize :: IPv4Range -> IPv4Range
 normalize (IPv4Range (IPv4 w) len) =
   let len' = min len 32
       w' = w .&. mask len'
    in IPv4Range (IPv4 w') len'
 
-member :: IPv4Range -> IPv4 -> Bool
-member (IPv4Range (IPv4 wsubnet) len) =
+-- | Checks to see if an 'IPv4' address belongs in the 'IPv4Range'.
+--
+-- >>> let ip = fromOctets 10 10 1 92
+-- >>> contains (IPv4Range (fromOctets 10 0 0 0) 8) ip
+-- True
+-- >>> contains (IPv4Range (fromOctets 10 11 0 0) 16) ip
+-- False
+--
+-- Typically, element-testing functions are written to take the element
+-- as the first argument and the set as the second argument. This is intentionally
+-- written the other way for better performance when iterating over a collection.
+-- For example, you might test elements in a list for membership like this:
+--
+-- >>> let r = IPv4Range (fromOctets 10 10 10 6) 31
+-- >>> mapM_ (print . contains r) (take 5 $ iterate succ $ fromOctets 10 10 10 5)
+-- False
+-- True
+-- True
+-- False
+-- False
+--
+-- The implementation of 'contains' ensures that (with GHC), the bitmask
+-- creation and range normalization only occur once in the above example.
+-- They are reused as the list is iterated.
+contains :: IPv4Range -> IPv4 -> Bool
+contains (IPv4Range (IPv4 wsubnet) len) =
   let theMask = mask len
       wsubnetNormalized = wsubnet .&. theMask
    in \(IPv4 w) -> (w .&. theMask) == wsubnetNormalized
+
+-- | This is provided to mirror the interface provided by @Data.Set@. It
+-- behaves just like 'contains' but with flipped arguments.
+--
+-- prop> member ip r == contains r ip
+member :: IPv4 -> IPv4Range -> Bool
+member = flip contains
 
 lowerInclusive :: IPv4Range -> IPv4
 lowerInclusive (IPv4Range (IPv4 w) len) =
@@ -122,6 +189,18 @@ upperInclusive (IPv4Range (IPv4 w) len) =
   let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
       theMask = complement theInvertedMask
    in IPv4 ((w .&. theMask) .|. theInvertedMask)
+
+-- | The RFC1918 24-bit block. Subnet mask: @10.0.0.0/8@
+private24 :: IPv4Range
+private24 = IPv4Range (fromOctets 10 0 0 0) 8
+
+-- | The RFC1918 20-bit block. Subnet mask: @172.16.0.0/12@
+private20 :: IPv4Range
+private20  = IPv4Range (fromOctets 172 16 0 0) 12
+
+-- | The RFC1918 16-bit block. Subnet mask: @192.168.0.0/16@
+private16 :: IPv4Range
+private16 = IPv4Range (fromOctets 192 168 0 0) 16
 
 fromDotDecimalText' :: Text -> Either String IPv4
 fromDotDecimalText' t =
@@ -165,12 +244,24 @@ dotDecimalParser = fromOctets'
       then fail "All octets in an ip address must be between 0 and 255"
       else return i
 
+-- | Create an 'IPv4' address from four octets. The first argument
+--   is the most significant octet. The last argument is the least
+--   significant.
+--
+--   Since the 'Show' and 'Read' instances for 'IPv4' are not generally
+--   usefully, this function is the recommened way to create 'IPv4' addresses.
+--   For example:
+--
+--   >>> fromOctets 192 168 1 1
+--   IPv4 {getIPv4 = 3232235777}
+--
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> IPv4
 fromOctets a b c d = fromOctets'
   (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
 
 -- | This is sort of a misnomer. It takes Word32 to make
---   dotDecimalParser probably perform better.
+--   dotDecimalParser probably perform better. This is mostly
+--   for internal use.
 fromOctets' :: Word32 -> Word32 -> Word32 -> Word32 -> IPv4
 fromOctets' a b c d = IPv4
     ( shiftL a 24
@@ -179,6 +270,9 @@ fromOctets' a b c d = IPv4
   .|. d
     )
 
+-- | Convert an 'IPv4' address into a quadruple of octets. The first
+--   element in the quadruple is the most significant octet. The last
+--   element is the least significant octet.
 toOctets :: IPv4 -> (Word8,Word8,Word8,Word8)
 toOctets (IPv4 w) =
   ( fromIntegral (shiftR w 24)
@@ -186,6 +280,20 @@ toOctets (IPv4 w) =
   , fromIntegral (shiftR w 8)
   , fromIntegral w
   )
+
+-- | $internal
+-- Everything below here is not part of the stable API. Many of these
+-- functions must live here because they are needed for the 'ToJSON' and
+-- 'FromJSON' instances. Hopefully, at some point, these can be removed
+-- from this module.
+
+-- | This only exists for doctests. Do not use it.
+prAddr :: IPv4 -> IO ()
+prAddr = Text.putStrLn . toDotDecimalText
+
+-- | This only exists for doctests. Do not use it.
+prRange :: IPv4Range -> IO ()
+prRange = Text.putStrLn . rangeToDotDecimalText
 
 toDotDecimalText :: IPv4 -> Text
 toDotDecimalText = toTextPreAllocated

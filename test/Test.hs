@@ -1,6 +1,3 @@
- {-# LANGUAGE StandaloneDeriving         #-}
- {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Main (main) where
 
 import Naive
@@ -17,6 +14,7 @@ import qualified Net.IPv4.ByteString.Char8 as IPv4_ByteString
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as Mac_Text
 
+import ArbitraryInstances ()
 import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
@@ -61,18 +59,6 @@ tests =
     , testProperty "Range contains self" propRangeSelf
     ]
   ]
-
-deriving instance Arbitrary IPv4
-
--- This instance can generate masks that exceed the recommended
--- length of 32.
-instance Arbitrary IPv4Range where
-  arbitrary = fmap fromTuple arbitrary
-    where fromTuple (a,b) = IPv4Range a b
-
-instance Arbitrary Mac where
-  arbitrary = fmap fromTuple arbitrary
-    where fromTuple (a,b) = Mac a b
 
 propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
 propEncodeDecodeIso f g a = g (f a) == Just a
