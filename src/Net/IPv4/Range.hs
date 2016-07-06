@@ -1,6 +1,7 @@
 module Net.IPv4.Range
   ( -- * Range functions
     normalize
+  , contains
   , member
   , lowerInclusive
   , upperInclusive
