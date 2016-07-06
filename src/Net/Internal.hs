@@ -15,6 +15,7 @@ import qualified Data.ByteString.Char8  as BC8
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.Text.Lazy.Builder as TBuilder
+import qualified Data.Text.Lazy.Builder.Int as TBuilder
 
 attoparsecParseJSON :: AT.Parser a -> Aeson.Value -> Aeson.Parser a
 attoparsecParseJSON p v =
@@ -207,4 +208,48 @@ mask32 = 0xFFFFFFFF
 -- r1,r2,r3,r4,r5,r6 :: Word32
 -- r1 = fromOctets' 0 0 0 0
 
+macTextParser :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> AT.Parser a
+macTextParser f = f
+  <$> (AT.hexadecimal >>= limitSize)
+  <*  AT.char ':'
+  <*> (AT.hexadecimal >>= limitSize)
+  <*  AT.char ':'
+  <*> (AT.hexadecimal >>= limitSize)
+  <*  AT.char ':'
+  <*> (AT.hexadecimal >>= limitSize)
+  <*  AT.char ':'
+  <*> (AT.hexadecimal >>= limitSize)
+  <*  AT.char ':'
+  <*> (AT.hexadecimal >>= limitSize)
+  where
+  limitSize i =
+    if i > 255
+      then fail "All octets in a mac address must be between 00 and FF"
+      else return i
+
+macToText :: Word16 -> Word32 -> Text
+macToText a b = LText.toStrict (TBuilder.toLazyText (macToTextBuilder a b))
+
+macToTextBuilder :: Word16 -> Word32 -> TBuilder.Builder
+macToTextBuilder a b =
+  TBuilder.hexadecimal (255 .&. shiftR a 8 )
+  <> colon
+  <> TBuilder.hexadecimal (255 .&. a )
+  <> colon
+  <> TBuilder.hexadecimal (255 .&. shiftR b 24 )
+  <> colon
+  <> TBuilder.hexadecimal (255 .&. shiftR b 16 )
+  <> colon
+  <> TBuilder.hexadecimal (255 .&. shiftR b 8 )
+  <> colon
+  <> TBuilder.hexadecimal (255 .&. b)
+  where colon = TBuilder.singleton ':'
+
+macFromText :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Maybe a
+macFromText f = rightToMaybe . macFromText' f
+{-# INLINE macFromText #-}
+
+macFromText' :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Either String a
+macFromText' f = AT.parseOnly (macTextParser f <* AT.endOfInput)
+{-# INLINE macFromText' #-}
 

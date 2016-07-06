@@ -1,8 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 {-| An IPv4 data type
 
     This module provides the IPv4 data type and functions for working
@@ -49,7 +44,6 @@ import Control.Monad.Primitive          (PrimMonad,PrimState)
 import qualified Net.Internal           as Internal
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Text.IO           as Text
-import qualified Data.Vector.Unboxed    as UVector
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Unsafe as ByteString
 

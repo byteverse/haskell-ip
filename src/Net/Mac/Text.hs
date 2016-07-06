@@ -6,24 +6,25 @@ module Net.Mac.Text
   , parser
   ) where
 
-import Net.Mac
+import Net.Types (Mac(..))
+import Net.Mac (fromOctetsNoCast)
 import Data.Text (Text)
-import Net.Internal (rightToMaybe)
+import qualified Net.Internal as Internal
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Text.Lazy.Builder as TBuilder
 
 encode :: Mac -> Text
-encode = toText
+encode (Mac a b) = Internal.macToText a b
 
 decodeEither :: Text -> Either String Mac
-decodeEither = fromText'
+decodeEither = Internal.macFromText' fromOctetsNoCast
 
 decode :: Text -> Maybe Mac
-decode = rightToMaybe . decodeEither
+decode = Internal.rightToMaybe . decodeEither
 
 builder :: Mac -> TBuilder.Builder
-builder = toTextBuilder
+builder (Mac a b) = Internal.macToTextBuilder a b
 
 parser :: AT.Parser Mac
-parser = textParser
+parser = Internal.macTextParser fromOctetsNoCast
 

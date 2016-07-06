@@ -5,7 +5,8 @@ module Net.Mac.ByteString.Char8
   , parser
   ) where
 
-import Net.Mac
+import Net.Types (Mac(..))
+import Net.Mac (fromOctetsNoCast)
 import Data.ByteString (ByteString)
 import Data.Attoparsec.ByteString.Char8 (Parser)
 import Data.ByteString.Lazy.Builder (Builder)
@@ -28,7 +29,7 @@ builder :: Mac -> Builder
 builder = Builder.byteString . encode
 
 parser :: Parser Mac
-parser = fromOctets'
+parser = fromOctetsNoCast
   <$> (AB.hexadecimal >>= limitSize)
   <*  AB.char ':'
   <*> (AB.hexadecimal >>= limitSize)
