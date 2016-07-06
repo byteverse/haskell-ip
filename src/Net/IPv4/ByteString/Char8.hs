@@ -6,8 +6,11 @@ module Net.IPv4.ByteString.Char8
   , parser
   ) where
 
+import Net.Types (IPv4(..))
 import Net.IPv4
 import Control.Monad
+import Data.Coerce (coerce)
+import qualified Net.Internal as Internal
 import qualified Net.IPv4.Text as IPv4Text
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import qualified Data.ByteString.Builder as Builder
@@ -102,7 +105,7 @@ builder :: IPv4 -> Builder
 builder = Builder.byteString . encode
 
 parser :: Parser IPv4
-parser = fromOctets'
+parser = coerce $ Internal.fromOctets'
   <$> (AB.decimal >>= limitSize)
   <*  AB.char '.'
   <*> (AB.decimal >>= limitSize)

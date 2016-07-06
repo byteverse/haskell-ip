@@ -5,7 +5,7 @@ module ArbitraryInstances where
 
 -- Orphan instances that are needed to make QuickCheck work.
 
-import Net.IPv4 (IPv4(..),IPv4Range(..))
+import Net.Types (IPv4(..),IPv4Range(..))
 import Net.Mac (Mac(..))
 import Test.QuickCheck (Arbitrary(..))
 

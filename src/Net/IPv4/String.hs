@@ -2,7 +2,7 @@
 -- 'String' representation of an 'IPv4' address. Using this module
 -- is discouraged unless the end user is working with a library
 -- that can only use 'String' to deal with textual data (such as
--- @pandoc@ or @hxr@).
+-- @pandoc@, @hxr@, or @network@).
 --
 module Net.IPv4.String
   ( encode
@@ -10,7 +10,7 @@ module Net.IPv4.String
   , decodeEither
   ) where
 
-import Net.IPv4
+import Net.Types (IPv4(..))
 import qualified Data.Text as Text
 import qualified Net.IPv4.Text as N
 

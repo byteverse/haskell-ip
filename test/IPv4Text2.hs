@@ -1,11 +1,10 @@
 module IPv4Text2 where
 
-import Net.IPv4 (IPv4(..))
+import Net.Types (IPv4(..))
 import Data.Text (Text)
 import qualified Net.IPv4 as IPv4
 import qualified Data.Text as Text
 import Text.Read (readMaybe)
-import Net.IPv4 (IPv4(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Data.Monoid ((<>))
 import Data.Text.Lazy.Builder.Int (decimal)

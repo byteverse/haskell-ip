@@ -6,9 +6,10 @@ import Test.QuickCheck                      (Gen, Arbitrary(..), choose)
 import Test.Framework                       (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
-import Net.IPv4 (IPv4(..),IPv4Range(..))
+import Net.Types (IPv4(..),IPv4Range(..))
 import Net.Mac (Mac(..))
 import qualified Net.IPv4 as IPv4
+import qualified Net.IPv4.Range as IPv4Range
 import qualified Net.IPv4.Text as IPv4_Text
 import qualified Net.IPv4.ByteString.Char8 as IPv4_ByteString
 import qualified Net.Mac as Mac
@@ -53,7 +54,7 @@ tests =
     ]
   , testGroup "IP Range Operations"
     [ testProperty "Idempotence of normalizing IPv4 range"
-        $ propIdempotence IPv4.normalize
+        $ propIdempotence IPv4Range.normalize
     , testProperty "Normalize does not affect membership" propNormalizeMember
     , testProperty "Membership agrees with bounds" propMemberUpperLower
     , testProperty "Range contains self" propRangeSelf
@@ -70,12 +71,12 @@ propIdempotence :: Eq a => (a -> a) -> a -> Bool
 propIdempotence f a = f a == f (f a)
 
 propNormalizeMember :: IPv4 -> IPv4Range -> Bool
-propNormalizeMember i r = IPv4.member r i == IPv4.member (IPv4.normalize r) i
+propNormalizeMember i r = IPv4Range.member i r == IPv4Range.member i (IPv4Range.normalize r)
 
 propMemberUpperLower :: IPv4 -> IPv4Range -> Bool
 propMemberUpperLower i r =
-  (i >= IPv4.lowerInclusive r && i <= IPv4.upperInclusive r) == IPv4.member r i
+  (i >= IPv4Range.lowerInclusive r && i <= IPv4Range.upperInclusive r) == IPv4Range.member i r
 
 propRangeSelf :: IPv4Range -> Bool
-propRangeSelf r = IPv4.member r (IPv4.ipv4RangeBase r) == True
+propRangeSelf r = IPv4Range.member (ipv4RangeBase r) r == True
 

@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Criterion.Main
-import Net.IPv4 (IPv4(..))
+import Net.Types (IPv4(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Data.Monoid ((<>))
 import Data.Text.Lazy.Builder.Int (decimal)

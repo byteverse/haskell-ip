@@ -1,5 +1,6 @@
 module IPv4ByteString1 where
 
+import Net.Types (IPv4(..))
 import Net.IPv4
 
 import Data.ByteString.Internal as I
