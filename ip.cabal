@@ -1,5 +1,5 @@
 name:                ip
-version:             0.8.1
+version:             0.8.2
 synopsis:            Library for IP and MAC addresses
 description:         Please see README.md
 homepage:            https://github.com/andrewthad/haskell-ip#readme
@@ -20,6 +20,7 @@ library
     Net.Mac.ByteString.Char8
     Net.IPv4
     Net.IPv4.Range
+    Net.IPv4.Range.Text
     Net.IPv4.String
     Net.IPv4.Text
     Net.IPv4.ByteString.Char8
@@ -49,6 +50,8 @@ test-suite test
     , QuickCheck
     , text
     , bytestring
+    , HUnit
+    , test-framework-hunit
   other-modules:
     ArbitraryInstances
     Naive
@@ -77,10 +80,13 @@ benchmark criterion
     , criterion
     , text
     , bytestring
+    , attoparsec
   other-modules:
     Naive
     IPv4Text1
     IPv4Text2
+    IPv4DecodeText1
+    IPv4DecodeText2
     IPv4ByteString1
   ghc-options:         -Wall -O2
   default-language:    Haskell2010

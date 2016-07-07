@@ -11,6 +11,7 @@ module Net.Types
   ( IPv4(..)
   , IPv4Range(..)
   , Mac(..)
+  , MacEncoding(..)
   ) where
 
 import qualified Net.Internal         as Internal
@@ -48,34 +49,17 @@ data IPv4Range = IPv4Range
   , ipv4RangeLength :: {-# UNPACK #-} !Word8
   } deriving (Eq,Ord,Show,Read,Generic)
 
-instance Hashable IPv4Range
-
-instance ToJSON IPv4 where
-  toJSON (IPv4 addr) = Aeson.String (Internal.toDotDecimalText addr)
-
-instance FromJSON IPv4 where
-  parseJSON = Internal.attoparsecParseJSON
-    (coerce (Internal.dotDecimalParser <* AT.endOfInput))
-
-instance ToJSON IPv4Range where
-  toJSON (IPv4Range (IPv4 addr) range) = Aeson.String (Internal.rangeToDotDecimalText addr range)
-
-instance FromJSON IPv4Range where
-  parseJSON (Aeson.String t) =
-    case Internal.rangeFromDotDecimalText' mkIPv4Range t of
-      Left err  -> fail err
-      Right res -> return res
-  parseJSON _ = mzero
-
-mkIPv4Range :: Word32 -> Word8 -> IPv4Range
-mkIPv4Range w len = IPv4Range (IPv4 w) len
-{-# INLINE mkIPv4Range #-}
-
+-- | A 48-bit MAC address.
 data Mac = Mac
   { macA :: {-# UNPACK #-} !Word16
   , macB :: {-# UNPACK #-} !Word32
   }
   deriving (Eq,Ord,Show,Read,Generic)
+
+data MacEncoding = MacEncoding
+  { macEncodingSeparator :: {-# UNPACK #-} !Word8 -- ^ ASCII value of the separator
+  , macEncodingUpperCase :: {-# UNPACK #-} !Bool
+  } deriving (Eq,Ord,Show,Read,Generic)
 
 instance Hashable Mac
 
@@ -91,6 +75,28 @@ macFromOctets' a b c d e f = Mac
     ( shiftL a 8 .|. b )
     ( shiftL c 24 .|. shiftL d 16 .|. shiftL e 8 .|. f )
 {-# INLINE macFromOctets' #-}
+
+instance Hashable IPv4Range
+
+instance ToJSON IPv4 where
+  toJSON (IPv4 addr) = Aeson.String (Internal.toDotDecimalText addr)
+
+instance FromJSON IPv4 where
+  parseJSON = Aeson.withText "IPv4" (Internal.eitherToAesonParser . coerce Internal.decodeIPv4TextEither)
+
+instance ToJSON IPv4Range where
+  toJSON (IPv4Range (IPv4 addr) range) = Aeson.String (Internal.rangeToDotDecimalText addr range)
+
+instance FromJSON IPv4Range where
+  parseJSON (Aeson.String t) =
+    case Internal.rangeFromDotDecimalText' mkIPv4Range t of
+      Left err  -> fail err
+      Right res -> return res
+  parseJSON _ = mzero
+
+mkIPv4Range :: Word32 -> Word8 -> IPv4Range
+mkIPv4Range w len = IPv4Range (IPv4 w) len
+{-# INLINE mkIPv4Range #-}
 
 newtype instance UVector.MVector s IPv4 = MV_IPv4 (PVector.MVector s IPv4)
 newtype instance UVector.Vector IPv4 = V_IPv4 (PVector.Vector IPv4)
