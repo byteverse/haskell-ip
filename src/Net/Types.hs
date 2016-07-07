@@ -17,6 +17,8 @@ import qualified Net.Internal         as Internal
 import qualified Data.Aeson           as Aeson
 import qualified Data.Aeson.Types     as Aeson
 import qualified Data.Attoparsec.Text as AT
+-- import qualified Data.Vector.Generic            as G
+-- import qualified Data.Vector.Generic.Mutable    as M
 import qualified Data.Vector.Generic            as GVector
 import qualified Data.Vector.Unboxed            as UVector
 import qualified Data.Vector.Primitive          as PVector
@@ -69,6 +71,27 @@ mkIPv4Range :: Word32 -> Word8 -> IPv4Range
 mkIPv4Range w len = IPv4Range (IPv4 w) len
 {-# INLINE mkIPv4Range #-}
 
+data Mac = Mac
+  { macA :: {-# UNPACK #-} !Word16
+  , macB :: {-# UNPACK #-} !Word32
+  }
+  deriving (Eq,Ord,Show,Read,Generic)
+
+instance Hashable Mac
+
+instance ToJSON Mac where
+  toJSON (Mac a b) = Aeson.String (Internal.macToText a b)
+
+instance FromJSON Mac where
+  parseJSON = Internal.attoparsecParseJSON
+    (Internal.macTextParser macFromOctets' <* AT.endOfInput)
+
+macFromOctets' :: Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> Mac
+macFromOctets' a b c d e f = Mac
+    ( shiftL a 8 .|. b )
+    ( shiftL c 24 .|. shiftL d 16 .|. shiftL e 8 .|. f )
+{-# INLINE macFromOctets' #-}
+
 newtype instance UVector.MVector s IPv4 = MV_IPv4 (PVector.MVector s IPv4)
 newtype instance UVector.Vector IPv4 = V_IPv4 (PVector.Vector IPv4)
 
@@ -116,23 +139,210 @@ instance GVector.Vector UVector.Vector IPv4 where
   basicUnsafeCopy (MV_IPv4 mv) (V_IPv4 v) = GVector.basicUnsafeCopy mv v
   elemseq _ = seq
 
-data Mac = Mac
-  { macA :: {-# UNPACK #-} !Word16
-  , macB :: {-# UNPACK #-} !Word32
-  }
-  deriving (Eq,Ord,Show,Read,Generic)
+data instance MUVector.MVector s IPv4Range
+    = MV_IPv4Range {-# UNPACK #-} !Int !(MUVector.MVector s IPv4)
+                                       !(MUVector.MVector s Word8)
+data instance UVector.Vector IPv4Range
+    = V_IPv4Range {-# UNPACK #-} !Int !(UVector.Vector IPv4)
+                                      !(UVector.Vector Word8)
+instance UVector.Unbox IPv4Range
+instance MGVector.MVector MUVector.MVector IPv4Range where
+  {-# INLINE basicLength  #-}
+  basicLength (MV_IPv4Range n_ as bs) = n_
+  {-# INLINE basicUnsafeSlice  #-}
+  basicUnsafeSlice i_ m_ (MV_IPv4Range n_ as bs)
+      = MV_IPv4Range m_ (MGVector.basicUnsafeSlice i_ m_ as)
+                        (MGVector.basicUnsafeSlice i_ m_ bs)
+  {-# INLINE basicOverlaps  #-}
+  basicOverlaps (MV_IPv4Range n_1 as1 bs1) (MV_IPv4Range n_2 as2 bs2)
+      = MGVector.basicOverlaps as1 as2
+        || MGVector.basicOverlaps bs1 bs2
+  {-# INLINE basicUnsafeNew  #-}
+  basicUnsafeNew n_
+      = do
+          as <- MGVector.basicUnsafeNew n_
+          bs <- MGVector.basicUnsafeNew n_
+          return $ MV_IPv4Range n_ as bs
+  {-# INLINE basicUnsafeReplicate  #-}
+  basicUnsafeReplicate n_ (IPv4Range a b)
+      = do
+          as <- MGVector.basicUnsafeReplicate n_ a
+          bs <- MGVector.basicUnsafeReplicate n_ b
+          return $ MV_IPv4Range n_ as bs
+  {-# INLINE basicUnsafeRead  #-}
+  basicUnsafeRead (MV_IPv4Range n_ as bs) i_
+      = do
+          a <- MGVector.basicUnsafeRead as i_
+          b <- MGVector.basicUnsafeRead bs i_
+          return (IPv4Range a b)
+  {-# INLINE basicUnsafeWrite  #-}
+  basicUnsafeWrite (MV_IPv4Range n_ as bs) i_ (IPv4Range a b)
+      = do
+          MGVector.basicUnsafeWrite as i_ a
+          MGVector.basicUnsafeWrite bs i_ b
+  {-# INLINE basicClear  #-}
+  basicClear (MV_IPv4Range n_ as bs)
+      = do
+          MGVector.basicClear as
+          MGVector.basicClear bs
+  {-# INLINE basicSet  #-}
+  basicSet (MV_IPv4Range n_ as bs) (IPv4Range a b)
+      = do
+          MGVector.basicSet as a
+          MGVector.basicSet bs b
+  {-# INLINE basicUnsafeCopy  #-}
+  basicUnsafeCopy (MV_IPv4Range n_1 as1 bs1) (MV_IPv4Range n_2 as2
+                                                               bs2)
+      = do
+          MGVector.basicUnsafeCopy as1 as2
+          MGVector.basicUnsafeCopy bs1 bs2
+  {-# INLINE basicUnsafeMove  #-}
+  basicUnsafeMove (MV_IPv4Range n_1 as1 bs1) (MV_IPv4Range n_2 as2
+                                                               bs2)
+      = do
+          MGVector.basicUnsafeMove as1 as2
+          MGVector.basicUnsafeMove bs1 bs2
+  {-# INLINE basicUnsafeGrow  #-}
+  basicUnsafeGrow (MV_IPv4Range n_ as bs) m_
+      = do
+          as' <- MGVector.basicUnsafeGrow as m_
+          bs' <- MGVector.basicUnsafeGrow bs m_
+          return $ MV_IPv4Range (m_+n_) as' bs'
+instance GVector.Vector UVector.Vector IPv4Range where
+  {-# INLINE basicUnsafeFreeze  #-}
+  basicUnsafeFreeze (MV_IPv4Range n_ as bs)
+      = do
+          as' <- GVector.basicUnsafeFreeze as
+          bs' <- GVector.basicUnsafeFreeze bs
+          return $ V_IPv4Range n_ as' bs'
+  {-# INLINE basicUnsafeThaw  #-}
+  basicUnsafeThaw (V_IPv4Range n_ as bs)
+      = do
+          as' <- GVector.basicUnsafeThaw as
+          bs' <- GVector.basicUnsafeThaw bs
+          return $ MV_IPv4Range n_ as' bs'
+  {-# INLINE basicLength  #-}
+  basicLength (V_IPv4Range n_ as bs) = n_
+  {-# INLINE basicUnsafeSlice  #-}
+  basicUnsafeSlice i_ m_ (V_IPv4Range n_ as bs)
+      = V_IPv4Range m_ (GVector.basicUnsafeSlice i_ m_ as)
+                       (GVector.basicUnsafeSlice i_ m_ bs)
+  {-# INLINE basicUnsafeIndexM  #-}
+  basicUnsafeIndexM (V_IPv4Range n_ as bs) i_
+      = do
+          a <- GVector.basicUnsafeIndexM as i_
+          b <- GVector.basicUnsafeIndexM bs i_
+          return (IPv4Range a b)
+  {-# INLINE basicUnsafeCopy  #-}
+  basicUnsafeCopy (MV_IPv4Range n_1 as1 bs1) (V_IPv4Range n_2 as2
+                                                              bs2)
+      = do
+          GVector.basicUnsafeCopy as1 as2
+          GVector.basicUnsafeCopy bs1 bs2
+  {-# INLINE elemseq  #-}
+  elemseq _ (IPv4Range a b)
+      = GVector.elemseq (undefined :: UVector.Vector a) a
+        . GVector.elemseq (undefined :: UVector.Vector b) b
 
-instance Hashable Mac
 
-instance ToJSON Mac where
-  toJSON (Mac a b) = Aeson.String (Internal.macToText a b)
-
-instance FromJSON Mac where
-  parseJSON = Internal.attoparsecParseJSON
-    (Internal.macTextParser macFromOctets' <* AT.endOfInput)
-
-macFromOctets' :: Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> Mac
-macFromOctets' a b c d e f = Mac
-    ( shiftL a 8 .|. b )
-    ( shiftL c 24 .|. shiftL d 16 .|. shiftL e 8 .|. f )
-{-# INLINE macFromOctets' #-}
+data instance MUVector.MVector s Mac
+    = MV_Mac {-# UNPACK #-} !Int !(MUVector.MVector s Word16)
+                                 !(MUVector.MVector s Word32)
+data instance UVector.Vector Mac
+    = V_Mac {-# UNPACK #-} !Int !(UVector.Vector Word16)
+                                !(UVector.Vector Word32)
+instance UVector.Unbox Mac
+instance MGVector.MVector MUVector.MVector Mac where
+  {-# INLINE basicLength  #-}
+  basicLength (MV_Mac n_ as bs) = n_
+  {-# INLINE basicUnsafeSlice  #-}
+  basicUnsafeSlice i_ m_ (MV_Mac n_ as bs)
+      = MV_Mac m_ (MGVector.basicUnsafeSlice i_ m_ as)
+                  (MGVector.basicUnsafeSlice i_ m_ bs)
+  {-# INLINE basicOverlaps  #-}
+  basicOverlaps (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
+      = MGVector.basicOverlaps as1 as2
+        || MGVector.basicOverlaps bs1 bs2
+  {-# INLINE basicUnsafeNew  #-}
+  basicUnsafeNew n_
+      = do
+          as <- MGVector.basicUnsafeNew n_
+          bs <- MGVector.basicUnsafeNew n_
+          return $ MV_Mac n_ as bs
+  {-# INLINE basicUnsafeReplicate  #-}
+  basicUnsafeReplicate n_ (Mac a b)
+      = do
+          as <- MGVector.basicUnsafeReplicate n_ a
+          bs <- MGVector.basicUnsafeReplicate n_ b
+          return $ MV_Mac n_ as bs
+  {-# INLINE basicUnsafeRead  #-}
+  basicUnsafeRead (MV_Mac n_ as bs) i_
+      = do
+          a <- MGVector.basicUnsafeRead as i_
+          b <- MGVector.basicUnsafeRead bs i_
+          return (Mac a b)
+  {-# INLINE basicUnsafeWrite  #-}
+  basicUnsafeWrite (MV_Mac n_ as bs) i_ (Mac a b)
+      = do
+          MGVector.basicUnsafeWrite as i_ a
+          MGVector.basicUnsafeWrite bs i_ b
+  {-# INLINE basicClear  #-}
+  basicClear (MV_Mac n_ as bs)
+      = do
+          MGVector.basicClear as
+          MGVector.basicClear bs
+  {-# INLINE basicSet  #-}
+  basicSet (MV_Mac n_ as bs) (Mac a b)
+      = do
+          MGVector.basicSet as a
+          MGVector.basicSet bs b
+  {-# INLINE basicUnsafeCopy  #-}
+  basicUnsafeCopy (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
+      = do
+          MGVector.basicUnsafeCopy as1 as2
+          MGVector.basicUnsafeCopy bs1 bs2
+  {-# INLINE basicUnsafeMove  #-}
+  basicUnsafeMove (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
+      = do
+          MGVector.basicUnsafeMove as1 as2
+          MGVector.basicUnsafeMove bs1 bs2
+  {-# INLINE basicUnsafeGrow  #-}
+  basicUnsafeGrow (MV_Mac n_ as bs) m_
+      = do
+          as' <- MGVector.basicUnsafeGrow as m_
+          bs' <- MGVector.basicUnsafeGrow bs m_
+          return $ MV_Mac (m_+n_) as' bs'
+instance GVector.Vector UVector.Vector Mac where
+  {-# INLINE basicUnsafeFreeze  #-}
+  basicUnsafeFreeze (MV_Mac n_ as bs)
+      = do
+          as' <- GVector.basicUnsafeFreeze as
+          bs' <- GVector.basicUnsafeFreeze bs
+          return $ V_Mac n_ as' bs'
+  {-# INLINE basicUnsafeThaw  #-}
+  basicUnsafeThaw (V_Mac n_ as bs)
+      = do
+          as' <- GVector.basicUnsafeThaw as
+          bs' <- GVector.basicUnsafeThaw bs
+          return $ MV_Mac n_ as' bs'
+  {-# INLINE basicLength  #-}
+  basicLength (V_Mac n_ as bs) = n_
+  {-# INLINE basicUnsafeSlice  #-}
+  basicUnsafeSlice i_ m_ (V_Mac n_ as bs)
+      = V_Mac m_ (GVector.basicUnsafeSlice i_ m_ as)
+                 (GVector.basicUnsafeSlice i_ m_ bs)
+  {-# INLINE basicUnsafeIndexM  #-}
+  basicUnsafeIndexM (V_Mac n_ as bs) i_
+      = do
+          a <- GVector.basicUnsafeIndexM as i_
+          b <- GVector.basicUnsafeIndexM bs i_
+          return (Mac a b)
+  {-# INLINE basicUnsafeCopy  #-}
+  basicUnsafeCopy (MV_Mac n_1 as1 bs1) (V_Mac n_2 as2 bs2)
+      = do
+          GVector.basicUnsafeCopy as1 as2
+          GVector.basicUnsafeCopy bs1 bs2
+  {-# INLINE elemseq  #-}
+  elemseq _ (Mac a b)
+      = GVector.elemseq (undefined :: UVector.Vector a) a
+        . GVector.elemseq (undefined :: UVector.Vector b) b
