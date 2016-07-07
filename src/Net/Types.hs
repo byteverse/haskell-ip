@@ -163,6 +163,11 @@ instance MGVector.MVector MUVector.MVector IPv4Range where
           as <- MGVector.basicUnsafeNew n_
           bs <- MGVector.basicUnsafeNew n_
           return $ MV_IPv4Range n_ as bs
+  {-# INLINE basicInitialize  #-}
+  basicInitialize (MV_IPv4Range _ as bs)
+      = do
+          MGVector.basicInitialize as
+          MGVector.basicInitialize bs
   {-# INLINE basicUnsafeReplicate  #-}
   basicUnsafeReplicate n_ (IPv4Range a b)
       = do
@@ -269,6 +274,11 @@ instance MGVector.MVector MUVector.MVector Mac where
           as <- MGVector.basicUnsafeNew n_
           bs <- MGVector.basicUnsafeNew n_
           return $ MV_Mac n_ as bs
+  {-# INLINE basicInitialize  #-}
+  basicInitialize (MV_Mac _ as bs)
+      = do
+          MGVector.basicInitialize as
+          MGVector.basicInitialize bs
   {-# INLINE basicUnsafeReplicate  #-}
   basicUnsafeReplicate n_ (Mac a b)
       = do
