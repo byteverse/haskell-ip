@@ -1,5 +1,5 @@
 name:                ip
-version:             0.8.2
+version:             0.8.3
 synopsis:            Library for IP and MAC addresses
 description:         Please see README.md
 homepage:            https://github.com/andrewthad/haskell-ip#readme
