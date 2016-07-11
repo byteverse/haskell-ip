@@ -23,6 +23,7 @@ module Net.IPv4
     -- * Range Predicates
   , private
   , reserved
+  , public
   ) where
 
 import Prelude hiding (any)
