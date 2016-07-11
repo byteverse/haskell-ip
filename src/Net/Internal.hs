@@ -1,8 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Net.Internal where
 
 import Data.Monoid ((<>))
 import Data.Word
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
+import Data.Bits ((.&.),(.|.),shiftR,shiftL,shift,complement)
 import Control.Monad.ST
 import Data.Text.Internal (Text(..))
 import Data.ByteString (ByteString)
@@ -231,6 +233,30 @@ fromOctets' a b c d =
   .|. shiftL c 8
   .|. d
     )
+
+-- | Given the size of the mask, return the
+--   total number of ips in the subnet. This
+--   only works for IPv4 addresses because 
+--   an IPv6 subnet can have up to 2^128 
+--   addresses.
+countAddrs :: Word8 -> Word64
+countAddrs w = 
+  let amountToShift = if w > 32
+        then 0
+        else 32 - fromIntegral w
+   in shift 1 amountToShift
+
+wordSuccessors :: Word64 -> Word32 -> [Word32]
+wordSuccessors !w !a = if w > 0
+  then a : wordSuccessors (w - 1) (a + 1)
+  else []
+
+wordSuccessorsM :: MonadPlus m => (Word32 -> a) -> Word64 -> Word32 -> m a
+wordSuccessorsM f = go where
+  go !w !a = if w > 0
+    then mplus (return (f a)) (go (w - 1) (a + 1))
+    else mzero
+{-# INLINE wordSuccessorsM #-}
 
 mask :: Word8 -> Word32
 mask = complement . shiftR 0xffffffff . fromIntegral

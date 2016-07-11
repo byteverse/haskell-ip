@@ -5,6 +5,9 @@ module Net.IPv4.Range
   , member
   , lowerInclusive
   , upperInclusive
+    -- * Conversion to IPv4
+  , toList
+  , toGenerator
     -- * Private Ranges
   , private24
   , private20
@@ -16,6 +19,8 @@ module Net.IPv4.Range
 
 import Net.Types (IPv4(..),IPv4Range(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
+import Data.Coerce (coerce)
+import Control.Monad
 import qualified Net.Internal as Internal
 import qualified Net.IPv4     as IPv4
 import qualified Data.Text.IO as Text
@@ -87,6 +92,25 @@ upperInclusive (IPv4Range (IPv4 w) len) =
   let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
       theMask = complement theInvertedMask
    in IPv4 ((w .&. theMask) .|. theInvertedMask)
+
+-- | Convert an 'IPv4Range' into a list of the 'IPv4' addresses that
+--   are in it.
+-- >>> let r = IPv4Range (fromOctets 192 168 1 8) 30
+-- >>> mapM_ I.print (toList r)
+-- 192.168.1.8
+-- 192.168.1.9
+-- 192.168.1.10
+-- 192.168.1.11
+
+toList :: IPv4Range -> [IPv4]
+toList (IPv4Range (IPv4 ip) len) = 
+  let totalAddrs = Internal.countAddrs len
+   in coerce (Internal.wordSuccessors totalAddrs ip)
+
+toGenerator :: MonadPlus m => IPv4Range -> m IPv4
+toGenerator (IPv4Range (IPv4 ip) len) =  
+  let totalAddrs = Internal.countAddrs len
+   in Internal.wordSuccessorsM IPv4 totalAddrs ip
 
 -- | The RFC1918 24-bit block. Subnet mask: @10.0.0.0/8@
 private24 :: IPv4Range
