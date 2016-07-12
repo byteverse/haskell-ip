@@ -90,7 +90,7 @@ any = IPv4 0
 loopback :: IPv4
 loopback = fromOctets 127 0 0 1
 
--- | The broadcast IP address: @127.0.0.1@
+-- | The broadcast IP address: @255.255.255.255@
 broadcast :: IPv4
 broadcast = fromOctets 255 255 255 255
 
