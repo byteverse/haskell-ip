@@ -20,8 +20,8 @@ description:
   typeclasses of its own. Neither does it prefix functions with the name
   of the type that they work on. Instead, functions of the same name are
   exported by several different modules, and it is expected that end users
-  disambiguate by imported these modules qualified. For example,
-  `Data.IPv4.Text` and `Data.IPv4.ByteString.Char8` have nearly identical
+  disambiguate by importing these modules qualified. For example,
+  `Data.IPv4.ByteString.Char8` and `Data.IPv4.Text` have nearly identical
   export lists.
   .
   The only module intended to be imported unqualified is `Net.Types`. The
@@ -32,6 +32,7 @@ description:
   .
   * `yesod-ip`: Provides orphan instances needed to work with yesod and
     persistent. Also, provides a `yesod-form` helper.
+  .
   * `impure-containers`: Provides a trie that can be used for looking
     up which subnet an IP address belongs in.
 
