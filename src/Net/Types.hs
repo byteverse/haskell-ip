@@ -27,7 +27,7 @@ import qualified Data.Vector.Generic.Mutable    as MGVector
 import qualified Data.Vector.Unboxed.Mutable    as MUVector
 import qualified Data.Vector.Primitive.Mutable  as MPVector
 import Data.Primitive.Types (Prim)
-import Data.Bits ((.|.),shiftL)
+import Data.Bits (Bits,(.|.),shiftL)
 import Data.Coerce (coerce)
 import Control.Monad
 import Data.Word
@@ -38,7 +38,7 @@ import GHC.Generics (Generic)
 
 -- | A 32-bit Internet Protocol address.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
-  deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim)
+  deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits)
 
 -- | The length should be between 0 and 32. These bounds are inclusive.
 --   This expectation is not in any way enforced by this library because

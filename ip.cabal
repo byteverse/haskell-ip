@@ -1,7 +1,6 @@
 name:                ip
-version:             0.8.4
+version:             0.8.5
 synopsis:            Library for IP and MAC addresses
-description:         Please see README.md
 homepage:            https://github.com/andrewthad/haskell-ip#readme
 license:             BSD3
 license-file:        LICENSE
@@ -11,6 +10,30 @@ copyright:           2016 Andrew Martin
 category:            web
 build-type:          Simple
 cabal-version:       >=1.10
+description:
+  The `ip` package provides types and functions for dealing with
+  IPv4 addresses, CIDR blocks, and MAC addresses. We provide instances
+  for typeclasses found in commonly used packages like `aeson`, `vector`,
+  and `hashable`. We also provide `Parser`s for working with attoparsec.
+  .
+  Notably, this package does not overload functions by introducing any
+  typeclasses of its own. Neither does it prefix functions with the name
+  of the type that they work on. Instead, functions of the same name are
+  exported by several different modules, and it is expected that end users
+  disambiguate by imported these modules qualified. For example,
+  `Data.IPv4.Text` and `Data.IPv4.ByteString.Char8` have nearly identical
+  export lists.
+  .
+  The only module intended to be imported unqualified is `Net.Types`. The
+  types in this package should not conflict with the types in
+  any other commonly used packages.
+  .
+  The following packages are intended to be used with this package:
+  .
+  * `yesod-ip`: Provides orphan instances needed to work with yesod and
+    persistent. Also, provides a `yesod-form` helper.
+  * `impure-containers`: Provides a trie that can be used for looking
+    up which subnet an IP address belongs in.
 
 library
   hs-source-dirs:      src
