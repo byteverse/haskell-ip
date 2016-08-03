@@ -12,6 +12,7 @@ module Net.Types
   , IPv4Range(..)
   , Mac(..)
   , MacEncoding(..)
+  , MacDecoding(..)
   ) where
 
 import qualified Net.Internal         as Internal
@@ -61,6 +62,10 @@ data MacEncoding = MacEncoding
   , macEncodingUpperCase :: {-# UNPACK #-} !Bool
   } deriving (Eq,Ord,Show,Read,Generic)
 
+newtype MacDecoding = MacDecoding
+  { macDecodingSeparator :: Maybe Word8
+  }
+
 instance Hashable Mac
 
 instance ToJSON Mac where
@@ -68,7 +73,7 @@ instance ToJSON Mac where
 
 instance FromJSON Mac where
   parseJSON = Internal.attoparsecParseJSON
-    (Internal.macTextParser macFromOctets' <* AT.endOfInput)
+    (Internal.macTextParser (Just ':') macFromOctets' <* AT.endOfInput)
 
 macFromOctets' :: Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> Mac
 macFromOctets' a b c d e f = Mac

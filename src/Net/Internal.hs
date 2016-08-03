@@ -236,11 +236,11 @@ fromOctets' a b c d =
 
 -- | Given the size of the mask, return the
 --   total number of ips in the subnet. This
---   only works for IPv4 addresses because 
---   an IPv6 subnet can have up to 2^128 
+--   only works for IPv4 addresses because
+--   an IPv6 subnet can have up to 2^128
 --   addresses.
 countAddrs :: Word8 -> Word64
-countAddrs w = 
+countAddrs w =
   let amountToShift = if w > 32
         then 0
         else 32 - fromIntegral w
@@ -285,20 +285,23 @@ mask32 = 0xFFFFFFFF
 -- r1,r2,r3,r4,r5,r6 :: Word32
 -- r1 = fromOctets' 0 0 0 0
 
-macTextParser :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> AT.Parser a
-macTextParser f = f
+macTextParser :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> AT.Parser a
+macTextParser separator f = f
   <$> (AT.hexadecimal >>= limitSize)
-  <*  AT.char ':'
+  <*  parseSeparator
   <*> (AT.hexadecimal >>= limitSize)
-  <*  AT.char ':'
+  <*  parseSeparator
   <*> (AT.hexadecimal >>= limitSize)
-  <*  AT.char ':'
+  <*  parseSeparator
   <*> (AT.hexadecimal >>= limitSize)
-  <*  AT.char ':'
+  <*  parseSeparator
   <*> (AT.hexadecimal >>= limitSize)
-  <*  AT.char ':'
+  <*  parseSeparator
   <*> (AT.hexadecimal >>= limitSize)
   where
+  parseSeparator = case separator of
+    Just c -> AT.char c
+    Nothing -> return 'x' -- character is unused
   limitSize i =
     if i > 255
       then fail "All octets in a mac address must be between 00 and FF"
@@ -322,12 +325,13 @@ macToTextBuilder a b =
   <> TBuilder.hexadecimal (255 .&. b)
   where colon = TBuilder.singleton ':'
 
-macFromText :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Maybe a
-macFromText f = rightToMaybe . macFromText' f
+macFromText :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Maybe a
+macFromText separator f = rightToMaybe . macFromText' separator f
 {-# INLINE macFromText #-}
 
-macFromText' :: (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Either String a
-macFromText' f = AT.parseOnly (macTextParser f <* AT.endOfInput)
+macFromText' :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Either String a
+macFromText' separator f =
+  AT.parseOnly (macTextParser separator f <* AT.endOfInput)
 {-# INLINE macFromText' #-}
 
 twoDigits :: ByteString
