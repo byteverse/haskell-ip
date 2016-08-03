@@ -65,7 +65,7 @@ parseTwoHex :: Parser Word8
 parseTwoHex = do
   a <- ABW.anyWord8 >>= parseWord8Hex
   b <- ABW.anyWord8 >>= parseWord8Hex
-  return (unsafeShiftL a 1 + b)
+  return (unsafeShiftL a 4 + b)
 
 parseWord8Hex :: Word8 -> Parser Word8
 parseWord8Hex w
