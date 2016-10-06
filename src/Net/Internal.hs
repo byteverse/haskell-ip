@@ -4,7 +4,7 @@ module Net.Internal where
 
 import Data.Monoid ((<>))
 import Data.Word
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,shift,complement)
+import Data.Bits ((.&.),(.|.),shiftR,shiftL,shift,complement,unsafeShiftR,unsafeShiftL)
 import Control.Monad.ST
 import Data.Text.Internal (Text(..))
 import Data.ByteString (ByteString)
@@ -146,11 +146,11 @@ putMac hexPairs pos w marr = do
 
 macToTextPreAllocated :: Word8 -> Bool -> Word16 -> Word32 -> Text
 macToTextPreAllocated separator' isUpperCase wa wb =
-  let w1 = fromIntegral $ 255 .&. shiftR wa 8
+  let w1 = fromIntegral $ 255 .&. unsafeShiftR wa 8
       w2 = fromIntegral $ 255 .&. wa
-      w3 = fromIntegral $ 255 .&. shiftR wb 24
-      w4 = fromIntegral $ 255 .&. shiftR wb 16
-      w5 = fromIntegral $ 255 .&. shiftR wb 8
+      w3 = fromIntegral $ 255 .&. unsafeShiftR wb 24
+      w4 = fromIntegral $ 255 .&. unsafeShiftR wb 16
+      w5 = fromIntegral $ 255 .&. unsafeShiftR wb 8
       w6 = fromIntegral $ 255 .&. wb
       hexPairs = if isUpperCase then twoHexDigits else twoHexDigitsLower
       separator = fromIntegral separator' :: Word16
@@ -226,12 +226,62 @@ dotDecimalParser = fromOctets'
 -- | This is sort of a misnomer. It takes Word32 to make
 --   dotDecimalParser probably perform better. This is mostly
 --   for internal use.
+--
+--   At some point, it would be worth revisiting the decision
+--   to use 'Word32' here. Using 'Word' would probably give
+--   better performance on a 64-bit processor.
 fromOctets' :: Word32 -> Word32 -> Word32 -> Word32 -> Word32
 fromOctets' a b c d =
     ( shiftL a 24
   .|. shiftL b 16
   .|. shiftL c 8
   .|. d
+    )
+
+fromOctetsV6 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> (Word64,Word64)
+fromOctetsV6 a b c d e f g h i j k l m n o p =
+  ( fromOctetsWord64 a b c d e f g h
+  , fromOctetsWord64 i j k l m n o p
+  )
+
+fromWord16sV6 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> (Word64,Word64)
+fromWord16sV6 a b c d e f g h =
+  ( fromWord16Word64 a b c d
+  , fromWord16Word64 e f g h
+  )
+
+fromWord16Word64 :: Word64 -> Word64 -> Word64 -> Word64 -> Word64
+fromWord16Word64 a b c d = fromIntegral
+    ( unsafeShiftL a 48
+  .|. unsafeShiftL b 32
+  .|. unsafeShiftL c 16
+  .|. d
+    )
+
+-- | All the words given as argument should be
+--   range restricted from 0 to 255. This is not
+--   checked.
+fromOctetsWord64 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64
+fromOctetsWord64 a b c d e f g h = fromIntegral
+    ( shiftL a 56
+  .|. shiftL b 48
+  .|. shiftL c 40
+  .|. shiftL d 32
+  .|. shiftL e 24
+  .|. shiftL f 16
+  .|. shiftL g 8
+  .|. h
     )
 
 -- | Given the size of the mask, return the

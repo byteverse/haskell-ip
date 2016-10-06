@@ -1,5 +1,5 @@
 name:                ip
-version:             0.8.6
+version:             0.8.7
 synopsis:            Library for IP and MAC addresses
 homepage:            https://github.com/andrewthad/haskell-ip#readme
 license:             BSD3
@@ -48,6 +48,8 @@ library
     Net.IPv4.String
     Net.IPv4.Text
     Net.IPv4.ByteString.Char8
+    Net.IPv6
+    Net.IPv6.Text
     Net.Types
     Net.Internal
   build-depends:
@@ -76,6 +78,7 @@ test-suite test
     , bytestring
     , HUnit
     , test-framework-hunit
+    , attoparsec
   other-modules:
     ArbitraryInstances
     Naive

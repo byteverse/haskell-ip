@@ -43,9 +43,9 @@ newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits)
 
 -- | A 128-bit Internet Protocol version 6 address.
-newtype IPv6 = IPv6
-  { ipv6A :: {-# UNPACK #-} !IPv6
-  , ipv6B :: {-# UNPACK #-} !IPv6
+data IPv6 = IPv6
+  { ipv6A :: {-# UNPACK #-} !Word64
+  , ipv6B :: {-# UNPACK #-} !Word64
   } deriving (Eq,Ord,Show,Read)
 
 -- | The length should be between 0 and 32. These bounds are inclusive.

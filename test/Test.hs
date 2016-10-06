@@ -7,15 +7,21 @@ import Test.Framework                       (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.Framework.Providers.HUnit       (testCase)
 import Test.HUnit                           (Assertion,(@?=))
+import Numeric                              (showHex)
+import Data.Word
 
-import Net.Types (IPv4(..),IPv4Range(..),Mac(..))
+import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
 import qualified Data.Text as Text
 import qualified Net.IPv4 as IPv4
+import qualified Net.IPv6 as IPv6
 import qualified Net.IPv4.Range as IPv4Range
 import qualified Net.IPv4.Text as IPv4Text
+import qualified Net.IPv6.Text as IPv6Text
 import qualified Net.IPv4.ByteString.Char8 as IPv4ByteString
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as MacText
+
+import qualified Data.Attoparsec.Text as AT
 
 import ArbitraryInstances ()
 import qualified Naive
@@ -59,6 +65,9 @@ tests =
       [ testProperty "Identical to Naive"
           $ propMatching IPv4ByteString.encode Naive.encodeByteString
       ]
+    , testGroup "IPv6 encode/decode"
+      [ testCase "Parser Test Cases" testIPv6Parser
+      ]
     ]
   , testGroup "IP Range Operations"
     [ testProperty "Idempotence of normalizing IPv4 range"
@@ -92,6 +101,36 @@ testIPv4Decode :: Assertion
 testIPv4Decode = IPv4Text.decode (Text.pack "124.222.255.0")
              @?= Just (IPv4.fromOctets 124 222 255 0)
 
+testIPv6Parser :: Assertion
+testIPv6Parser = do
+  -- Basic test
+  go 0xABCD 0x1234 0xABCD 0x1234 0xDCBA 0x4321 0xFFFF 0xE0E0
+     "ABCD:1234:ABCD:1234:DCBA:4321:FFFF:E0E0"
+  -- Tests that leading zeros can be omitted
+  go 0x1234 0x5678 0x9ABC 0xDEF0 0x0123 0x4567 0x89AB 0xCDEF
+     "1234:5678:9ABC:DEF0:123:4567:89AB:CDEF"
+  -- Test that the IPv6 "any" abbreviation works
+  go 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
+     "::"
+  go 0x1623 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
+     "1623::"
+  go 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0xABCD 0x1234
+     "::ABCD:1234"
+  go 0xAAAA 0x0000 0x0000 0x0000 0x0000 0x0000 0xABCD 0x1234
+     "AAAA::ABCD:1234"
+  go 0xAAAA 0x0000 0x0000 0x0000 0xBBBB 0x0000 0xABCD 0x1234
+     "AAAA::BBBB:0000:ABCD:1234"
+  go 0xAAAA 0x0000 0x0000 0x0000 0xBBBB 0x0000 0xABCD 0x1234
+     "AAAA:0000:0000:0000:BBBB::ABCD:1234"
+  where
+  go a b c d e f g h str =
+    Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
+    @?= fmap HexIPv6
+      (AT.parseOnly
+        (IPv6Text.parser <* AT.endOfInput)
+        (Text.pack str)
+      )
+
 textBadIPv4 :: [String]
 textBadIPv4 =
   [ "122.256.0.0"
@@ -111,4 +150,25 @@ testDecodeFailures = flip map textBadIPv4 $ \str ->
 testMacEncode :: Assertion
 testMacEncode = MacText.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
             @?= Text.pack "ff:00:ab:12:99:0f"
+
+newtype HexIPv6 = HexIPv6 { getHexIPv6 :: IPv6 }
+  deriving (Eq)
+
+instance Show HexIPv6 where
+  showsPrec _ (HexIPv6 v) =
+    let (a,b,c,d,e,f,g,h) = IPv6.toWord16s v
+     in showHex a . showChar ':'
+        . showHex b . showChar ':'
+        . showHex c . showChar ':'
+        . showHex d . showChar ':'
+        . showHex e . showChar ':'
+        . showHex f . showChar ':'
+        . showHex g . showChar ':'
+        . showHex h
+
+newtype Hex a = Hex { getHex :: a }
+
+-- instance (Integral a, Show a) => Show (Hex a) where
+--   show = showHex . getHex
+
 
