@@ -50,6 +50,7 @@ library
     Net.IPv4.ByteString.Char8
     Net.IPv6
     Net.IPv6.Text
+    Net.IP
     Net.Types
     Net.Internal
   build-depends:

@@ -10,6 +10,7 @@
 module Net.Types
   ( IPv4(..)
   , IPv6(..)
+  , IP(..)
   , IPv4Range(..)
   , Mac(..)
   , MacEncoding(..)
@@ -47,6 +48,12 @@ data IPv6 = IPv6
   { ipv6A :: {-# UNPACK #-} !Word64
   , ipv6B :: {-# UNPACK #-} !Word64
   } deriving (Eq,Ord,Show,Read)
+
+-- | A 32-bit 'IPv4' address or a 128-bit 'IPv6' address. Internally, this
+--   is just represented as an 'IPv6' address. The functions provided
+--   in @Net.IP@ help simulate pattern matching on it.
+newtype IP = IP { getIP :: IPv6 }
+  deriving (Eq,Ord,Show,Read)
 
 -- | The length should be between 0 and 32. These bounds are inclusive.
 --   This expectation is not in any way enforced by this library because
