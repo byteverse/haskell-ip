@@ -20,7 +20,7 @@ import qualified Data.Attoparsec.Text as AT
 import qualified Data.Text.Lazy.Builder as TBuilder
 
 encode :: Mac -> Text
-encode (Mac a b) = Internal.macToTextPreAllocated 58 False a b
+encode (Mac a b) = Internal.macToText a b
 
 decodeEitherWith :: MacDecoding -> Text -> Either String Mac
 decodeEitherWith (MacDecoding separator) =
@@ -38,7 +38,7 @@ decodeWith d = Internal.rightToMaybe . decodeEitherWith d
 -- decodeWith ::
 
 builder :: Mac -> TBuilder.Builder
-builder (Mac a b) = Internal.macToTextBuilder a b
+builder (Mac a b) = TBuilder.fromText (Internal.macToText a b)
 
 parser :: AT.Parser Mac
 parser = parserWith defDecoding
