@@ -83,7 +83,7 @@ newtype MacDecoding = MacDecoding
 instance Hashable Mac
 
 instance ToJSON Mac where
-  toJSON (Mac a b) = Aeson.String (Internal.macToText a b)
+  toJSON (Mac a b) = Aeson.String (Internal.macToTextDefault a b)
 
 instance FromJSON Mac where
   parseJSON = Internal.attoparsecParseJSON

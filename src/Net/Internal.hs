@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 
 module Net.Internal where
 
@@ -10,6 +11,8 @@ import Data.Text.Internal (Text(..))
 import Data.ByteString (ByteString)
 import Data.Text.Lazy.Builder.Int (decimal)
 import Control.Monad
+import Text.Printf (printf)
+import Data.Char (chr)
 import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Attoparsec.Text   as AT
@@ -95,11 +98,27 @@ rangeToDotDecimalBuilder addr len =
 --   to do more of the math upfront and allocate less space.
 toTextPreAllocated :: Word32 -> Text
 toTextPreAllocated w =
-  let w1 = fromIntegral $ 255 .&. shiftR w 24
-      w2 = fromIntegral $ 255 .&. shiftR w 16
-      w3 = fromIntegral $ 255 .&. shiftR w 8
-      w4 = fromIntegral $ 255 .&. w
-      dot = 46
+  let w1 = 255 .&. unsafeShiftR (fromIntegral w) 24
+      w2 = 255 .&. unsafeShiftR (fromIntegral w) 16
+      w3 = 255 .&. unsafeShiftR (fromIntegral w) 8
+      w4 = 255 .&. fromIntegral w
+   in toTextPreallocatedPartTwo w1 w2 w3 w4
+
+toTextPreallocatedPartTwo :: Word -> Word -> Word -> Word -> Text
+toTextPreallocatedPartTwo w1 w2 w3 w4 =
+#ifdef ghcjs_HOST_OS
+  let dotStr = "."
+   in Text.pack $ concat
+        [ show w1
+        , "."
+        , show w2
+        , "."
+        , show w3
+        , "."
+        , show w4
+        ]
+#else
+  let dot = 46
       (arr,len) = runST $ do
         marr <- TArray.new 15
         i1 <- putAndCount 0 w1 marr
@@ -117,7 +136,8 @@ toTextPreAllocated w =
         i4 <- putAndCount n3' w4 marr
         theArr <- TArray.unsafeFreeze marr
         return (theArr,i4 + n3')
-  in Text arr 0 len
+   in Text arr 0 len
+#endif
 
 putAndCount :: Int -> Word8 -> TArray.MArray s -> ST s Int
 putAndCount pos w marr
@@ -135,7 +155,7 @@ putAndCount pos w marr
     TArray.unsafeWrite marr (off + 1) $ get3 (j + 1)
     TArray.unsafeWrite marr (off + 2) $ get3 (j + 2)
   get2 = fromIntegral . ByteString.unsafeIndex twoDigits
-  get3 = fromIntegral . ByteString.unsafeIndex threeDigits
+  get3 = fromIntegral . ByteString.unsafeIndex threeDigitsWord8
 
 putMac :: ByteString -> Int -> Int -> TArray.MArray s -> ST s ()
 putMac hexPairs pos w marr = do
@@ -144,15 +164,42 @@ putMac hexPairs pos w marr = do
   TArray.unsafeWrite marr (pos + 1) $ fromIntegral $ ByteString.unsafeIndex hexPairs (i + 1)
 {-# INLINE putMac #-}
 
+macToTextDefault :: Word16 -> Word32 -> Text
+macToTextDefault = macToTextPreAllocated 58 False
+
 macToTextPreAllocated :: Word8 -> Bool -> Word16 -> Word32 -> Text
 macToTextPreAllocated separator' isUpperCase wa wb =
-  let w1 = fromIntegral $ 255 .&. unsafeShiftR wa 8
-      w2 = fromIntegral $ 255 .&. wa
-      w3 = fromIntegral $ 255 .&. unsafeShiftR wb 24
-      w4 = fromIntegral $ 255 .&. unsafeShiftR wb 16
-      w5 = fromIntegral $ 255 .&. unsafeShiftR wb 8
-      w6 = fromIntegral $ 255 .&. wb
-      hexPairs = if isUpperCase then twoHexDigits else twoHexDigitsLower
+  let w1 = 255 .&. unsafeShiftR (fromIntegral wa) 8
+      w2 = 255 .&. fromIntegral wa
+      w3 = 255 .&. unsafeShiftR (fromIntegral wb) 24
+      w4 = 255 .&. unsafeShiftR (fromIntegral wb) 16
+      w5 = 255 .&. unsafeShiftR (fromIntegral wb) 8
+      w6 = 255 .&. fromIntegral wb
+  in macToTextPartTwo separator' isUpperCase w1 w2 w3 w4 w5 w6
+{-# INLINE macToTextPreAllocated #-}
+
+macToTextPartTwo :: Word8 -> Bool -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Text
+macToTextPartTwo separator' isUpperCase w1 w2 w3 w4 w5 w6 =
+#ifdef ghcjs_HOST_OS
+  Text.pack $ concat
+    [ toHex w1
+    , separatorStr
+    , toHex w2
+    , separatorStr
+    , toHex w3
+    , separatorStr
+    , toHex w4
+    , separatorStr
+    , toHex w5
+    , separatorStr
+    , toHex w6
+    ]
+  where
+  toHex :: Word64 -> String
+  toHex = if isUpperCase then printf "%02X" else printf "%02x"
+  separatorStr = [chr (fromEnum separator')]
+#else
+  let hexPairs = if isUpperCase then twoHexDigits else twoHexDigitsLower
       separator = fromIntegral separator' :: Word16
       arr = runST $ do
         marr <- TArray.new 17
@@ -169,7 +216,9 @@ macToTextPreAllocated separator' isUpperCase wa wb =
         putMac hexPairs 15 w6 marr
         TArray.unsafeFreeze marr
   in Text arr 0 17
-{-# INLINE macToTextPreAllocated #-}
+#endif
+{-# INLINE macToTextPartTwo #-}
+
 
 zero :: Word16
 zero = 48
@@ -357,24 +406,6 @@ macTextParser separator f = f
       then fail "All octets in a mac address must be between 00 and FF"
       else return i
 
-macToText :: Word16 -> Word32 -> Text
-macToText a b = LText.toStrict (TBuilder.toLazyText (macToTextBuilder a b))
-
-macToTextBuilder :: Word16 -> Word32 -> TBuilder.Builder
-macToTextBuilder a b =
-  TBuilder.hexadecimal (255 .&. shiftR a 8 )
-  <> colon
-  <> TBuilder.hexadecimal (255 .&. a )
-  <> colon
-  <> TBuilder.hexadecimal (255 .&. shiftR b 24 )
-  <> colon
-  <> TBuilder.hexadecimal (255 .&. shiftR b 16 )
-  <> colon
-  <> TBuilder.hexadecimal (255 .&. shiftR b 8 )
-  <> colon
-  <> TBuilder.hexadecimal (255 .&. b)
-  where colon = TBuilder.singleton ':'
-
 macFromText :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Maybe a
 macFromText separator f = rightToMaybe . macFromText' separator f
 {-# INLINE macFromText #-}
@@ -385,63 +416,18 @@ macFromText' separator f =
 {-# INLINE macFromText' #-}
 
 twoDigits :: ByteString
-twoDigits = BC8.pack
-  "0001020304050607080910111213141516171819\
-  \2021222324252627282930313233343536373839\
-  \4041424344454647484950515253545556575859\
-  \6061626364656667686970717273747576777879\
-  \8081828384858687888990919293949596979899"
+twoDigits = foldMap (BC8.pack . printf "%02d") $ enumFromTo (0 :: Int) 99
+{-# NOINLINE twoDigits #-}
 
-threeDigits :: ByteString
-threeDigits =
-  ByteString.replicate 300 0 <> BC8.pack
-  "100101102103104105106107108109110111112\
-  \113114115116117118119120121122123124125\
-  \126127128129130131132133134135136137138\
-  \139140141142143144145146147148149150151\
-  \152153154155156157158159160161162163164\
-  \165166167168169170171172173174175176177\
-  \178179180181182183184185186187188189190\
-  \191192193194195196197198199200201202203\
-  \204205206207208209210211212213214215216\
-  \217218219220221222223224225226227228229\
-  \230231232233234235236237238239240241242\
-  \243244245246247248249250251252253254255"
+threeDigitsWord8 :: ByteString
+threeDigitsWord8 = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 255
+{-# NOINLINE threeDigitsWord8 #-}
 
 twoHexDigits :: ByteString
-twoHexDigits = BC8.pack
-  "000102030405060708090A0B0C0D0E0F\
-  \101112131415161718191A1B1C1D1E1F\
-  \202122232425262728292A2B2C2D2E2F\
-  \303132333435363738393A3B3C3D3E3F\
-  \404142434445464748494A4B4C4D4E4F\
-  \505152535455565758595A5B5C5D5E5F\
-  \606162636465666768696A6B6C6D6E6F\
-  \707172737475767778797A7B7C7D7E7F\
-  \808182838485868788898A8B8C8D8E8F\
-  \909192939495969798999A9B9C9D9E9F\
-  \A0A1A2A3A4A5A6A7A8A9AAABACADAEAF\
-  \B0B1B2B3B4B5B6B7B8B9BABBBCBDBEBF\
-  \C0C1C2C3C4C5C6C7C8C9CACBCCCDCECF\
-  \D0D1D2D3D4D5D6D7D8D9DADBDCDDDEDF\
-  \E0E1E2E3E4E5E6E7E8E9EAEBECEDEEEF\
-  \F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF"
+twoHexDigits = foldMap (BC8.pack . printf "%02X") $ enumFromTo (0 :: Int) 255
+{-# NOINLINE twoHexDigits #-}
 
 twoHexDigitsLower :: ByteString
-twoHexDigitsLower = BC8.pack
-  "000102030405060708090a0b0c0d0e0f\
-  \101112131415161718191a1b1c1d1e1f\
-  \202122232425262728292a2b2c2d2e2f\
-  \303132333435363738393a3b3c3d3e3f\
-  \404142434445464748494a4b4c4d4e4f\
-  \505152535455565758595a5b5c5d5e5f\
-  \606162636465666768696a6b6c6d6e6f\
-  \707172737475767778797a7b7c7d7e7f\
-  \808182838485868788898a8b8c8d8e8f\
-  \909192939495969798999a9b9c9d9e9f\
-  \a0a1a2a3a4a5a6a7a8a9aaabacadaeaf\
-  \b0b1b2b3b4b5b6b7b8b9babbbcbdbebf\
-  \c0c1c2c3c4c5c6c7c8c9cacbcccdcecf\
-  \d0d1d2d3d4d5d6d7d8d9dadbdcdddedf\
-  \e0e1e2e3e4e5e6e7e8e9eaebecedeeef\
-  \f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+twoHexDigitsLower = foldMap (BC8.pack . printf "%02x") $ enumFromTo (0 :: Int) 255
+{-# NOINLINE twoHexDigitsLower #-}
+

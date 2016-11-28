@@ -11,16 +11,8 @@ import Data.Text (Text)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Word
-import Data.Aeson (ToJSON(..),FromJSON(..))
-import qualified Data.Attoparsec.Text as AT
-import qualified Data.Attoparsec.ByteString.Char8 as AB
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Net.Internal (attoparsecParseJSON,rightToMaybe)
-import qualified Data.Text.Lazy.Builder as TBuilder
-import Data.Text.Lazy.Builder.Int (hexadecimal)
-import Data.Monoid ((<>))
-import qualified Data.Aeson as Aeson
-import qualified Data.Text.Lazy as LText
 
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
 fromOctets a b c d e f = fromOctetsNoCast
