@@ -139,7 +139,7 @@ toTextPreallocatedPartTwo w1 w2 w3 w4 =
    in Text arr 0 len
 #endif
 
-putAndCount :: Int -> Word8 -> TArray.MArray s -> ST s Int
+putAndCount :: Int -> Word -> TArray.MArray s -> ST s Int
 putAndCount pos w marr
   | w < 10 = TArray.unsafeWrite marr pos (i2w w) >> return 1
   | w < 100 = write2 pos w >> return 2
@@ -157,9 +157,10 @@ putAndCount pos w marr
   get2 = fromIntegral . ByteString.unsafeIndex twoDigits
   get3 = fromIntegral . ByteString.unsafeIndex threeDigitsWord8
 
-putMac :: ByteString -> Int -> Int -> TArray.MArray s -> ST s ()
-putMac hexPairs pos w marr = do
-  let i = w + w
+putMac :: ByteString -> Int -> Word64 -> TArray.MArray s -> ST s ()
+putMac hexPairs pos w' marr = do
+  let w = fromIntegral w'
+      i = w + w
   TArray.unsafeWrite marr pos $ fromIntegral $ ByteString.unsafeIndex hexPairs i
   TArray.unsafeWrite marr (pos + 1) $ fromIntegral $ ByteString.unsafeIndex hexPairs (i + 1)
 {-# INLINE putMac #-}
