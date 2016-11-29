@@ -76,9 +76,16 @@ data MacEncoding = MacEncoding
   , macEncodingUpperCase :: {-# UNPACK #-} !Bool
   } deriving (Eq,Ord,Show,Read,Generic)
 
-newtype MacDecoding = MacDecoding
-  { macDecodingSeparator :: Maybe Word8
-  }
+-- | The format expected by the mac address parser. The 'Word8' taken
+--   by some of these constructors is the ascii value of the character
+--   to be used as the separator. This is typically a colon, a hyphen, or
+--   a space character. All decoding functions are case insensitive.
+data MacDecoding
+  = MacDecodingPairs !Char -- ^ Two-character groups, @FA:2B:40:09:8C:11@
+  | MacDecodingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
+  | MacDecodingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
+  | MacDecodingNoSeparator -- ^ No separator, @24AF4B5B0780@
+  | MacDecodingLenient -- ^ Optional separators, @2.A_0.5BA-0A92:01@
 
 instance Hashable Mac
 

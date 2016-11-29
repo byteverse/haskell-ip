@@ -12,7 +12,7 @@ import Data.ByteString (ByteString)
 import Data.Text.Lazy.Builder.Int (decimal)
 import Control.Monad
 import Text.Printf (printf)
-import Data.Char (chr)
+import Data.Char (chr,ord)
 import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Attoparsec.Text   as AT
@@ -24,6 +24,12 @@ import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Read         as TextRead
 import qualified Data.Text.Lazy.Builder.Int as TBuilder
+
+-- | Taken from @Data.ByteString.Internal@. The same warnings
+--   apply here.
+c2w :: Char -> Word8
+c2w = fromIntegral . ord
+{-# INLINE c2w #-}
 
 eitherToAesonParser :: Either String a -> Aeson.Parser a
 eitherToAesonParser x = case x of

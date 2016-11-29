@@ -23,8 +23,8 @@ encode :: Mac -> Text
 encode (Mac a b) = Internal.macToTextDefault a b
 
 decodeEitherWith :: MacDecoding -> Text -> Either String Mac
-decodeEitherWith (MacDecoding separator) =
-  Internal.macFromText' (fmap w8ToChar separator) fromOctetsNoCast
+decodeEitherWith = error "decodeEitherWith: write me" -- (MacDecoding separator) =
+  -- Internal.macFromText' (fmap w8ToChar separator) fromOctetsNoCast
 
 decodeEither :: Text -> Either String Mac
 decodeEither = decodeEitherWith defDecoding
@@ -44,15 +44,15 @@ parser :: AT.Parser Mac
 parser = parserWith defDecoding
 
 parserWith :: MacDecoding -> AT.Parser Mac
-parserWith (MacDecoding separator) =
-  Internal.macTextParser (fmap w8ToChar separator) fromOctetsNoCast
+parserWith = error "parserWith: write me" -- (MacDecoding separator) =
+  -- Internal.macTextParser (fmap w8ToChar separator) fromOctetsNoCast
 
 encodeWith :: MacEncoding -> Mac -> Text
 encodeWith (MacEncoding separator isUpperCase) (Mac a b) =
   Internal.macToTextPreAllocated separator isUpperCase a b
 
 defDecoding :: MacDecoding
-defDecoding = MacDecoding (Just 58)
+defDecoding = MacDecodingPairs ':'
 
 w8ToChar :: Word8 -> Char
 w8ToChar = chr . fromIntegral
