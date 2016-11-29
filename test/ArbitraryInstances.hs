@@ -20,3 +20,17 @@ instance Arbitrary Mac where
   arbitrary = fmap fromTuple arbitrary
     where fromTuple (a,b) = Mac a b
 
+instance Arbitrary MacCodec where
+  arbitrary = MacCodec <$> arbitrary <*> arbitrary
+
+instance Arbitrary MacGrouping where
+  arbitrary = oneof
+    [ MacGroupingPairs <$> arbitraryMacSeparator
+    , MacGroupingTriples <$> arbitraryMacSeparator
+    , MacGroupingQuadruples <$> arbitraryMacSeparator
+    , pure MacGroupingNoSeparator
+    ]
+
+arbitraryMacSeparator :: Gen Char
+arbitraryMacSeparator = oneof [':','-','.','_']
+

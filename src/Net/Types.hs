@@ -13,8 +13,8 @@ module Net.Types
   , IP(..)
   , IPv4Range(..)
   , Mac(..)
-  , MacEncoding(..)
-  , MacDecoding(..)
+  , MacCodec(..)
+  , MacGrouping(..)
   ) where
 
 import qualified Net.Internal         as Internal
@@ -71,21 +71,26 @@ data Mac = Mac
   }
   deriving (Eq,Ord,Show,Read,Generic)
 
-data MacEncoding = MacEncoding
-  { macEncodingSeparator :: {-# UNPACK #-} !Word8 -- ^ ASCII value of the separator
-  , macEncodingUpperCase :: {-# UNPACK #-} !Bool
+-- data MacEncoding = MacEncoding
+--   { macEncodingSeparator :: {-# UNPACK #-} !Word8 -- ^ ASCII value of the separator
+--   , macEncodingUpperCase :: {-# UNPACK #-} !Bool
+--   } deriving (Eq,Ord,Show,Read,Generic)
+
+data MacCodec = MacCodec
+  { macCodecGrouping :: !MacGrouping
+  , macCodecUpperCase :: !Bool
   } deriving (Eq,Ord,Show,Read,Generic)
 
 -- | The format expected by the mac address parser. The 'Word8' taken
 --   by some of these constructors is the ascii value of the character
 --   to be used as the separator. This is typically a colon, a hyphen, or
 --   a space character. All decoding functions are case insensitive.
-data MacDecoding
-  = MacDecodingPairs !Char -- ^ Two-character groups, @FA:2B:40:09:8C:11@
-  | MacDecodingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
-  | MacDecodingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
-  | MacDecodingNoSeparator -- ^ No separator, @24AF4B5B0780@
-  | MacDecodingLenient -- ^ Optional separators, @2.A_0.5BA-0A92:01@
+data MacGrouping
+  = MacGroupingPairs !Char -- ^ Two-character groups, @FA:2B:40:09:8C:11@
+  | MacGroupingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
+  | MacGroupingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
+  | MacGroupingNoSeparator -- ^ No separator, @24AF4B5B0780@
+  deriving (Eq,Ord,Show,Read,Generic)
 
 instance Hashable Mac
 

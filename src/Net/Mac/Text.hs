@@ -10,7 +10,7 @@ module Net.Mac.Text
   , parserWith
   ) where
 
-import Net.Types (Mac(..),MacEncoding(..),MacDecoding(..))
+import Net.Types (Mac(..),MacCodec(..),MacGrouping(..))
 import Net.Mac (fromOctetsNoCast)
 import Data.Text (Text)
 import Data.Word (Word8)
@@ -22,17 +22,17 @@ import qualified Data.Text.Lazy.Builder as TBuilder
 encode :: Mac -> Text
 encode (Mac a b) = Internal.macToTextDefault a b
 
-decodeEitherWith :: MacDecoding -> Text -> Either String Mac
+decodeEitherWith :: MacCodec -> Text -> Either String Mac
 decodeEitherWith = error "decodeEitherWith: write me" -- (MacDecoding separator) =
   -- Internal.macFromText' (fmap w8ToChar separator) fromOctetsNoCast
 
 decodeEither :: Text -> Either String Mac
-decodeEither = decodeEitherWith defDecoding
+decodeEither = decodeEitherWith defCodec
 
 decode :: Text -> Maybe Mac
-decode = decodeWith defDecoding
+decode = decodeWith defCodec
 
-decodeWith :: MacDecoding -> Text -> Maybe Mac
+decodeWith :: MacCodec -> Text -> Maybe Mac
 decodeWith d = Internal.rightToMaybe . decodeEitherWith d
 
 -- decodeWith ::
@@ -41,18 +41,18 @@ builder :: Mac -> TBuilder.Builder
 builder (Mac a b) = TBuilder.fromText (Internal.macToTextDefault a b)
 
 parser :: AT.Parser Mac
-parser = parserWith defDecoding
+parser = parserWith defCodec
 
-parserWith :: MacDecoding -> AT.Parser Mac
+parserWith :: MacCodec -> AT.Parser Mac
 parserWith = error "parserWith: write me" -- (MacDecoding separator) =
   -- Internal.macTextParser (fmap w8ToChar separator) fromOctetsNoCast
 
-encodeWith :: MacEncoding -> Mac -> Text
-encodeWith (MacEncoding separator isUpperCase) (Mac a b) =
-  Internal.macToTextPreAllocated separator isUpperCase a b
+encodeWith :: MacCodec -> Mac -> Text
+encodeWith (MacCodec grouping isUpperCase) (Mac a b) =
+  Internal.macToTextPreAllocated grouping isUpperCase a b
 
-defDecoding :: MacDecoding
-defDecoding = MacDecodingPairs ':'
+defCodec :: MacCodec
+defCodec = MacCodec (MacGroupingPairs ':') False
 
 w8ToChar :: Word8 -> Char
 w8ToChar = chr . fromIntegral
