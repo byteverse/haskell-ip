@@ -7,6 +7,7 @@ module Net.Mac.ByteString.Char8
   , builder
   , parser
   , parserWith
+  , parserLenient
   ) where
 
 import Net.Types (Mac(..),MacCodec(..),MacGrouping(..))

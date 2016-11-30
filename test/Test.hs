@@ -13,6 +13,7 @@ import Data.Word
 
 import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
 import qualified Data.Text as Text
+import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Net.IPv4.Range as IPv4Range
@@ -50,6 +51,7 @@ tests =
     , testGroup "Currently used MAC ByteString encode/decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIsoSettings MacByteString.encodeWith MacByteString.decodeWith
+      , testCase "Lenient Decoding" testLenientMacByteStringParser
       ]
     , testGroup "Naive IPv4 encode/decode"
       [ testProperty "Isomorphism"
@@ -121,6 +123,17 @@ testIPv4Decode :: Assertion
 testIPv4Decode = IPv4Text.decode (Text.pack "124.222.255.0")
              @?= Just (IPv4.fromOctets 124 222 255 0)
 
+testLenientMacByteStringParser :: Assertion
+testLenientMacByteStringParser = do
+  go 0xAB 0x12 0x0F 0x1C 0x88 0x79
+     "AB:12:0F:1C:88:79"
+  go 0xAB 0x12 0x0F 0x0C 0xAA 0x76
+     "AB1-20F-0CA-A76"
+  where
+  go a b c d e f str =
+    Just (HexMac (Mac.fromOctets a b c d e f))
+    @?= fmap HexMac (MacByteString.decodeLenient (BC8.pack str))
+
 testIPv6Parser :: Assertion
 testIPv6Parser = do
   -- Basic test
@@ -176,6 +189,20 @@ failure msg = failed
   { reason = msg
   , theException = Nothing
   }
+
+newtype HexMac = HexMac { getHexMac :: Mac }
+  deriving (Eq)
+
+instance Show HexMac where
+  showsPrec _ (HexMac v) =
+    let (a,b,c,d,e,f) = Mac.toOctets v
+     in showHex a . showChar ':'
+        . showHex b . showChar ':'
+        . showHex c . showChar ':'
+        . showHex d . showChar ':'
+        . showHex e . showChar ':'
+        . showHex f
+
 
 newtype HexIPv6 = HexIPv6 { getHexIPv6 :: IPv6 }
   deriving (Eq)
