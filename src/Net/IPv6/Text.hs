@@ -16,7 +16,7 @@ import Debug.Trace
 parser :: Atto.Parser IPv6
 parser = do
   s <- start
-  case toIPv6 (traceShowId s) of
+  case toIPv6 s of
     Nothing -> fail "Wrong number of octets in IPv6 address"
     Just ip -> return ip
   where

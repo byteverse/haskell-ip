@@ -3,26 +3,27 @@
 
 module Net.Mac
   ( fromOctets
-  , fromOctetsNoCast
+  , toOctets
   ) where
 
 import Net.Types (Mac(..))
-import Data.Text (Text)
-import Data.Hashable (Hashable)
-import GHC.Generics (Generic)
 import Data.Word
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
-import Net.Internal (attoparsecParseJSON,rightToMaybe)
+import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement,unsafeShiftR)
+import qualified Net.Internal as Internal
 
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
-fromOctets a b c d e f = fromOctetsNoCast
+fromOctets a b c d e f = Mac $ Internal.unsafeWord48FromOctets
   (fromIntegral a) (fromIntegral b) (fromIntegral c)
   (fromIntegral d) (fromIntegral e) (fromIntegral f)
+{-# INLINE fromOctets #-}
 
-fromOctetsNoCast :: Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> Mac
-fromOctetsNoCast a b c d e f = Mac
-    ( shiftL a 8 .|. b )
-    ( shiftL c 24 .|. shiftL d 16 .|. shiftL e 8 .|. f )
-{-# INLINE fromOctetsNoCast #-}
-
+toOctets :: Mac -> (Word8,Word8,Word8,Word8,Word8,Word8)
+toOctets (Mac w) =
+  ( fromIntegral $ unsafeShiftR w 40
+  , fromIntegral $ unsafeShiftR w 32
+  , fromIntegral $ unsafeShiftR w 24
+  , fromIntegral $ unsafeShiftR w 16
+  , fromIntegral $ unsafeShiftR w 8
+  , fromIntegral w
+  )
 
