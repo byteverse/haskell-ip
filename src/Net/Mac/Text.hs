@@ -11,7 +11,7 @@ module Net.Mac.Text
   ) where
 
 import Net.Types (Mac(..),MacCodec(..),MacGrouping(..))
-import Net.Mac (fromOctetsNoCast)
+-- import Net.Mac (fromOctetsNoCast)
 import Data.Text (Text)
 import Data.Word (Word8)
 import Data.Char (chr)
@@ -20,11 +20,16 @@ import qualified Data.Attoparsec.Text as AT
 import qualified Data.Text.Lazy.Builder as TBuilder
 
 encode :: Mac -> Text
-encode (Mac a b) = Internal.macToTextDefault a b
+encode (Mac w) = encodeWith defCodec -- Internal.macToTextDefault w
+
+encodeWith :: MacCodec -> Mac -> Text
+encodeWith (MacCodec g upper) (Mac w) = case x of
+  MacGroupingPairs c -> macToTextPreAllocated (Internal.c2w c) upper w
+  _ -> error "encodeWith: write this part"
 
 decodeEitherWith :: MacCodec -> Text -> Either String Mac
-decodeEitherWith = error "decodeEitherWith: write me" -- (MacDecoding separator) =
-  -- Internal.macFromText' (fmap w8ToChar separator) fromOctetsNoCast
+decodeEitherWith (MacCodec g upper) t = case g of
+  MacGroupingPairs c -> Internal.macFromText' (fmap w8ToChar separator) fromOctetsNoCast
 
 decodeEither :: Text -> Either String Mac
 decodeEither = decodeEitherWith defCodec

@@ -6,7 +6,7 @@ module Net.Mac.ByteString.Char8
   , parserWith
   ) where
 
-import Net.Types (Mac(..),MacEncoding(..),MacDecoding(..))
+import Net.Types (Mac(..),MacCodec(..))
 import Net.Mac (fromOctets)
 import Data.ByteString (ByteString)
 import Data.Attoparsec.ByteString.Char8 (Parser)
@@ -19,7 +19,7 @@ import Control.Monad
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.ByteString.Char8 as AB
-import qualified Net.Mac.Text as MacText
+-- import qualified Net.Mac.Text as MacText
 
 -- | This is a mediocre implementation that should
 --   be rewritten.
