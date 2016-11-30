@@ -29,8 +29,9 @@ import qualified Data.Vector.Primitive          as PVector
 import qualified Data.Vector.Generic.Mutable    as MGVector
 import qualified Data.Vector.Unboxed.Mutable    as MUVector
 import qualified Data.Vector.Primitive.Mutable  as MPVector
+import Data.Word.Synthetic (Word48)
 import Data.Primitive.Types (Prim)
-import Data.Bits (Bits,FiniteBits,(.|.),shiftL)
+import Data.Bits (Bits,FiniteBits,(.|.),unsafeShiftL)
 import Data.Coerce (coerce)
 import Control.Monad
 import Data.Word
@@ -65,10 +66,7 @@ data IPv4Range = IPv4Range
   } deriving (Eq,Ord,Show,Read,Generic)
 
 -- | A 48-bit MAC address.
-data Mac = Mac
-  { macA :: {-# UNPACK #-} !Word16
-  , macB :: {-# UNPACK #-} !Word32
-  }
+newtype Mac = Mac { getMac :: Word48 }
   deriving (Eq,Ord,Show,Read,Generic)
 
 -- data MacEncoding = MacEncoding
@@ -95,16 +93,17 @@ data MacGrouping
 instance Hashable Mac
 
 instance ToJSON Mac where
-  toJSON (Mac a b) = Aeson.String (Internal.macToTextDefault a b)
+  toJSON (Mac w) = Aeson.String (Internal.macToTextDefault w)
 
 instance FromJSON Mac where
   parseJSON = Internal.attoparsecParseJSON
     (Internal.macTextParser (Just ':') macFromOctets' <* AT.endOfInput)
 
-macFromOctets' :: Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> Mac
-macFromOctets' a b c d e f = Mac
-    ( shiftL a 8 .|. b )
-    ( shiftL c 24 .|. shiftL d 16 .|. shiftL e 8 .|. f )
+-- Unchecked invariant: each of these Word64s must be smaller
+-- than 256.
+macFromOctets' :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Mac
+macFromOctets' a b c d e f = 
+  Mac (Internal.unsafeWord48FromOctets a b c d e f)
 {-# INLINE macFromOctets' #-}
 
 instance Hashable IPv4Range
@@ -287,109 +286,8 @@ instance GVector.Vector UVector.Vector IPv4Range where
         . GVector.elemseq (undefined :: UVector.Vector b) b
 
 
-data instance MUVector.MVector s Mac
-    = MV_Mac {-# UNPACK #-} !Int !(MUVector.MVector s Word16)
-                                 !(MUVector.MVector s Word32)
-data instance UVector.Vector Mac
-    = V_Mac {-# UNPACK #-} !Int !(UVector.Vector Word16)
-                                !(UVector.Vector Word32)
-instance UVector.Unbox Mac
-instance MGVector.MVector MUVector.MVector Mac where
-  {-# INLINE basicLength  #-}
-  basicLength (MV_Mac n_ as bs) = n_
-  {-# INLINE basicUnsafeSlice  #-}
-  basicUnsafeSlice i_ m_ (MV_Mac n_ as bs)
-      = MV_Mac m_ (MGVector.basicUnsafeSlice i_ m_ as)
-                  (MGVector.basicUnsafeSlice i_ m_ bs)
-  {-# INLINE basicOverlaps  #-}
-  basicOverlaps (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
-      = MGVector.basicOverlaps as1 as2
-        || MGVector.basicOverlaps bs1 bs2
-  {-# INLINE basicUnsafeNew  #-}
-  basicUnsafeNew n_
-      = do
-          as <- MGVector.basicUnsafeNew n_
-          bs <- MGVector.basicUnsafeNew n_
-          return $ MV_Mac n_ as bs
-  {-# INLINE basicInitialize  #-}
-  basicInitialize (MV_Mac _ as bs)
-      = do
-          MGVector.basicInitialize as
-          MGVector.basicInitialize bs
-  {-# INLINE basicUnsafeReplicate  #-}
-  basicUnsafeReplicate n_ (Mac a b)
-      = do
-          as <- MGVector.basicUnsafeReplicate n_ a
-          bs <- MGVector.basicUnsafeReplicate n_ b
-          return $ MV_Mac n_ as bs
-  {-# INLINE basicUnsafeRead  #-}
-  basicUnsafeRead (MV_Mac n_ as bs) i_
-      = do
-          a <- MGVector.basicUnsafeRead as i_
-          b <- MGVector.basicUnsafeRead bs i_
-          return (Mac a b)
-  {-# INLINE basicUnsafeWrite  #-}
-  basicUnsafeWrite (MV_Mac n_ as bs) i_ (Mac a b)
-      = do
-          MGVector.basicUnsafeWrite as i_ a
-          MGVector.basicUnsafeWrite bs i_ b
-  {-# INLINE basicClear  #-}
-  basicClear (MV_Mac n_ as bs)
-      = do
-          MGVector.basicClear as
-          MGVector.basicClear bs
-  {-# INLINE basicSet  #-}
-  basicSet (MV_Mac n_ as bs) (Mac a b)
-      = do
-          MGVector.basicSet as a
-          MGVector.basicSet bs b
-  {-# INLINE basicUnsafeCopy  #-}
-  basicUnsafeCopy (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
-      = do
-          MGVector.basicUnsafeCopy as1 as2
-          MGVector.basicUnsafeCopy bs1 bs2
-  {-# INLINE basicUnsafeMove  #-}
-  basicUnsafeMove (MV_Mac n_1 as1 bs1) (MV_Mac n_2 as2 bs2)
-      = do
-          MGVector.basicUnsafeMove as1 as2
-          MGVector.basicUnsafeMove bs1 bs2
-  {-# INLINE basicUnsafeGrow  #-}
-  basicUnsafeGrow (MV_Mac n_ as bs) m_
-      = do
-          as' <- MGVector.basicUnsafeGrow as m_
-          bs' <- MGVector.basicUnsafeGrow bs m_
-          return $ MV_Mac (m_+n_) as' bs'
-instance GVector.Vector UVector.Vector Mac where
-  {-# INLINE basicUnsafeFreeze  #-}
-  basicUnsafeFreeze (MV_Mac n_ as bs)
-      = do
-          as' <- GVector.basicUnsafeFreeze as
-          bs' <- GVector.basicUnsafeFreeze bs
-          return $ V_Mac n_ as' bs'
-  {-# INLINE basicUnsafeThaw  #-}
-  basicUnsafeThaw (V_Mac n_ as bs)
-      = do
-          as' <- GVector.basicUnsafeThaw as
-          bs' <- GVector.basicUnsafeThaw bs
-          return $ MV_Mac n_ as' bs'
-  {-# INLINE basicLength  #-}
-  basicLength (V_Mac n_ as bs) = n_
-  {-# INLINE basicUnsafeSlice  #-}
-  basicUnsafeSlice i_ m_ (V_Mac n_ as bs)
-      = V_Mac m_ (GVector.basicUnsafeSlice i_ m_ as)
-                 (GVector.basicUnsafeSlice i_ m_ bs)
-  {-# INLINE basicUnsafeIndexM  #-}
-  basicUnsafeIndexM (V_Mac n_ as bs) i_
-      = do
-          a <- GVector.basicUnsafeIndexM as i_
-          b <- GVector.basicUnsafeIndexM bs i_
-          return (Mac a b)
-  {-# INLINE basicUnsafeCopy  #-}
-  basicUnsafeCopy (MV_Mac n_1 as1 bs1) (V_Mac n_2 as2 bs2)
-      = do
-          GVector.basicUnsafeCopy as1 as2
-          GVector.basicUnsafeCopy bs1 bs2
-  {-# INLINE elemseq  #-}
-  elemseq _ (Mac a b)
-      = GVector.elemseq (undefined :: UVector.Vector a) a
-        . GVector.elemseq (undefined :: UVector.Vector b) b
+newtype instance MUVector.MVector s Mac
+    = MV_Mac (MUVector.MVector s Word48)
+
+newtype instance UVector.Vector Mac
+    = V_Mac (UVector.Vector Word48)

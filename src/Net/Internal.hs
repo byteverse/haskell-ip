@@ -13,6 +13,7 @@ import Data.Text.Lazy.Builder.Int (decimal)
 import Control.Monad
 import Text.Printf (printf)
 import Data.Char (chr,ord)
+import Data.Word.Synthetic (Word48)
 import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Attoparsec.Text   as AT
@@ -171,17 +172,17 @@ putMac hexPairs pos w' marr = do
   TArray.unsafeWrite marr (pos + 1) $ fromIntegral $ ByteString.unsafeIndex hexPairs (i + 1)
 {-# INLINE putMac #-}
 
-macToTextDefault :: Word16 -> Word32 -> Text
+macToTextDefault :: Word48 -> Text
 macToTextDefault = macToTextPreAllocated 58 False
 
-macToTextPreAllocated :: Word8 -> Bool -> Word16 -> Word32 -> Text
-macToTextPreAllocated separator' isUpperCase wa wb =
-  let w1 = 255 .&. unsafeShiftR (fromIntegral wa) 8
-      w2 = 255 .&. fromIntegral wa
-      w3 = 255 .&. unsafeShiftR (fromIntegral wb) 24
-      w4 = 255 .&. unsafeShiftR (fromIntegral wb) 16
-      w5 = 255 .&. unsafeShiftR (fromIntegral wb) 8
-      w6 = 255 .&. fromIntegral wb
+macToTextPreAllocated :: Word8 -> Bool -> Word48 -> Text
+macToTextPreAllocated separator' isUpperCase w =
+  let w1 = 255 .&. unsafeShiftR (fromIntegral w) 40
+      w2 = 255 .&. unsafeShiftR (fromIntegral w) 32
+      w3 = 255 .&. unsafeShiftR (fromIntegral w) 24
+      w4 = 255 .&. unsafeShiftR (fromIntegral w) 16
+      w5 = 255 .&. unsafeShiftR (fromIntegral w) 8
+      w6 = 255 .&. fromIntegral w
   in macToTextPartTwo separator' isUpperCase w1 w2 w3 w4 w5 w6
 {-# INLINE macToTextPreAllocated #-}
 
@@ -391,7 +392,7 @@ mask32 = 0xFFFFFFFF
 -- r1,r2,r3,r4,r5,r6 :: Word32
 -- r1 = fromOctets' 0 0 0 0
 
-macTextParser :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> AT.Parser a
+macTextParser :: Maybe Char -> (Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> a) -> AT.Parser a
 macTextParser separator f = f
   <$> (AT.hexadecimal >>= limitSize)
   <*  parseSeparator
@@ -413,11 +414,24 @@ macTextParser separator f = f
       then fail "All octets in a mac address must be between 00 and FF"
       else return i
 
-macFromText :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Maybe a
+-- Unchecked invariant: each of these Word64s must be smaller
+-- than 256.
+unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word48
+unsafeWord48FromOctets a b c d e f =
+    fromIntegral
+  $ unsafeShiftL a 40 
+  .|. unsafeShiftL b 32
+  .|. unsafeShiftL c 24
+  .|. unsafeShiftL d 16
+  .|. unsafeShiftL e 8
+  .|. f
+{-# INLINE unsafeWord48FromOctets #-}
+
+macFromText :: Maybe Char -> (Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> a) -> Text -> Maybe a
 macFromText separator f = rightToMaybe . macFromText' separator f
 {-# INLINE macFromText #-}
 
-macFromText' :: Maybe Char -> (Word16 -> Word16 -> Word32 -> Word32 -> Word32 -> Word32 -> a) -> Text -> Either String a
+macFromText' :: Maybe Char -> (Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> a) -> Text -> Either String a
 macFromText' separator f =
   AT.parseOnly (macTextParser separator f <* AT.endOfInput)
 {-# INLINE macFromText' #-}
