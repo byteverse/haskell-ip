@@ -8,6 +8,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.Framework.Providers.HUnit       (testCase)
 import Test.HUnit                           (Assertion,(@?=))
 import Numeric                              (showHex)
+import Test.QuickCheck.Property             (failed,succeeded,Result(..))
 import Data.Word
 
 import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
@@ -20,6 +21,7 @@ import qualified Net.IPv6.Text as IPv6Text
 import qualified Net.IPv4.ByteString.Char8 as IPv4ByteString
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as MacText
+import qualified Net.Mac.ByteString.Char8 as MacByteString
 
 import qualified Data.Attoparsec.Text as AT
 
@@ -42,8 +44,12 @@ tests =
       ] ++ testDecodeFailures
     , testGroup "Currently used MAC Text encode/decode"
       [ testProperty "Isomorphism"
-          $ propEncodeDecodeIso MacText.encode MacText.decode
+          $ propEncodeDecodeIsoSettings MacText.encodeWith MacText.decodeWith
       , testCase "Encode a MAC Address" testMacEncode
+      ]
+    , testGroup "Currently used MAC ByteString encode/decode"
+      [ testProperty "Isomorphism"
+          $ propEncodeDecodeIsoSettings MacByteString.encodeWith MacByteString.decodeWith
       ]
     , testGroup "Naive IPv4 encode/decode"
       [ testProperty "Isomorphism"
@@ -80,6 +86,20 @@ tests =
 
 propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
 propEncodeDecodeIso f g a = g (f a) == Just a
+
+propEncodeDecodeIsoSettings :: (Eq a,Show a,Show b,Show e)
+  => (e -> a -> b) -> (e -> b -> Maybe a) -> e -> a -> Result
+propEncodeDecodeIsoSettings f g e a =
+  let fa = f e a
+      gfa = g e fa
+   in if gfa == Just a
+        then succeeded
+        else failure $ concat
+          [ "env:     ", show e, "\n"
+          , "x:       ", show a, "\n"
+          , "f(x):    ", show fa, "\n"
+          , "g(f(x)): ", show gfa, "\n"
+          ]
 
 propMatching :: Eq b => (a -> b) -> (a -> b) -> a -> Bool
 propMatching f g a = f a == g a
@@ -150,6 +170,12 @@ testDecodeFailures = flip map textBadIPv4 $ \str ->
 testMacEncode :: Assertion
 testMacEncode = MacText.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
             @?= Text.pack "ff:00:ab:12:99:0f"
+
+failure :: String -> Result
+failure msg = failed
+  { reason = msg
+  , theException = Nothing
+  }
 
 newtype HexIPv6 = HexIPv6 { getHexIPv6 :: IPv6 }
   deriving (Eq)

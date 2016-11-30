@@ -1,12 +1,15 @@
 module Net.Mac.ByteString.Char8
   ( encode
+  , encodeWith
   , decode
+  , decodeWith
+  , decodeLenient
   , builder
   , parser
   , parserWith
   ) where
 
-import Net.Types (Mac(..),MacCodec(..))
+import Net.Types (Mac(..),MacCodec(..),MacGrouping(..))
 import Net.Mac (fromOctets)
 import Data.ByteString (ByteString)
 import Data.Attoparsec.ByteString.Char8 (Parser)
@@ -14,22 +17,27 @@ import Data.ByteString.Lazy.Builder (Builder)
 import Net.Internal (rightToMaybe,c2w)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8')
 import Data.Word (Word8)
-import Data.Bits (unsafeShiftL)
+import Data.Word.Synthetic (Word12)
+import Data.Bits (unsafeShiftL,unsafeShiftR)
 import Control.Monad
+import Data.Monoid
+import qualified Data.ByteString.SmallBuilder as FB
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 -- import qualified Net.Mac.Text as MacText
 
--- | This is a mediocre implementation that should
---   be rewritten.
 encode :: Mac -> ByteString
-encode = encodeUtf8 . MacText.encode
+encode = encodeWith defCodec
 
--- | This is a mediocre implementation that should
---   be rewritten.
 decode :: ByteString -> Maybe Mac
-decode = MacText.decode <=< rightToMaybe . decodeUtf8'
+decode = decodeWith defCodec
+
+decodeWith :: MacCodec -> ByteString -> Maybe Mac
+decodeWith codec bs = rightToMaybe (AB.parseOnly (parserWith codec <* AB.endOfInput) bs)
+
+decodeLenient :: ByteString -> Maybe Mac
+decodeLenient bs = rightToMaybe (AB.parseOnly (parserLenient <* AB.endOfInput) bs)
 
 -- | Make a bytestring builder from a 'Mac' address
 --   using a colon as the separator.
@@ -39,17 +47,15 @@ builder = Builder.byteString . encode
 -- | Parser for a 'Mac' address using with a colon as the
 --   separator (i.e. @FA:43:B2:C0:0F:99@).
 parser :: Parser Mac
-parser = parserWith defDecoding
+parser = parserWith defCodec
 
--- | Parser for a 'Mac' address using to the provided
---   settings.
-parserWith :: MacDecoding -> Parser Mac
-parserWith x = case x of
-  MacDecodingPairs s -> parserPairs (c2w s)
-  MacDecodingTriples s -> parserTriples (c2w s)
-  MacDecodingQuadruples s -> parserQuadruples (c2w s)
-  MacDecodingNoSeparator -> parserNoSeparator
-  MacDecodingLenient -> parserLenient
+-- | Parser for a 'Mac' address using the provided settings.
+parserWith :: MacCodec -> Parser Mac
+parserWith (MacCodec g _) = case g of
+  MacGroupingPairs s -> parserPairs (c2w s)
+  MacGroupingTriples s -> parserTriples (c2w s)
+  MacGroupingQuadruples s -> parserQuadruples (c2w s)
+  MacGroupingNoSeparator -> parserNoSeparator
 
 parserLenient :: Parser Mac
 parserLenient = do
@@ -154,6 +160,95 @@ tryParseWord8Hex a w
 parseWord8Hex :: Word8 -> Parser Word8
 parseWord8Hex = tryParseWord8Hex (fail "invalid hexadecimal character")
 
-defDecoding :: MacDecoding
-defDecoding = MacDecodingPairs ':'
+defCodec :: MacCodec
+defCodec = MacCodec (MacGroupingPairs ':') False
+
+encodeWith :: MacCodec -> Mac -> ByteString
+encodeWith (MacCodec g u) m = case g of
+  MacGroupingNoSeparator -> case u of
+    True -> FB.run (fixedBuilderNoSeparator FB.word8HexFixedUpper) m
+    False -> FB.run (fixedBuilderNoSeparator FB.word8HexFixedLower) m
+  MacGroupingPairs c -> case u of
+    True -> FB.run (fixedBuilderPairs FB.word8HexFixedUpper) (Pair (c2w c) m)
+    False -> FB.run (fixedBuilderPairs FB.word8HexFixedLower) (Pair (c2w c) m)
+    -- withCasedBuilder u $ \bw8 -> FB.run (fixedBuilderPairs bw8) (Pair c m)
+  MacGroupingTriples c -> case u of
+    True -> FB.run (fixedBuilderTriples FB.word12HexFixedUpper) (Pair (c2w c) m)
+    False -> FB.run (fixedBuilderTriples FB.word12HexFixedLower) (Pair (c2w c) m)
+  MacGroupingQuadruples c -> case u of
+    True -> FB.run (fixedBuilderQuadruples FB.word8HexFixedUpper) (Pair (c2w c) m)
+    False -> FB.run (fixedBuilderQuadruples FB.word8HexFixedLower) (Pair (c2w c) m)
+
+withCasedBuilder :: Bool -> (FB.Builder Word8 -> a) -> a
+withCasedBuilder x f = case x of
+  True -> f FB.word8HexFixedUpper
+  False -> f FB.word8HexFixedLower
+{-# INLINE withCasedBuilder #-}
+
+withCasedBuilderTriple :: Bool -> (FB.Builder Word12 -> a) -> a
+withCasedBuilderTriple x f = case x of
+  True -> f FB.word12HexFixedUpper
+  False -> f FB.word12HexFixedLower
+{-# INLINE withCasedBuilderTriple #-}
+
+data Pair = Pair
+  { pairSep :: {-# UNPACK #-} !Word8
+  , pairMac :: {-# UNPACK #-} !Mac
+  }
+
+fixedBuilderTriples :: FB.Builder Word12 -> FB.Builder Pair
+fixedBuilderTriples tripBuilder =
+     FB.contramapBuilder (word12At 36 . pairMac) tripBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word12At 24 . pairMac) tripBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word12At 12 . pairMac) tripBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word12At 0 . pairMac) tripBuilder
+{-# INLINE fixedBuilderTriples #-}
+
+fixedBuilderQuadruples :: FB.Builder Word8 -> FB.Builder Pair
+fixedBuilderQuadruples pairBuilder =
+     FB.contramapBuilder (word8At 40 . pairMac) pairBuilder
+  <> FB.contramapBuilder (word8At 32 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 24 . pairMac) pairBuilder
+  <> FB.contramapBuilder (word8At 16 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 8 . pairMac) pairBuilder
+  <> FB.contramapBuilder (word8At 0 . pairMac) pairBuilder
+{-# INLINE fixedBuilderQuadruples #-}
+
+fixedBuilderPairs :: FB.Builder Word8 -> FB.Builder Pair
+fixedBuilderPairs pairBuilder =
+     FB.contramapBuilder (word8At 40 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 32 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 24 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 16 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 8 . pairMac) pairBuilder
+  <> FB.contramapBuilder pairSep FB.word8
+  <> FB.contramapBuilder (word8At 0 . pairMac) pairBuilder
+{-# INLINE fixedBuilderPairs #-}
+
+fixedBuilderNoSeparator :: FB.Builder Word8 -> FB.Builder Mac
+fixedBuilderNoSeparator hexBuilder =
+     FB.contramapBuilder (word8At 40) hexBuilder
+  <> FB.contramapBuilder (word8At 32) hexBuilder
+  <> FB.contramapBuilder (word8At 24) hexBuilder
+  <> FB.contramapBuilder (word8At 16) hexBuilder
+  <> FB.contramapBuilder (word8At 8) hexBuilder
+  <> FB.contramapBuilder (word8At 0) hexBuilder
+{-# INLINE fixedBuilderNoSeparator #-}
+
+word8At :: Int -> Mac -> Word8
+word8At i (Mac w) = fromIntegral (unsafeShiftR w i)
+{-# INLINE word8At #-}
+
+word12At :: Int -> Mac -> Word12
+word12At i (Mac w) = fromIntegral (unsafeShiftR w i)
+{-# INLINE word12At #-}
 

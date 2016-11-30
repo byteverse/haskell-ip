@@ -1,5 +1,5 @@
 name:                ip
-version:             0.8.7
+version:             0.9
 synopsis:            Library for IP and MAC addresses
 homepage:            https://github.com/andrewthad/haskell-ip#readme
 license:             BSD3
@@ -40,7 +40,7 @@ library
   hs-source-dirs:      src
   exposed-modules:
     Net.Mac
-    -- Net.Mac.Text
+    Net.Mac.Text
     Net.Mac.ByteString.Char8
     Net.IPv4
     Net.IPv4.Range
@@ -53,6 +53,11 @@ library
     Net.IP
     Net.Types
     Net.Internal
+    Data.Word.Synthetic
+    Data.Word.Synthetic.Word48
+    Data.Word.Synthetic.Word12
+    Data.Text.SmallBuilder
+    Data.ByteString.SmallBuilder
   build-depends:
       base        >= 4.8  && < 5
     , attoparsec
@@ -126,3 +131,4 @@ benchmark criterion
 source-repository head
   type:     git
   location: https://github.com/andrewthad/haskell-ip
+

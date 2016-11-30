@@ -172,6 +172,17 @@ putMac hexPairs pos w' marr = do
   TArray.unsafeWrite marr (pos + 1) $ fromIntegral $ ByteString.unsafeIndex hexPairs (i + 1)
 {-# INLINE putMac #-}
 
+word48AsOctets :: Word48 -> (Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> a) -> a
+word48AsOctets w f =
+  let w1 = fromIntegral $ unsafeShiftR w 40
+      w2 = fromIntegral $ unsafeShiftR w 32
+      w3 = fromIntegral $ unsafeShiftR w 24
+      w4 = fromIntegral $ unsafeShiftR w 16
+      w5 = fromIntegral $ unsafeShiftR w 8
+      w6 = fromIntegral w
+  in f w1 w2 w3 w4 w5 w6
+{-# INLINE word48AsOctets #-}
+
 macToTextDefault :: Word48 -> Text
 macToTextDefault = macToTextPreAllocated 58 False
 
@@ -419,7 +430,7 @@ macTextParser separator f = f
 unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word48
 unsafeWord48FromOctets a b c d e f =
     fromIntegral
-  $ unsafeShiftL a 40 
+  $ unsafeShiftL a 40
   .|. unsafeShiftL b 32
   .|. unsafeShiftL c 24
   .|. unsafeShiftL d 16
