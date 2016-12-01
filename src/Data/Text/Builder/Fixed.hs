@@ -9,7 +9,7 @@
     characters each, this can be ten times faster than the builder
     that ships with @text@.
 -}
-module Data.Text.SmallBuilder
+module Data.Text.Builder.Fixed
   ( Builder
   , fromText
   , run

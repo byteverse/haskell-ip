@@ -9,7 +9,7 @@
     characters each, this can be six times faster than the builder
     that ships with @bytestring@.
 -}
-module Data.ByteString.SmallBuilder
+module Data.ByteString.Builder.Fixed
   ( Builder
   , fromByteString
   , run

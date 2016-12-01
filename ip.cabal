@@ -56,8 +56,8 @@ library
     Data.Word.Synthetic
     Data.Word.Synthetic.Word48
     Data.Word.Synthetic.Word12
-    Data.Text.SmallBuilder
-    Data.ByteString.SmallBuilder
+    Data.Text.Builder.Fixed
+    Data.ByteString.Builder.Fixed
   build-depends:
       base        >= 4.8  && < 5
     , attoparsec

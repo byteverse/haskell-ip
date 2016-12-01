@@ -24,7 +24,7 @@ import Data.Monoid
 import qualified Net.Internal as Internal
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.SmallBuilder as FB
+import qualified Data.Text.Builder.Fixed as FB
 
 encode :: Mac -> Text
 encode = encodeWith defCodec -- Internal.macToTextDefault w

@@ -22,11 +22,10 @@ import Data.Word.Synthetic (Word12)
 import Data.Bits (unsafeShiftL,unsafeShiftR)
 import Control.Monad
 import Data.Monoid
-import qualified Data.ByteString.SmallBuilder as FB
+import qualified Data.ByteString.Builder.Fixed as FB
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.ByteString.Char8 as AB
--- import qualified Net.Mac.Text as MacText
 
 encode :: Mac -> ByteString
 encode = encodeWith defCodec
