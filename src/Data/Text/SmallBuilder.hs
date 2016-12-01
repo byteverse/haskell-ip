@@ -7,14 +7,15 @@
 
 {-| For concatenating fixed-width strings that are only a few
     characters each, this can be ten times faster than the builder
-    that ships with @text@.
+    that ships with @text@. The restriction imposed is that all
+    of the concatenated textual encoding be fixed-width.
 -}
 module Data.Text.SmallBuilder
   ( Builder
   , fromText
   , run
   , contramapBuilder
-  , char
+  , charBmp
   , word8HexFixedLower
   , word8HexFixedUpper
   , word12HexFixedLower
@@ -26,7 +27,7 @@ import Control.Monad.ST
 import Data.Monoid
 import Data.Word
 import Data.Bits
-import Text.Printf
+import Text.Printf (printf)
 import Debug.Trace
 import Data.Char (ord)
 import Data.Word.Synthetic (Word12)
@@ -39,8 +40,8 @@ import qualified Data.Text.IO as Text
 import qualified Data.Text.Array as A
 
 data Builder a where
-  BuilderStatic :: Text -> Builder a
-  BuilderFunction :: Text -> (forall s. Int -> A.MArray s -> a -> ST s ()) -> Builder a
+  BuilderStatic :: !Text -> Builder a
+  BuilderFunction :: !Text -> (forall s. Int -> A.MArray s -> a -> ST s ()) -> Builder a
 
 instance Monoid (Builder a) where
   {-# INLINE mempty #-}
@@ -68,17 +69,19 @@ run :: Builder a -> a -> Text
 run x a = case x of
   BuilderStatic t -> t
   BuilderFunction (Text inArr off len) f ->
-    let outArr = runST $ do
+    let outArr = A.run $ do
           marr <- A.new len
           A.copyI marr 0 inArr off len
           f 0 marr a
-          A.unsafeFreeze marr
+          return marr
      in Text outArr 0 len
 
 word8HexFixedUpper :: Builder Word8
 word8HexFixedUpper = word8HexFixedGeneral True
 {-# INLINE word8HexFixedUpper #-}
 
+-- | Lowercase fixed-width hexidecimal 'Word8' encoding. The text
+--   produced is always two characters in length.
 word8HexFixedLower :: Builder Word8
 word8HexFixedLower = word8HexFixedGeneral False
 {-# INLINE word8HexFixedLower #-}
@@ -94,11 +97,11 @@ word8HexFixedGeneral upper = BuilderFunction (Text.pack "--") $ \i marr w -> do
 {-# INLINE word8HexFixedGeneral #-}
 
 -- | Characters outside the basic multilingual plane are not handled
---   correctly by this function. They will not cause a program to crash;
---   instead, the character will have the upper bits masked out.
-char :: Builder Char
-char = BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
-{-# INLINE char #-}
+--   correctly by this function. However, they will not cause a program to crash.
+--   Instead, the character will have the upper bits masked out.
+charBmp :: Builder Char
+charBmp = BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
+{-# INLINE charBmp #-}
 
 hexValuesUpper :: A.Array
 hexValuesUpper = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02X") [0 :: Int ..255] in arr
