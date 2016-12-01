@@ -1,6 +1,18 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
+
+{-| This is a builder optimized for concatenating short
+    variable-length strings whose length has a known upper
+    bound. In these cases, this can be up to ten times faster
+    than the builder provided by the @text@ library. However,
+    data whose textual encoding has no known upper bound cannot
+    be encoded by the builder provided here. For example, it
+    is possible to provide decimal builders for types like 'Int8' and
+    'Word16', whose lengths are respectively bounded by 
+    4 and 5. However, this is not possible for 'Integer', since
+    its decimal representation could be arbitrarily long.
+-}
 module Data.Text.VariableBuilder
   ( Builder
   , run
@@ -16,12 +28,16 @@ import Data.Text.Internal (Text(..))
 import Text.Printf (printf)
 import Control.Monad.ST
 import Data.Char (ord)
+import Data.Vector (Vector)
+import Data.Function (on)
+import Data.Maybe (fromMaybe)
+import qualified Data.Vector as Vector
 import qualified Data.Text as Text
 import qualified Data.Text.Array as A
 
 data Builder a 
   = Builder 
-      {-# UNPACK #-} !Int -- the maximum length
+      {-# UNPACK #-} !Int -- the maximum length, not a character count
       !(forall s. Int -> A.MArray s -> a -> ST s Int) 
 
 instance Monoid (Builder a) where
@@ -83,6 +99,20 @@ word8 = Builder 3 $ \pos marr w -> if
       return (pos + 3)
 {-# INLINE word8 #-}
 
+-- This has not yet been tested.
+vector :: 
+     Text -- ^ Default, used when index is out of range
+  -> Vector Text -- ^ Texts to index into
+  -> Builder Int
+vector tDef v = Builder 
+  (Vector.maximum $ Vector.map textUtf16Length $ Vector.cons tDef v)
+  $ \pos marr i -> do
+    let Text arr off len = fromMaybe tDef (v Vector.!? i)
+        finalIx = i + len
+    A.copyI marr i arr off finalIx
+    return finalIx
+{-# INLINE vector #-}
+
 twoDecimalDigits :: A.Array
 twoDecimalDigits = 
   let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02d") [0 :: Int ..99] 
@@ -102,4 +132,8 @@ i2w v = asciiZero + fromIntegral v
 asciiZero :: Word16
 asciiZero = 48
 {-# INLINE asciiZero #-}
+
+-- | This is not the number of characters in the text.
+textUtf16Length :: Text -> Int
+textUtf16Length (Text _ _ i) = i
 
