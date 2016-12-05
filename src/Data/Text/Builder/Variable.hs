@@ -24,7 +24,7 @@ module Data.Text.Builder.Variable
 
 import Data.Monoid
 import Data.Word
-import Data.Text.Internal (Text(..))
+import Data.Text (Text)
 import Text.Printf (printf)
 import Control.Monad.ST
 import Data.Char (ord)
@@ -34,6 +34,8 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Vector as Vector
 import qualified Data.Text as Text
 import qualified Data.Text.Array as A
+import qualified Data.Text.Builder.Common.Internal as I
+import qualified Data.Text.Internal as TI
 
 data Builder a
   = Builder
@@ -50,12 +52,13 @@ instance Monoid (Builder a) where
       g ix2 marr a
 
 run :: Builder a -> a -> Text
-run (Builder maxLen f) a =
+run (Builder maxLen f) = \a ->
   let (outArr,len) = A.run2 $ do
         marr <- A.new maxLen
         finalIx <- f 0 marr a
         return (marr,finalIx)
-   in Text outArr 0 len
+   in TI.text outArr 0 len
+{-# INLINE run #-}
 
 contramap :: (b -> a) -> Builder a -> Builder b
 contramap f (Builder len g) = Builder len $ \i marr b ->
@@ -87,15 +90,15 @@ word8 = Builder 3 $ \pos marr w -> if
   | w < 100 -> do
       let wInt = fromIntegral w
           ix = wInt + wInt
-      A.unsafeWrite marr pos (A.unsafeIndex twoDecimalDigits ix)
-      A.unsafeWrite marr (pos + 1) (A.unsafeIndex twoDecimalDigits (ix + 1))
+      A.unsafeWrite marr pos (A.unsafeIndex I.twoDecimalDigits ix)
+      A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.twoDecimalDigits (ix + 1))
       return (pos + 2)
   | otherwise -> do
       let wInt = fromIntegral w
           ix = wInt + wInt + wInt
-      A.unsafeWrite marr pos (A.unsafeIndex threeDecimalDigits ix)
-      A.unsafeWrite marr (pos + 1) (A.unsafeIndex threeDecimalDigits (ix + 1))
-      A.unsafeWrite marr (pos + 2) (A.unsafeIndex threeDecimalDigits (ix + 2))
+      A.unsafeWrite marr pos (A.unsafeIndex I.threeDecimalDigits ix)
+      A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.threeDecimalDigits (ix + 1))
+      A.unsafeWrite marr (pos + 2) (A.unsafeIndex I.threeDecimalDigits (ix + 2))
       return (pos + 3)
 {-# INLINE word8 #-}
 
@@ -104,26 +107,17 @@ vector ::
      Text -- ^ Default, used when index is out of range
   -> Vector Text -- ^ Texts to index into
   -> Builder Int
-vector tDef v = Builder
-  (Vector.maximum $ Vector.map textUtf16Length $ Vector.cons tDef v)
-  $ \pos marr i -> do
-    let Text arr off len = fromMaybe tDef (v Vector.!? i)
-        finalIx = i + len
-    A.copyI marr i arr off finalIx
-    return finalIx
+vector tDef v =
+  let xs = Vector.map I.portableUntext v
+      xDef = I.portableUntext tDef
+   in Builder
+        (Vector.maximum $ Vector.map I.portableTextLength $ Vector.cons tDef v)
+        $ \pos marr i -> do
+          let (arr,len) = fromMaybe xDef (xs Vector.!? i)
+              finalIx = i + len
+          A.copyI marr i arr 0 finalIx
+          return finalIx
 {-# INLINE vector #-}
-
-twoDecimalDigits :: A.Array
-twoDecimalDigits =
-  let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02d") [0 :: Int ..99]
-   in arr
-{-# NOINLINE twoDecimalDigits #-}
-
-threeDecimalDigits :: A.Array
-threeDecimalDigits =
-  let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%03d") [0 :: Int ..255]
-   in arr
-{-# NOINLINE threeDecimalDigits #-}
 
 i2w :: Integral a => a -> Word16
 i2w v = asciiZero + fromIntegral v
@@ -132,8 +126,4 @@ i2w v = asciiZero + fromIntegral v
 asciiZero :: Word16
 asciiZero = 48
 {-# INLINE asciiZero #-}
-
--- | This is not the number of characters in the text.
-textUtf16Length :: Text -> Int
-textUtf16Length (Text _ _ i) = i
 
