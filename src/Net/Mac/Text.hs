@@ -167,11 +167,11 @@ data Pair = Pair
 fixedBuilderTriples :: FB.Builder Word12 -> FB.Builder Pair
 fixedBuilderTriples tripBuilder =
      FB.contramapBuilder (word12At 36 . pairMac) tripBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word12At 24 . pairMac) tripBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word12At 12 . pairMac) tripBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word12At 0 . pairMac) tripBuilder
 {-# INLINE fixedBuilderTriples #-}
 
@@ -189,10 +189,10 @@ fixedBuilderQuadruples :: FB.Builder Word8 -> FB.Builder Pair
 fixedBuilderQuadruples pairBuilder =
      FB.contramapBuilder (word8At 40 . pairMac) pairBuilder
   <> FB.contramapBuilder (word8At 32 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 24 . pairMac) pairBuilder
   <> FB.contramapBuilder (word8At 16 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 8 . pairMac) pairBuilder
   <> FB.contramapBuilder (word8At 0 . pairMac) pairBuilder
 {-# INLINE fixedBuilderQuadruples #-}
@@ -200,15 +200,15 @@ fixedBuilderQuadruples pairBuilder =
 fixedBuilderPairs :: FB.Builder Word8 -> FB.Builder Pair
 fixedBuilderPairs pairBuilder =
      FB.contramapBuilder (word8At 40 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 32 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 24 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 16 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 8 . pairMac) pairBuilder
-  <> FB.contramapBuilder pairSep FB.char
+  <> FB.contramapBuilder pairSep FB.charBmp
   <> FB.contramapBuilder (word8At 0 . pairMac) pairBuilder
 {-# INLINE fixedBuilderPairs #-}
 

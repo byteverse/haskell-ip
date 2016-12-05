@@ -27,6 +27,7 @@ import qualified IPv4Text2
 import qualified IPv4ByteString1
 import qualified IPv4DecodeText1
 import qualified IPv4DecodeText2
+import qualified IPv4TextVariableBuilder
 
 import qualified Net.IPv4.ByteString.Char8 as NIPBS
 
@@ -54,6 +55,7 @@ main = do
       [ bench "Naive" $ whnf Naive.encodeText ipAddr
       , bench "Text Builder" $ whnf IPv4Text2.encode ipAddr
       , bench "Preallocated" $ whnf IPv4Text1.encode ipAddr
+      , bench "Variable Builder" $ whnf IPv4TextVariableBuilder.encode ipAddr
       ]
     , bgroup "IPv4 from Text"
       [ bench "Naive" $ whnf Naive.decodeText ipText

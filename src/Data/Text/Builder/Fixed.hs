@@ -15,7 +15,7 @@ module Data.Text.Builder.Fixed
   , fromText
   , run
   , contramapBuilder
-  , char
+  , charBmp
   , word8HexFixedLower
   , word8HexFixedUpper
   , word12HexFixedLower
@@ -32,6 +32,7 @@ import Debug.Trace
 import Data.Char (ord)
 import Data.Word.Synthetic (Word12)
 import Data.Vector (Vector)
+import Data.Foldable (fold)
 import qualified Data.Vector as Vector
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as LText
@@ -148,14 +149,14 @@ word8HexFixedGeneral upper =
 -- | Characters outside the basic multilingual plane are not handled
 --   correctly by this function. They will not cause a program to crash;
 --   instead, the character will have the upper bits masked out.
-char :: Builder Char
-char =
+charBmp :: Builder Char
+charBmp =
 #ifdef ghcjs_HOST_OS
   BuilderFunction (dlistSingleton . Text.singleton)
 #else
   BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
 #endif
-{-# INLINE char #-}
+{-# INLINE charBmp #-}
 
 word12HexFixedGeneral :: Bool -> Builder Word12
 word12HexFixedGeneral upper =
@@ -205,19 +206,19 @@ hexValuesWord8LowerTexts = Vector.fromList
 #ifdef ghcjs_HOST_OS
 #else
 hexValuesWord12Upper :: A.Array
-hexValuesWord12Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord12UpperTexts
+hexValuesWord12Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord12UpperTexts in arr
 {-# NOINLINE hexValuesWord12Upper #-}
 
 hexValuesWord12Lower :: A.Array
-hexValuesWord12Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord12LowerTexts
+hexValuesWord12Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord12LowerTexts in arr
 {-# NOINLINE hexValuesWord12Lower #-}
 
 hexValuesWord8Upper :: A.Array
-hexValuesWord8Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord8UpperTexts
+hexValuesWord8Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord8UpperTexts in arr
 {-# NOINLINE hexValuesWord8Upper #-}
 
 hexValuesWord8Lower :: A.Array
-hexValuesWord8Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord8LowerTexts
+hexValuesWord8Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord8LowerTexts in arr
 {-# NOINLINE hexValuesWord8Lower #-}
 #endif
 
