@@ -2,7 +2,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -O2 -Wall -funbox-strict-fields #-}
 
@@ -41,56 +40,28 @@ import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Lazy.Builder.Int as TBuilder
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Array as A
+import qualified Data.Text.Internal as TI
+import qualified Data.Text.Internal.Unsafe.Char as TC
 
 data Builder a where
   BuilderStatic :: Text -> Builder a
-#ifdef ghcjs_HOST_OS
-  BuilderFunction :: (a -> DListText) -> Builder a
-#else
   BuilderFunction :: Text -> (forall s. Int -> A.MArray s -> a -> ST s ()) -> Builder a
-#endif
-
-#ifdef ghcjs_HOST_OS
-newtype DListText = DListText ([Text] -> [Text])
-
-dlistCons :: Text -> DListText -> DListText
-dlistCons a (DListText f) = DListText ((a:) . f)
-
-dlistSnoc :: DListText -> Text -> DListText
-dlistSnoc (DListText f) a = DListText (f . (a:))
-
-dlistSingleton :: Text -> DListText
-dlistSingleton t = DListText (t:)
-
-dlistToText :: DListText -> Text
-dlistToText (DListText f) = Text.concat (f [])
-
-instance Monoid DListText where
-  mempty = DListText id
-  mappend (DListText f) (DListText g) = DListText (f . g)
-#endif
 
 instance Monoid (Builder a) where
   {-# INLINE mempty #-}
   mempty = BuilderStatic Text.empty
   {-# INLINE mappend #-}
-#ifdef ghcjs_HOST_OS
   mappend x y = case x of
     BuilderStatic t1 -> case y of
       BuilderStatic t2 -> BuilderStatic (t1 <> t2)
-      BuilderFunction f -> BuilderFunction (\a -> dlistCons t1 (f a))
-    BuilderFunction f1 -> case y of
-      BuilderStatic t2 -> BuilderFunction (\a -> dlistSnoc (f1 a) t2)
-      BuilderFunction f2 -> BuilderFunction (\a -> f1 a <> f2 a)
-#else
-  mappend x y = case x of
-    BuilderStatic t1@(Text _ _ len1) -> case y of
-      BuilderStatic t2 -> BuilderStatic (t1 <> t2)
-      BuilderFunction t2 f -> BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
-    BuilderFunction t1@(Text _ _ len1) f1 -> case y of
+      BuilderFunction t2 f ->
+        let len1 = portableTextLength t1
+         in BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
+    BuilderFunction t1 f1 -> case y of
       BuilderStatic t2 -> BuilderFunction (t1 <> t2) f1
-      BuilderFunction t2 f2 -> BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
-#endif
+      BuilderFunction t2 f2 ->
+        let len1 = portableTextLength t1
+         in BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
 
 fromText :: Text -> Builder a
 fromText = BuilderStatic
@@ -99,27 +70,20 @@ fromText = BuilderStatic
 contramapBuilder :: (b -> a) -> Builder a -> Builder b
 contramapBuilder f x = case x of
   BuilderStatic t -> BuilderStatic t
-#ifdef ghcjs_HOST_OS
-  BuilderFunction g -> BuilderFunction (\b -> g (f b))
-#else
   BuilderFunction t g -> BuilderFunction t (\ix marr b -> g ix marr (f b))
-#endif
 {-# INLINE contramapBuilder #-}
 
 run :: Builder a -> a -> Text
 run x a = case x of
   BuilderStatic t -> t
-#ifdef ghcjs_HOST_OS
-  BuilderFunction f -> dlistToText (f a)
-#else
-  BuilderFunction (Text inArr off len) f ->
-    let outArr = runST $ do
+  BuilderFunction t f ->
+    let (inArr, len) = portableUntext t
+        outArr = runST $ do
           marr <- A.new len
-          A.copyI marr 0 inArr off len
+          A.copyI marr 0 inArr 0 len
           f 0 marr a
           A.unsafeFreeze marr
-     in Text outArr 0 len
-#endif
+     in TI.text outArr 0 len
 
 word8HexFixedUpper :: Builder Word8
 word8HexFixedUpper = word8HexFixedGeneral True
@@ -132,18 +96,12 @@ word8HexFixedLower = word8HexFixedGeneral False
 -- The Bool is True if the hex digits are upper case.
 word8HexFixedGeneral :: Bool -> Builder Word8
 word8HexFixedGeneral upper =
-#ifdef ghcjs_HOST_OS
-  BuilderFunction $ \w ->
-    let !ts = if upper then hexValuesWord8UpperTexts else hexValuesWord8LowerTexts
-     in dlistSingleton (Vector.unsafeIndex ts (fromIntegral w))
-#else
   BuilderFunction (Text.pack "--") $ \i marr w -> do
     let ix = unsafeShiftL (fromIntegral w) 1
         ix2 = ix + 1
         arr = if upper then hexValuesWord8Upper else hexValuesWord8Lower
     A.unsafeWrite marr i (A.unsafeIndex arr ix)
     A.unsafeWrite marr (i + 1) (A.unsafeIndex arr ix2)
-#endif
 {-# INLINE word8HexFixedGeneral #-}
 
 -- | Characters outside the basic multilingual plane are not handled
@@ -151,20 +109,11 @@ word8HexFixedGeneral upper =
 --   instead, the character will have the upper bits masked out.
 charBmp :: Builder Char
 charBmp =
-#ifdef ghcjs_HOST_OS
-  BuilderFunction (dlistSingleton . Text.singleton)
-#else
   BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
-#endif
 {-# INLINE charBmp #-}
 
 word12HexFixedGeneral :: Bool -> Builder Word12
 word12HexFixedGeneral upper =
-#ifdef ghcjs_HOST_OS
-  BuilderFunction $ \w ->
-    let !ts = if upper then hexValuesWord12UpperTexts else hexValuesWord12LowerTexts
-     in dlistSingleton (Vector.unsafeIndex ts (fromIntegral w))
-#else
   BuilderFunction (Text.pack "---") $ \i marr w -> do
     let !wInt = fromIntegral w
         !ix = wInt + wInt + wInt
@@ -172,7 +121,6 @@ word12HexFixedGeneral upper =
     A.unsafeWrite marr i (A.unsafeIndex arr ix)
     A.unsafeWrite marr (i + 1) (A.unsafeIndex arr (ix + 1))
     A.unsafeWrite marr (i + 2) (A.unsafeIndex arr (ix + 2))
-#endif
 {-# INLINE word12HexFixedGeneral #-}
 
 word12HexFixedUpper :: Builder Word12
@@ -203,22 +151,51 @@ hexValuesWord8LowerTexts = Vector.fromList
   (map (Text.pack . printf "%02x") [0 :: Int ..255])
 {-# NOINLINE hexValuesWord8LowerTexts #-}
 
-#ifdef ghcjs_HOST_OS
-#else
 hexValuesWord12Upper :: A.Array
-hexValuesWord12Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord12UpperTexts in arr
+hexValuesWord12Upper = portableTextArray $ fold hexValuesWord12UpperTexts
 {-# NOINLINE hexValuesWord12Upper #-}
 
 hexValuesWord12Lower :: A.Array
-hexValuesWord12Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord12LowerTexts in arr
+hexValuesWord12Lower = portableTextArray $ fold hexValuesWord12LowerTexts
 {-# NOINLINE hexValuesWord12Lower #-}
 
 hexValuesWord8Upper :: A.Array
-hexValuesWord8Upper = let Text arr _ _ = Text.copy $ fold hexValuesWord8UpperTexts in arr
+hexValuesWord8Upper = portableTextArray $ fold hexValuesWord8UpperTexts
 {-# NOINLINE hexValuesWord8Upper #-}
 
 hexValuesWord8Lower :: A.Array
-hexValuesWord8Lower = let Text arr _ _ = Text.copy $ fold hexValuesWord8LowerTexts in arr
+hexValuesWord8Lower = portableTextArray $ fold hexValuesWord8LowerTexts
 {-# NOINLINE hexValuesWord8Lower #-}
-#endif
+
+-- | This is slower that just pattern matching on the Text data constructor.
+--   However, it will work with GHCJS. This should only be used is places
+--   where we know that it will only be evaluated once.
+portableTextArray :: Text -> A.Array
+portableTextArray = fst . portableUntext
+
+-- | This length is not the character length. It is the length of Word16s
+--   required by a UTF16 representation.
+portableTextLength :: Text -> Int
+portableTextLength = snd . portableUntext
+
+portableUntext :: Text -> (A.Array,Int)
+portableUntext t =
+  let str = Text.unpack t
+      Sum len = foldMap (Sum . charUtf16Size) str
+      arr = A.run $ do
+        marr <- A.new len
+        writeString marr str
+        return marr
+   in (arr,len)
+
+writeString :: A.MArray s -> String -> ST s ()
+writeString marr = go 0 where
+  go i s = case s of
+    c : cs -> do
+      n <- TC.unsafeWrite marr i c
+      go (i + n) cs
+    [] -> return ()
+
+charUtf16Size :: Char -> Int
+charUtf16Size c = if ord c < 0x10000 then 1 else 2
 
