@@ -25,6 +25,7 @@ import qualified Net.Mac.Text as MacText
 import qualified Net.Mac.ByteString.Char8 as MacByteString
 
 import qualified Data.Attoparsec.Text as AT
+import qualified Data.Attoparsec.ByteString as AB
 
 import ArbitraryInstances ()
 import qualified Naive
@@ -77,6 +78,9 @@ tests =
     , testGroup "Raw byte array (with lookup table) IPv4 ByteString encode/decode"
       [ testProperty "Identical to Naive"
           $ propMatching IPv4ByteString.encode Naive.encodeByteString
+      ]
+    , testGroup "IPv4 encode/decode"
+      [ testCase "Parser Test Cases" testIPv4Parser
       ]
     , testGroup "IPv6 encode/decode"
       [ testCase "Parser Test Cases" testIPv6Parser
@@ -138,6 +142,18 @@ testLenientMacByteStringParser = do
   go a b c d e f str =
     Just (HexMac (Mac.fromOctets a b c d e f))
     @?= fmap HexMac (MacByteString.decodeLenient (BC8.pack str))
+
+testIPv4Parser :: Assertion
+testIPv4Parser = do
+  go 202 10 19 54 "202.10.19.54"
+  go 10 202 96 25 "10.202.96.25"
+  where
+  go a b c d str =
+    Right (IPv4.fromOctets a b c d)
+    @?= (AB.parseOnly
+          (IPv4ByteString.parser <* AT.endOfInput)
+          (BC8.pack str)
+        )
 
 testIPv6Parser :: Assertion
 testIPv6Parser = do
