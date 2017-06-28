@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -29,6 +30,8 @@ import qualified Data.Vector.Primitive          as PVector
 import qualified Data.Vector.Generic.Mutable    as MGVector
 import qualified Data.Vector.Unboxed.Mutable    as MUVector
 import qualified Data.Vector.Primitive.Mutable  as MPVector
+import qualified Data.Text.Encoding as TE
+import qualified Data.ByteString.Builder as BB
 import Data.Word.Synthetic (Word48)
 import Data.Primitive.Types (Prim)
 import Data.Bits (Bits,FiniteBits,(.|.),unsafeShiftL)
@@ -39,6 +42,12 @@ import Data.Int
 import Data.Hashable
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
+
+#if MIN_VERSION_aeson(1,0,0) 
+import qualified Data.Aeson.Encoding as Aeson
+import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
+  ToJSONKeyFunction(..),FromJSONKeyFunction(..))
+#endif
 
 -- | A 32-bit Internet Protocol version 4 address.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
@@ -94,6 +103,28 @@ instance Hashable Mac
 
 instance ToJSON Mac where
   toJSON (Mac w) = Aeson.String (Internal.macToTextDefault w)
+
+#if MIN_VERSION_aeson(1,0,0) 
+instance ToJSONKey Mac where
+  toJSONKey = ToJSONKeyText
+    (\(Mac w) -> Internal.macToTextDefault w)
+    (\(Mac w) -> Aeson.unsafeToEncoding $ BB.byteString $ TE.encodeUtf8 $ Internal.macToTextDefault w)
+
+instance FromJSONKey Mac where
+  fromJSONKey = FromJSONKeyTextParser $ \t -> 
+    case Internal.macFromText (Just ':') macFromOctets' t of
+      Nothing -> fail "invalid mac address"
+      Just mac -> return mac
+
+instance ToJSONKey IPv4 where
+  toJSONKey = ToJSONKeyText
+    (\(IPv4 w) -> Internal.toDotDecimalText w)
+    (\(IPv4 w) -> Aeson.unsafeToEncoding $ BB.byteString $ TE.encodeUtf8 $ Internal.toDotDecimalText w)
+
+instance FromJSONKey IPv4 where
+  fromJSONKey = FromJSONKeyTextParser
+    (Internal.eitherToAesonParser . coerce Internal.decodeIPv4TextEither)
+#endif
 
 instance FromJSON Mac where
   parseJSON = Internal.attoparsecParseJSON
