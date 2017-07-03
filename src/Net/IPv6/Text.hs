@@ -1,18 +1,53 @@
 {-# LANGUAGE BangPatterns #-}
 
 module Net.IPv6.Text
-  ( parser
+  ( encode
+  , parser
   ) where
 
 import Prelude hiding (print)
 import Net.Types (IPv6(..))
+import Net.IPv6 (toWord16s)
 import Data.Bits
+import Data.List (intercalate, group)
 import Data.Word
 import Control.Applicative
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Attoparsec.Text as Atto
 import Debug.Trace
+import Numeric (showHex)
 
+-- | Encodes the IP, using zero-compression on the leftmost-longest string of
+-- zeroes in the address.
+encode :: IPv6 -> Text
+encode ip =
+    let (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip in
+    let ws = [w1, w2, w3, w4, w5, w6, w7, w8] in
+    toText ws
+
+    where
+
+    toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
+
+        where
+
+        expand _ 8 _ = ["::"]
+        expand _ _ [] = []
+        expand i longest ((x, len):ws)
+            -- zero-compressed group:
+            | x == 0 && len == longest =
+                -- first and last need an extra colon since there's nothing
+                -- to concat against
+                (if i == 0 || (i+len) == 8 then ":" else "")
+                : expand (i+len) 0 ws
+            -- normal group:
+            | otherwise = replicate len (showHex x "") ++ expand (i+len) longest ws
+
+        longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
+        grouped = map (\x -> (head x, length x)) (group ws)
+
+        
 parser :: Atto.Parser IPv6
 parser = do
   s <- start
