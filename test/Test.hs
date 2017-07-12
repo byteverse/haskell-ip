@@ -10,6 +10,7 @@ import Test.HUnit                           (Assertion,(@?=))
 import Numeric                              (showHex)
 import Test.QuickCheck.Property             (failed,succeeded,Result(..))
 import Data.Word
+import Data.Bifunctor
 
 import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
 import qualified Data.Text as Text
@@ -85,6 +86,7 @@ tests =
     , testGroup "IPv6 encode/decode"
       [ testCase "Parser Test Cases" testIPv6Parser
       , testCase "Encode test cases" testIPv6Encode
+      , testCase "Parser Failure Test Cases" testIPv6ParserFailure
       ]
     ]
   , testGroup "IP Range Operations"
@@ -181,6 +183,20 @@ testIPv6Parser = do
   go a b c d e f g h str =
     Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
     @?= fmap HexIPv6
+      (AT.parseOnly
+        (IPv6Text.parser <* AT.endOfInput)
+        (Text.pack str)
+      )
+
+testIPv6ParserFailure :: Assertion
+testIPv6ParserFailure = do
+  go "1111:2222:3333:4444:5555:6666::7777:8888"
+  go "1111:2222:3333:4444:5555:6666:7777:8888:9999"
+  go "1111:2222:3333:4444:5555:6666:7777:8888::9999"
+  where
+  go str =
+    Left ()
+    @?= bimap (\_ -> ()) HexIPv6
       (AT.parseOnly
         (IPv6Text.parser <* AT.endOfInput)
         (Text.pack str)
