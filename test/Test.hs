@@ -84,6 +84,7 @@ tests =
       ]
     , testGroup "IPv6 encode/decode"
       [ testCase "Parser Test Cases" testIPv6Parser
+      , testCase "Encode test cases" testIPv6Encode
       ]
     ]
   , testGroup "IP Range Operations"
@@ -184,6 +185,42 @@ testIPv6Parser = do
         (IPv6Text.parser <* AT.endOfInput)
         (Text.pack str)
       )
+
+testIPv6Encode :: Assertion
+testIPv6Encode = do
+
+    -- degenerate cases:
+    "::" `roundTripsTo` "::"
+    "1234::" `roundTripsTo` "1234::"
+    "::1234" `roundTripsTo` "::1234"
+
+    -- zero-compression works:
+    "1234:1234:0000:0000:0000:0000:3456:3434" `roundTripsTo` "1234:1234::3456:3434"
+
+    -- picks first case:
+    "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234::1234:0:1234:0:123:1234"
+
+    -- picks longest case:
+    "1234:0000:1234:0000:0:0000:0123:1234" `roundTripsTo` "1234:0:1234::123:1234"
+
+    -- can exclude all but first and last:
+    "1234::1234" `roundTripsTo` "1234::1234"
+
+    -- prefers leftmost part to zero-compress:
+    "1:2:0:0:5::8" `roundTripsTo` "1:2::5:0:0:8"
+
+    -- can work with no zeroes:
+    "1:2:3:4:5:6:7:8" `roundTripsTo` "1:2:3:4:5:6:7:8"
+
+    -- works with only first or last:
+    "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
+    "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
+
+   where
+   roundTripsTo s sExpected =
+     case AT.parseOnly (IPv6Text.parser <* AT.endOfInput) (Text.pack s) of
+        Right result -> IPv6Text.encode result @?= Text.pack sExpected
+        Left failMsg -> fail failMsg -- parse shouldn't fail here
 
 textBadIPv4 :: [String]
 textBadIPv4 =
