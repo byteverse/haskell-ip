@@ -15,37 +15,29 @@ import Control.Applicative
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Attoparsec.Text as Atto
-import Debug.Trace
 import Numeric (showHex)
 
 -- | Encodes the IP, using zero-compression on the leftmost-longest string of
 -- zeroes in the address.
 encode :: IPv6 -> Text
-encode ip =
-    let (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip in
-    let ws = [w1, w2, w3, w4, w5, w6, w7, w8] in
-    toText ws
-
+encode ip = toText [w1, w2, w3, w4, w5, w6, w7, w8]
+  where
+  (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip
+  toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
     where
-
-    toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
-
-        where
-
-        expand _ 8 _ = ["::"]
-        expand _ _ [] = []
-        expand i longest ((x, len):ws)
-            -- zero-compressed group:
-            | x == 0 && len == longest =
-                -- first and last need an extra colon since there's nothing
-                -- to concat against
-                (if i == 0 || (i+len) == 8 then ":" else "")
-                : expand (i+len) 0 ws
-            -- normal group:
-            | otherwise = replicate len (showHex x "") ++ expand (i+len) longest ws
-
-        longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
-        grouped = map (\x -> (head x, length x)) (group ws)
+    expand _ 8 _ = ["::"]
+    expand _ _ [] = []
+    expand i longest ((x, len):wsNext)
+        -- zero-compressed group:
+        | x == 0 && len == longest =
+            -- first and last need an extra colon since there's nothing
+            -- to concat against
+            (if i == 0 || (i+len) == 8 then ":" else "")
+            : expand (i+len) 0 wsNext
+        -- normal group:
+        | otherwise = replicate len (showHex x "") ++ expand (i+len) longest wsNext
+    longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
+    grouped = map (\x -> (head x, length x)) (group ws)
 
         
 parser :: Atto.Parser IPv6
@@ -76,27 +68,12 @@ parser = do
             _ <- Atto.anyChar -- should be a colon
             if colonIndex == currentIndex
               then fmap ResWord Atto.hexadecimal <|> pure ResDone
-                -- do
-                -- md <- Atto.peekChar
-                -- case md of
-                --   Nothing -> return ResDone
-                --   Just d -> fmap ResWord Atto.hexadecimal <|> pure
-								-- 		then return ResColon
-								-- 		else fmap ResWord Atto.hexadecimal
               else do
                 d <- Atto.peekChar'
                 if d == ':'
                   then return ResColon
                   else fmap ResWord Atto.hexadecimal
-              -- else if colonIndex == currentIndex
-              --   then fmap ResWord Atto.hexadecimal <|> (ResDone <$ Atto.anyChar)
-              --   else fmap ResWord Atto.hexadecimal
           else return ResDone
-    -- fmap ResWord Atto.hexadecimal <|> (ResColon <$ Atto.char ':')
-    -- ) <|> pure ResDone
-    -- r <- (do _ <- Atto.char ':'
-    --          fmap ResWord Atto.hexadecimal <|> (ResColon <$ Atto.char ':')
-    --      ) <|> pure ResDone
     case r of
       ResDone -> pure (S colonIndex currentIndex ws)
       ResColon -> if alreadySet colonIndex
@@ -151,9 +128,9 @@ restrictTo16 msg w = if w > 65535
 --   The third is a reversed list of the 16s
 --   that comprise the ipv6 address.
 data S = S
-  { sDoubleColon :: {-# UNPACK #-} !Int
-  , sTotal :: {-# UNPACK #-} !Int
-  , sRevWords :: ![Word64]
+  { _sDoubleColon :: {-# UNPACK #-} !Int
+  , _sTotal :: {-# UNPACK #-} !Int
+  , _sRevWords :: ![Word64]
   } deriving (Show,Read)
 
 data Res
