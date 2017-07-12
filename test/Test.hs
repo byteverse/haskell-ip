@@ -191,6 +191,8 @@ testIPv6Parser = do
 testIPv6ParserFailure :: Assertion
 testIPv6ParserFailure = do
   go "1111:2222:3333:4444:5555:6666::7777:8888"
+  go "1111:2222:3333:4444:5555:6666:7777:8888:9999"
+  go "1111:2222:3333:4444:5555:6666:7777:8888::9999"
   where
   go str =
     Left ()

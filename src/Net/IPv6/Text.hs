@@ -105,7 +105,12 @@ parser = do
       ResWord w -> restrictTo16 msg w >> go colonIndex (currentIndex + 1) (w : ws)
 
 toIPv6 :: S -> Maybe IPv6
-toIPv6 (S colonIndex total input) = go 0 0 input
+toIPv6 (S colonIndex total input) = case compare total 8 of
+  EQ -> if colonIndex == (-1)
+    then go 0 0 input
+    else Nothing
+  GT -> Nothing
+  LT -> go 0 0 input
   where
   revColonIndex = total - colonIndex
   spacesToSkip = 8 - total
