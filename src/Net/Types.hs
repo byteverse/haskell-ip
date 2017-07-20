@@ -42,6 +42,7 @@ import Data.Int
 import Data.Hashable
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
+import Data.Monoid
 
 #if MIN_VERSION_aeson(1,0,0) 
 import qualified Data.Aeson.Encoding as Aeson
@@ -108,7 +109,8 @@ instance ToJSON Mac where
 instance ToJSONKey Mac where
   toJSONKey = ToJSONKeyText
     (\(Mac w) -> Internal.macToTextDefault w)
-    (\(Mac w) -> Aeson.unsafeToEncoding $ BB.byteString $ TE.encodeUtf8 $ Internal.macToTextDefault w)
+    -- The bytestring encoding currently goes through text. This is suboptimal.
+    (\(Mac w) -> Aeson.unsafeToEncoding $ BB.char7 '"' <> BB.byteString (TE.encodeUtf8 $ Internal.macToTextDefault w) <> BB.char7 '"')
 
 instance FromJSONKey Mac where
   fromJSONKey = FromJSONKeyTextParser $ \t -> 
@@ -119,7 +121,7 @@ instance FromJSONKey Mac where
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     (\(IPv4 w) -> Internal.toDotDecimalText w)
-    (\(IPv4 w) -> Aeson.unsafeToEncoding $ BB.byteString $ TE.encodeUtf8 $ Internal.toDotDecimalText w)
+    (\(IPv4 w) -> Aeson.unsafeToEncoding $ BB.char7 '"' <> (BB.byteString $ TE.encodeUtf8 $ Internal.toDotDecimalText w) <> BB.char7 '"')
 
 instance FromJSONKey IPv4 where
   fromJSONKey = FromJSONKeyTextParser
