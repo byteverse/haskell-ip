@@ -32,6 +32,7 @@ import qualified Data.Vector.Unboxed.Mutable    as MUVector
 import qualified Data.Vector.Primitive.Mutable  as MPVector
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Builder as BB
+import Foreign.Storable (Storable(..))
 import Data.Word.Synthetic (Word48)
 import Data.Primitive.Types (Prim)
 import Data.Bits (Bits,FiniteBits,(.|.),unsafeShiftL)
@@ -52,7 +53,7 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 
 -- | A 32-bit Internet Protocol version 4 address.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
-  deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits)
+  deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits,Storable)
 
 -- | A 128-bit Internet Protocol version 6 address.
 data IPv6 = IPv6
