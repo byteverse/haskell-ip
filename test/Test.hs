@@ -5,12 +5,12 @@ import Data.List                            (intercalate)
 import Test.QuickCheck                      (Gen, Arbitrary(..), choose)
 import Test.Framework                       (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.Framework.Providers.HUnit       (testCase)
 import Test.HUnit                           (Assertion,(@?=))
 import Numeric                              (showHex)
 import Test.QuickCheck.Property             (failed,succeeded,Result(..))
 import Data.Word
 import Data.Bifunctor
+import qualified Test.Framework.Providers.HUnit as PH
 
 import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
 import qualified Data.Text as Text
@@ -44,17 +44,17 @@ tests =
     [ testGroup "Currently used IPv4 encode/decode" $
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIso IPv4Text.encode IPv4Text.decode
-      , testCase "Decode an IP" testIPv4Decode
+      , PH.testCase "Decode an IP" testIPv4Decode
       ] ++ testDecodeFailures
     , testGroup "Currently used MAC Text encode/decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIsoSettings MacText.encodeWith MacText.decodeWith
-      , testCase "Encode a MAC Address" testMacEncode
+      , PH.testCase "Encode a MAC Address" testMacEncode
       ]
     , testGroup "Currently used MAC ByteString encode/decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIsoSettings MacByteString.encodeWith MacByteString.decodeWith
-      , testCase "Lenient Decoding" testLenientMacByteStringParser
+      , PH.testCase "Lenient Decoding" testLenientMacByteStringParser
       ]
     , testGroup "Naive IPv4 encode/decode"
       [ testProperty "Isomorphism"
@@ -81,12 +81,12 @@ tests =
           $ propMatching IPv4ByteString.encode Naive.encodeByteString
       ]
     , testGroup "IPv4 encode/decode"
-      [ testCase "Parser Test Cases" testIPv4Parser
+      [ PH.testCase "Parser Test Cases" testIPv4Parser
       ]
     , testGroup "IPv6 encode/decode"
-      [ testCase "Parser Test Cases" testIPv6Parser
-      , testCase "Encode test cases" testIPv6Encode
-      , testCase "Parser Failure Test Cases" testIPv6ParserFailure
+      [ PH.testCase "Parser Test Cases" testIPv6Parser
+      , PH.testCase "Encode test cases" testIPv6Encode
+      , PH.testCase "Parser Failure Test Cases" testIPv6ParserFailure
       ]
     ]
   , testGroup "IP Range Operations"
@@ -252,7 +252,7 @@ textBadIPv4 =
 
 testDecodeFailures :: [Test]
 testDecodeFailures = flip map textBadIPv4 $ \str ->
-  testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4Text.decode (Text.pack str) @?= Nothing
+  PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4Text.decode (Text.pack str) @?= Nothing
 
 testMacEncode :: Assertion
 testMacEncode = MacText.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
