@@ -1,13 +1,13 @@
 module Main (main) where
 
 import Naive
-import Data.List                            (intercalate)
-import Test.QuickCheck                      (Gen, Arbitrary(..), choose)
-import Test.Framework                       (defaultMain, testGroup, Test)
+import Data.List (intercalate)
+import Test.QuickCheck (Gen, Arbitrary(..), choose)
+import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.HUnit                           (Assertion,(@?=))
-import Numeric                              (showHex)
-import Test.QuickCheck.Property             (failed,succeeded,Result(..))
+import Test.HUnit (Assertion,(@?=))
+import Numeric (showHex)
+import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Word
 import Data.Bifunctor
 import qualified Test.Framework.Providers.HUnit as PH
@@ -18,9 +18,6 @@ import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Net.IPv4.Range as IPv4Range
-import qualified Net.IPv4.Text as IPv4Text
-import qualified Net.IPv6.Text as IPv6Text
-import qualified Net.IPv4.ByteString.Char8 as IPv4ByteString
 import qualified Net.Mac as Mac
 import qualified Net.Mac.Text as MacText
 import qualified Net.Mac.ByteString.Char8 as MacByteString
@@ -43,7 +40,7 @@ tests =
   [ testGroup "Encoding and Decoding"
     [ testGroup "Currently used IPv4 encode/decode" $
       [ testProperty "Isomorphism"
-          $ propEncodeDecodeIso IPv4Text.encode IPv4Text.decode
+          $ propEncodeDecodeIso IPv4.encode IPv4.decode
       , PH.testCase "Decode an IP" testIPv4Decode
       ] ++ testDecodeFailures
     , testGroup "Currently used MAC Text encode/decode"
@@ -78,7 +75,7 @@ tests =
       ]
     , testGroup "Raw byte array (with lookup table) IPv4 ByteString encode/decode"
       [ testProperty "Identical to Naive"
-          $ propMatching IPv4ByteString.encode Naive.encodeByteString
+          $ propMatching IPv4.encodeUtf8 Naive.encodeByteString
       ]
     , testGroup "IPv4 encode/decode"
       [ PH.testCase "Parser Test Cases" testIPv4Parser
@@ -132,7 +129,7 @@ propRangeSelf :: IPv4Range -> Bool
 propRangeSelf r = IPv4Range.member (ipv4RangeBase r) r == True
 
 testIPv4Decode :: Assertion
-testIPv4Decode = IPv4Text.decode (Text.pack "124.222.255.0")
+testIPv4Decode = IPv4.decode (Text.pack "124.222.255.0")
              @?= Just (IPv4.fromOctets 124 222 255 0)
 
 testLenientMacByteStringParser :: Assertion
@@ -154,7 +151,7 @@ testIPv4Parser = do
   go a b c d str =
     Right (IPv4.fromOctets a b c d)
     @?= (AB.parseOnly
-          (IPv4ByteString.parser <* AT.endOfInput)
+          (IPv4.parserUtf8 <* AT.endOfInput)
           (BC8.pack str)
         )
 
@@ -184,7 +181,7 @@ testIPv6Parser = do
     Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
     @?= fmap HexIPv6
       (AT.parseOnly
-        (IPv6Text.parser <* AT.endOfInput)
+        (IPv6.parser <* AT.endOfInput)
         (Text.pack str)
       )
 
@@ -198,7 +195,7 @@ testIPv6ParserFailure = do
     Left ()
     @?= bimap (\_ -> ()) HexIPv6
       (AT.parseOnly
-        (IPv6Text.parser <* AT.endOfInput)
+        (IPv6.parser <* AT.endOfInput)
         (Text.pack str)
       )
 
@@ -234,8 +231,8 @@ testIPv6Encode = do
 
    where
    roundTripsTo s sExpected =
-     case AT.parseOnly (IPv6Text.parser <* AT.endOfInput) (Text.pack s) of
-        Right result -> IPv6Text.encode result @?= Text.pack sExpected
+     case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
+        Right result -> IPv6.encode result @?= Text.pack sExpected
         Left failMsg -> fail failMsg -- parse shouldn't fail here
 
 textBadIPv4 :: [String]
@@ -252,7 +249,7 @@ textBadIPv4 =
 
 testDecodeFailures :: [Test]
 testDecodeFailures = flip map textBadIPv4 $ \str ->
-  PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4Text.decode (Text.pack str) @?= Nothing
+  PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4.decode (Text.pack str) @?= Nothing
 
 testMacEncode :: Assertion
 testMacEncode = MacText.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
