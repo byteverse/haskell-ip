@@ -40,8 +40,6 @@ library
   hs-source-dirs:      src
   exposed-modules:
     Net.Mac
-    Net.Mac.Text
-    Net.Mac.ByteString.Char8
     Net.IPv4
     Net.IPv4.Range
     Net.IPv6
