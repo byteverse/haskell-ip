@@ -8,7 +8,6 @@ import Data.Bits
 import Text.Printf
 import Debug.Trace
 import Data.Char (ord)
-import Data.Word.Synthetic (Word12)
 import Data.Vector (Vector)
 import Data.Foldable (fold)
 import qualified Data.Vector as Vector

@@ -18,7 +18,7 @@ import Data.ByteString.Lazy.Builder (Builder)
 import Net.Internal (rightToMaybe,c2w)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8')
 import Data.Word (Word8)
-import Data.Word.Synthetic (Word12)
+import Data.Word.Synthetic.Word12 (Word12)
 import Data.Bits (unsafeShiftL,unsafeShiftR)
 import Control.Monad
 import Data.Monoid

@@ -25,7 +25,7 @@ module Data.ByteString.Builder.Fixed
 import Control.Monad.ST
 import Data.Monoid
 import Data.Word
-import Data.Word.Synthetic (Word12)
+import Data.Word.Synthetic.Word12 (Word12)
 import Data.Bits
 import Data.Char (ord)
 import Text.Printf

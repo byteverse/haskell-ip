@@ -48,8 +48,7 @@ library
     Net.IP
     Net.Types
     Net.Internal
-    Data.Word.Synthetic
-    Data.Word.Synthetic.Word48
+  other-modules:
     Data.Word.Synthetic.Word12
     Data.Text.Builder.Fixed
     Data.Text.Builder.Variable
@@ -90,7 +89,7 @@ test-suite test
     IPv4Text1
     IPv4Text2
     IPv4ByteString1
-    IPv4TextVariableBuilder
+    -- IPv4TextVariableBuilder
   ghc-options:         -Wall -O2
   default-language:    Haskell2010
 

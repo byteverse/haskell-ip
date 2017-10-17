@@ -13,7 +13,6 @@ import Data.Text.Lazy.Builder.Int (decimal)
 import Control.Monad
 import Text.Printf (printf)
 import Data.Char (chr,ord)
-import Data.Word.Synthetic (Word48)
 import qualified Data.Text              as Text
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Attoparsec.Text   as AT
@@ -172,7 +171,7 @@ putMac hexPairs pos w' marr = do
   TArray.unsafeWrite marr (pos + 1) $ fromIntegral $ ByteString.unsafeIndex hexPairs (i + 1)
 {-# INLINE putMac #-}
 
-word48AsOctets :: Word48 -> (Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> a) -> a
+word48AsOctets :: Word64 -> (Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> a) -> a
 word48AsOctets w f =
   let w1 = fromIntegral $ unsafeShiftR w 40
       w2 = fromIntegral $ unsafeShiftR w 32
@@ -183,10 +182,10 @@ word48AsOctets w f =
   in f w1 w2 w3 w4 w5 w6
 {-# INLINE word48AsOctets #-}
 
-macToTextDefault :: Word48 -> Text
+macToTextDefault :: Word64 -> Text
 macToTextDefault = macToTextPreAllocated 58 False
 
-macToTextPreAllocated :: Word8 -> Bool -> Word48 -> Text
+macToTextPreAllocated :: Word8 -> Bool -> Word64 -> Text
 macToTextPreAllocated separator' isUpperCase w =
   let w1 = 255 .&. unsafeShiftR (fromIntegral w) 40
       w2 = 255 .&. unsafeShiftR (fromIntegral w) 32
@@ -427,7 +426,7 @@ macTextParser separator f = f
 
 -- Unchecked invariant: each of these Word64s must be smaller
 -- than 256.
-unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word48
+unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64
 unsafeWord48FromOctets a b c d e f =
     fromIntegral
   $ unsafeShiftL a 40

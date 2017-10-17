@@ -30,7 +30,7 @@ import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
 import qualified IPv4ByteString1
-import qualified IPv4TextVariableBuilder
+-- import qualified IPv4TextVariableBuilder
 
 main :: IO ()
 main = defaultMain tests
@@ -61,10 +61,10 @@ tests =
       [ testProperty "Identical to Naive"
           $ propMatching IPv4Text2.encode Naive.encodeText
       ]
-    , testGroup "Variable Text Builder IPv4 Text encode/decode"
-      [ testProperty "Identical to Naive"
-          $ propMatching IPv4TextVariableBuilder.encode Naive.encodeText
-      ]
+    -- , testGroup "Variable Text Builder IPv4 Text encode/decode"
+    --   [ testProperty "Identical to Naive"
+    --       $ propMatching IPv4TextVariableBuilder.encode Naive.encodeText
+    --   ]
     , testGroup "Raw byte array IPv4 Text encode/decode"
       [ testProperty "Identical to Naive"
           $ propMatching IPv4Text1.encode Naive.encodeText

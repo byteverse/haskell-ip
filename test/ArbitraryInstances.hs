@@ -8,19 +8,23 @@ module ArbitraryInstances where
 import Net.Types (IPv4(..),IPv4Range(..),Mac(..),MacGrouping(..),MacCodec(..))
 import Test.QuickCheck (Arbitrary(..),oneof,Gen,elements)
 import Data.Word
-import Data.Word.Synthetic
+import qualified Net.Mac as Mac
 
 deriving instance Arbitrary IPv4
-deriving instance Arbitrary Mac
+instance Arbitrary Mac where
+  arbitrary = Mac.fromOctets
+    <$> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
 
 -- This instance can generate masks that exceed the recommended
 -- length of 32.
 instance Arbitrary IPv4Range where
   arbitrary = fmap fromTuple arbitrary
     where fromTuple (a,b) = IPv4Range a b
-
-instance Arbitrary Word48 where
-  arbitrary = fromIntegral <$> (arbitrary :: Gen Word64)
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary

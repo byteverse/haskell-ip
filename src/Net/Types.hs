@@ -33,7 +33,6 @@ import qualified Data.Vector.Primitive.Mutable  as MPVector
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Builder as BB
 import Foreign.Storable (Storable(..))
-import Data.Word.Synthetic (Word48)
 import Data.Primitive.Types (Prim)
 import Data.Bits (Bits,FiniteBits,(.|.),unsafeShiftL)
 import Data.Coerce (coerce)
@@ -76,8 +75,10 @@ data IPv4Range = IPv4Range
   , ipv4RangeLength :: {-# UNPACK #-} !Word8
   } deriving (Eq,Ord,Show,Read,Generic)
 
--- | A 48-bit MAC address.
-newtype Mac = Mac { getMac :: Word48 }
+-- | A 48-bit MAC address. Do not use the data constructor for this
+--   type. It is not considered part of the stable API, and it
+--   allows you to construct invalid MAC addresses.
+newtype Mac = Mac { getMac :: Word64 }
   deriving (Eq,Ord,Show,Read,Generic)
 
 -- data MacEncoding = MacEncoding
@@ -320,8 +321,8 @@ instance GVector.Vector UVector.Vector IPv4Range where
         . GVector.elemseq (undefined :: UVector.Vector b) b
 
 
-newtype instance MUVector.MVector s Mac
-    = MV_Mac (MUVector.MVector s Word48)
-
-newtype instance UVector.Vector Mac
-    = V_Mac (UVector.Vector Word48)
+-- newtype instance MUVector.MVector s Mac
+--   = MV_Mac (MUVector.MVector s Word16)
+-- 
+-- newtype instance UVector.Vector Mac
+--   = V_Mac (UVector.Vector Word16)
