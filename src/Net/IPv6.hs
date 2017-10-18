@@ -1,29 +1,48 @@
 {-# LANGUAGE BangPatterns #-}
 
 module Net.IPv6
-  ( -- * Convert
-    fromOctets
+  ( -- * Types
+    IPv6(..)
+    -- * Convert
+  , fromOctets
   , fromWord16s
   , toWord16s
     -- * Textual Conversion
     -- ** Text
   , encode
+  , decode
   , parser
   ) where
 
 import qualified Net.Internal as Internal
 import Data.Bits
 import Data.Word
-import Net.Types
 import Data.Bits
 import Data.List (intercalate, group)
 import Data.Word
 import Control.Applicative
 import Data.Text (Text)
+import Net.Internal (rightToMaybe)
 import qualified Data.Text as Text
 import qualified Data.Attoparsec.Text as Atto
+import qualified Data.Aeson as Aeson
+import qualified Data.Attoparsec.Text as AT
 import Numeric (showHex)
 
+-- | A 128-bit Internet Protocol version 6 address.
+data IPv6 = IPv6
+  { ipv6A :: {-# UNPACK #-} !Word64
+  , ipv6B :: {-# UNPACK #-} !Word64
+  } deriving (Eq,Ord,Show,Read)
+
+instance Aeson.ToJSON IPv6 where
+  toJSON = Aeson.String . encode
+
+instance Aeson.FromJSON IPv6 where
+  parseJSON = Aeson.withText "IPv6" $ \t -> case decode t of
+    Nothing -> fail "invalid IPv6 address"
+    Just i -> return i
+        
 fromOctets ::
      Word8 -> Word8 -> Word8 -> Word8
   -> Word8 -> Word8 -> Word8 -> Word8
@@ -82,7 +101,9 @@ encode ip = toText [w1, w2, w3, w4, w5, w6, w7, w8]
     longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
     grouped = map (\x -> (head x, length x)) (group ws)
 
-        
+decode :: Text -> Maybe IPv6
+decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
+
 parser :: Atto.Parser IPv6
 parser = do
   s <- start

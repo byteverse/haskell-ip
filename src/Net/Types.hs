@@ -8,6 +8,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+{-# OPTIONS_GHC -Wall #-}
+
 module Net.Types
   ( IPv4(..)
   , IPv6(..)
@@ -43,6 +45,7 @@ import Data.Hashable
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
 import Data.Monoid
+import Net.IPv6 (IPv6(..))
 
 #if MIN_VERSION_aeson(1,0,0) 
 import qualified Data.Aeson.Encoding as Aeson
@@ -53,12 +56,6 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 -- | A 32-bit Internet Protocol version 4 address.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits,Storable)
-
--- | A 128-bit Internet Protocol version 6 address.
-data IPv6 = IPv6
-  { ipv6A :: {-# UNPACK #-} !Word64
-  , ipv6B :: {-# UNPACK #-} !Word64
-  } deriving (Eq,Ord,Show,Read)
 
 -- | A 32-bit 'IPv4' address or a 128-bit 'IPv6' address. Internally, this
 --   is just represented as an 'IPv6' address. The functions provided
