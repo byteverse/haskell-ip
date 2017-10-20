@@ -53,27 +53,6 @@ stripDecimal t = case Text.uncons t of
     else Left "expected a dot but found a different character"
 {-# INLINE stripDecimal #-}
 
-decodeIPv4TextReader :: TextRead.Reader Word32
-decodeIPv4TextReader t1' = do
-  (a,t2) <- TextRead.decimal t1'
-  t2' <- stripDecimal t2
-  (b,t3) <- TextRead.decimal t2'
-  t3' <- stripDecimal t3
-  (c,t4) <- TextRead.decimal t3'
-  t4' <- stripDecimal t4
-  (d,t5) <- TextRead.decimal t4'
-  if a > 255 || b > 255 || c > 255 || d > 255
-    then Left ipOctetSizeErrorMsg
-    else Right (fromOctets' a b c d,t5)
-{-# INLINE decodeIPv4TextReader #-}
-
-decodeIPv4TextEither :: Text -> Either String Word32
-decodeIPv4TextEither t = case decodeIPv4TextReader t of
-  Left err -> Left err
-  Right (w,t') -> if Text.null t'
-    then Right w
-    else Left "expected end of text but it continued instead"
-
 ipOctetSizeErrorMsg :: String
 ipOctetSizeErrorMsg = "All octets in an IPv4 address must be between 0 and 255"
 
@@ -247,10 +226,6 @@ i2w v = zero + fromIntegral v
 {-# INLINE i2w #-}
 
 
-fromDotDecimalText' :: Text -> Either String Word32
-fromDotDecimalText' t =
-  AT.parseOnly (dotDecimalParser <* AT.endOfInput) t
-
 fromDotDecimalText :: Text -> Maybe Word32
 fromDotDecimalText = rightToMaybe . fromDotDecimalText'
 
@@ -261,49 +236,6 @@ rangeFromDotDecimalText' f t =
 
 rangeFromDotDecimalText :: (Word32 -> Word8 -> a) -> Text -> Maybe a
 rangeFromDotDecimalText f = rightToMaybe . rangeFromDotDecimalText' f
-
-dotDecimalRangeParser :: (Word32 -> Word8 -> a) -> AT.Parser a
-dotDecimalRangeParser f = f
-  <$> dotDecimalParser
-  <*  AT.char '/'
-  <*> (AT.decimal >>= limitSize)
-  where
-  limitSize i =
-    if i > 32
-      then fail "An IP range length must be between 0 and 32"
-      else return i
-
--- | This does not do an endOfInput check because it is
--- reused in the range parser implementation.
-dotDecimalParser :: AT.Parser Word32
-dotDecimalParser = fromOctets'
-  <$> (AT.decimal >>= limitSize)
-  <*  AT.char '.'
-  <*> (AT.decimal >>= limitSize)
-  <*  AT.char '.'
-  <*> (AT.decimal >>= limitSize)
-  <*  AT.char '.'
-  <*> (AT.decimal >>= limitSize)
-  where
-  limitSize i =
-    if i > 255
-      then fail ipOctetSizeErrorMsg
-      else return i
-
--- | This is sort of a misnomer. It takes Word32 to make
---   dotDecimalParser probably perform better. This is mostly
---   for internal use.
---
---   At some point, it would be worth revisiting the decision
---   to use 'Word32' here. Using 'Word' would probably give
---   better performance on a 64-bit processor.
-fromOctets' :: Word32 -> Word32 -> Word32 -> Word32 -> Word32
-fromOctets' a b c d =
-    ( shiftL a 24
-  .|. shiftL b 16
-  .|. shiftL c 8
-  .|. d
-    )
 
 fromOctetsV6 ::
      Word64 -> Word64 -> Word64 -> Word64
@@ -378,15 +310,6 @@ wordSuccessorsM f = go where
 mask :: Word8 -> Word32
 mask = complement . shiftR 0xffffffff . fromIntegral
 
-p24 :: Word32
-p24 = fromOctets' 10 0 0 0
-
-p20 :: Word32
-p20 = fromOctets' 172 16 0 0
-
-p16 :: Word32
-p16 = fromOctets' 192 168 0 0
-
 mask8,mask4,mask12,mask20,mask28,mask16,mask10,mask24,mask32,mask15 :: Word32
 mask4  = 0xF0000000
 mask8  = 0xFF000000
@@ -449,6 +372,10 @@ macFromText' separator f =
 twoDigits :: ByteString
 twoDigits = foldMap (BC8.pack . printf "%02d") $ enumFromTo (0 :: Int) 99
 {-# NOINLINE twoDigits #-}
+
+threeDigits :: ByteString
+threeDigits = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 999
+{-# NOINLINE threeDigits #-}
 
 threeDigitsWord8 :: ByteString
 threeDigitsWord8 = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 255

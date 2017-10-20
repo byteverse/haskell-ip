@@ -1,4 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE CPP #-}
 
 {-| An IPv4 data type
 
@@ -44,10 +50,11 @@ module Net.IPv4
     -- $string
   , encodeString
   , decodeString
+    -- * Types
+  , IPv4(..)
   ) where
 
 import Prelude hiding (any,print)
-import Net.Types (IPv4(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Data.Word
 import Data.Int
@@ -66,6 +73,10 @@ import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (poke)
 import Data.Monoid ((<>))
 import Data.Text.Encoding (decodeUtf8')
+import Foreign.Storable (Storable)
+import Data.Bits (Bits,FiniteBits)
+import Data.Primitive.Types (Prim)
+import qualified Data.Text.Read as TextRead
 import qualified Data.ByteString.Builder as Builder
 import qualified Net.Internal as Internal
 import qualified Data.Text.Lazy as LText
@@ -81,6 +92,19 @@ import qualified Data.ByteString
 import qualified Data.Text as Text
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as BSU
+import qualified Data.Vector.Generic as GVector
+import qualified Data.Vector.Generic.Mutable as MGVector
+import qualified Data.Vector.Unboxed as UVector
+import qualified Data.Vector.Primitive as PVector
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Builder as BB
+import qualified Data.Text.Encoding as TE
+
+#if MIN_VERSION_aeson(1,0,0) 
+import qualified Data.Aeson.Encoding as Aeson
+import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
+  ToJSONKeyFunction(..),FromJSONKeyFunction(..))
+#endif
 
 -- $setup
 --
@@ -182,7 +206,7 @@ encode :: IPv4 -> Text
 encode = Internal.toDotDecimalText . getIPv4
 
 decodeEither :: Text -> Either String IPv4
-decodeEither = coerce . Internal.decodeIPv4TextEither
+decodeEither = coerce . decodeIPv4TextEither
 
 decode :: Text -> Maybe IPv4
 decode = Internal.rightToMaybe . decodeEither
@@ -191,7 +215,7 @@ builder :: IPv4 -> TBuilder.Builder
 builder = Internal.toDotDecimalBuilder . getIPv4
 
 reader :: Text.Reader IPv4
-reader = coerce Internal.decodeIPv4TextReader
+reader = coerce decodeIPv4TextReader
 
 parser :: AT.Parser IPv4
 parser = coerce Internal.dotDecimalParser
@@ -226,7 +250,7 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
           | word >= 100 = do
               let int = fromIntegral word
                   indx = int + int + int
-                  get3 = fromIntegral . BSU.unsafeIndex threeDigits
+                  get3 = fromIntegral . BSU.unsafeIndex Internal.threeDigits
               poke ptr (get3 indx)
               poke (ptr `plusPtr` 1) (get3 (indx + 1))
               poke (ptr `plusPtr` 2) (get3 (indx + 2))
@@ -234,7 +258,7 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
           | word >= 10 = do
               let int = fromIntegral word
                   indx = int + int
-                  get2 = fromIntegral . BSU.unsafeIndex twoDigits
+                  get2 = fromIntegral . BSU.unsafeIndex Internal.twoDigits
               poke ptr (get2 indx)
               poke (ptr `plusPtr` 1) (get2 (indx + 1))
               return 2
@@ -282,26 +306,154 @@ decodeString :: String -> Maybe IPv4
 decodeString = decode . Text.pack
 
 
-twoDigits :: ByteString
-twoDigits = BC8.pack
-  "0001020304050607080910111213141516171819\
-  \2021222324252627282930313233343536373839\
-  \4041424344454647484950515253545556575859\
-  \6061626364656667686970717273747576777879\
-  \8081828384858687888990919293949596979899"
+-- | A 32-bit Internet Protocol version 4 address.
+newtype IPv4 = IPv4 { getIPv4 :: Word32 }
+  deriving (Eq,Ord,Show,Read,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits,Storable)
 
-threeDigits :: ByteString
-threeDigits =
-  Data.ByteString.replicate 300 0 <> BC8.pack
-  "100101102103104105106107108109110111112\
-  \113114115116117118119120121122123124125\
-  \126127128129130131132133134135136137138\
-  \139140141142143144145146147148149150151\
-  \152153154155156157158159160161162163164\
-  \165166167168169170171172173174175176177\
-  \178179180181182183184185186187188189190\
-  \191192193194195196197198199200201202203\
-  \204205206207208209210211212213214215216\
-  \217218219220221222223224225226227228229\
-  \230231232233234235236237238239240241242\
-  \243244245246247248249250251252253254255"
+
+newtype instance UVector.MVector s IPv4 = MV_IPv4 (PVector.MVector s IPv4)
+newtype instance UVector.Vector IPv4 = V_IPv4 (PVector.Vector IPv4)
+
+instance UVector.Unbox IPv4
+
+instance MGVector.MVector UVector.MVector IPv4 where
+  {-# INLINE basicLength #-}
+  {-# INLINE basicUnsafeSlice #-}
+  {-# INLINE basicOverlaps #-}
+  {-# INLINE basicUnsafeNew #-}
+  {-# INLINE basicInitialize #-}
+  {-# INLINE basicUnsafeReplicate #-}
+  {-# INLINE basicUnsafeRead #-}
+  {-# INLINE basicUnsafeWrite #-}
+  {-# INLINE basicClear #-}
+  {-# INLINE basicSet #-}
+  {-# INLINE basicUnsafeCopy #-}
+  {-# INLINE basicUnsafeGrow #-}
+  basicLength (MV_IPv4 v) = MGVector.basicLength v
+  basicUnsafeSlice i n (MV_IPv4 v) = MV_IPv4 $ MGVector.basicUnsafeSlice i n v
+  basicOverlaps (MV_IPv4 v1) (MV_IPv4 v2) = MGVector.basicOverlaps v1 v2
+  basicUnsafeNew n = MV_IPv4 `liftM` MGVector.basicUnsafeNew n
+  basicInitialize (MV_IPv4 v) = MGVector.basicInitialize v
+  basicUnsafeReplicate n x = MV_IPv4 `liftM` MGVector.basicUnsafeReplicate n x
+  basicUnsafeRead (MV_IPv4 v) i = MGVector.basicUnsafeRead v i
+  basicUnsafeWrite (MV_IPv4 v) i x = MGVector.basicUnsafeWrite v i x
+  basicClear (MV_IPv4 v) = MGVector.basicClear v
+  basicSet (MV_IPv4 v) x = MGVector.basicSet v x
+  basicUnsafeCopy (MV_IPv4 v1) (MV_IPv4 v2) = MGVector.basicUnsafeCopy v1 v2
+  basicUnsafeMove (MV_IPv4 v1) (MV_IPv4 v2) = MGVector.basicUnsafeMove v1 v2
+  basicUnsafeGrow (MV_IPv4 v) n = MV_IPv4 `liftM` MGVector.basicUnsafeGrow v n
+
+instance GVector.Vector UVector.Vector IPv4 where
+  {-# INLINE basicUnsafeFreeze #-}
+  {-# INLINE basicUnsafeThaw #-}
+  {-# INLINE basicLength #-}
+  {-# INLINE basicUnsafeSlice #-}
+  {-# INLINE basicUnsafeIndexM #-}
+  {-# INLINE elemseq #-}
+  basicUnsafeFreeze (MV_IPv4 v) = V_IPv4 `liftM` GVector.basicUnsafeFreeze v
+  basicUnsafeThaw (V_IPv4 v) = MV_IPv4 `liftM` GVector.basicUnsafeThaw v
+  basicLength (V_IPv4 v) = GVector.basicLength v
+  basicUnsafeSlice i n (V_IPv4 v) = V_IPv4 $ GVector.basicUnsafeSlice i n v
+  basicUnsafeIndexM (V_IPv4 v) i = GVector.basicUnsafeIndexM v i
+  basicUnsafeCopy (MV_IPv4 mv) (V_IPv4 v) = GVector.basicUnsafeCopy mv v
+  elemseq _ = seq
+
+instance ToJSON IPv4 where
+  toJSON (IPv4 addr) = Aeson.String (Internal.toDotDecimalText addr)
+
+instance FromJSON IPv4 where
+  parseJSON = Aeson.withText "IPv4" (Internal.eitherToAesonParser . coerce decodeIPv4TextEither)
+
+instance ToJSONKey IPv4 where
+  toJSONKey = ToJSONKeyText
+    (\(IPv4 w) -> Internal.toDotDecimalText w)
+    (\(IPv4 w) -> Aeson.unsafeToEncoding $ BB.char7 '"' <> (BB.byteString $ TE.encodeUtf8 $ Internal.toDotDecimalText w) <> BB.char7 '"')
+
+#if MIN_VERSION_aeson(1,0,0) 
+instance FromJSONKey IPv4 where
+  fromJSONKey = FromJSONKeyTextParser
+    (Internal.eitherToAesonParser . coerce decodeIPv4TextEither)
+#endif
+
+------------------------------------
+-- Internal functions, not exported
+------------------------------------
+
+decodeIPv4TextEither :: Text -> Either String Word32
+decodeIPv4TextEither t = case decodeIPv4TextReader t of
+  Left err -> Left err
+  Right (w,t') -> if Text.null t'
+    then Right w
+    else Left "expected end of text but it continued instead"
+
+decodeIPv4TextReader :: TextRead.Reader Word32
+decodeIPv4TextReader t1' = do
+  (a,t2) <- TextRead.decimal t1'
+  t2' <- stripDecimal t2
+  (b,t3) <- TextRead.decimal t2'
+  t3' <- stripDecimal t3
+  (c,t4) <- TextRead.decimal t3'
+  t4' <- stripDecimal t4
+  (d,t5) <- TextRead.decimal t4'
+  if a > 255 || b > 255 || c > 255 || d > 255
+    then Left ipOctetSizeErrorMsg
+    else Right (fromOctets' a b c d,t5)
+
+
+-- | This is sort of a misnomer. It takes Word32 to make
+--   dotDecimalParser probably perform better. This is mostly
+--   for internal use.
+--
+--   At some point, it would be worth revisiting the decision
+--   to use 'Word32' here. Using 'Word' would probably give
+--   better performance on a 64-bit processor.
+fromOctets' :: Word32 -> Word32 -> Word32 -> Word32 -> Word32
+fromOctets' a b c d =
+    ( shiftL a 24
+  .|. shiftL b 16
+  .|. shiftL c 8
+  .|. d
+    )
+
+p24 :: Word32
+p24 = fromOctets' 10 0 0 0
+
+p20 :: Word32
+p20 = fromOctets' 172 16 0 0
+
+p16 :: Word32
+p16 = fromOctets' 192 168 0 0
+
+-- | This does not do an endOfInput check because it is
+-- reused in the range parser implementation.
+dotDecimalParser :: AT.Parser Word32
+dotDecimalParser = fromOctets'
+  <$> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
+  <*  AT.char '.'
+  <*> (AT.decimal >>= limitSize)
+  where
+  limitSize i =
+    if i > 255
+      then fail ipOctetSizeErrorMsg
+      else return i
+
+fromDotDecimalText' :: Text -> Either String Word32
+fromDotDecimalText' t =
+  AT.parseOnly (dotDecimalParser <* AT.endOfInput) t
+
+dotDecimalRangeParser :: (Word32 -> Word8 -> a) -> AT.Parser a
+dotDecimalRangeParser f = f
+  <$> dotDecimalParser
+  <*  AT.char '/'
+  <*> (AT.decimal >>= limitSize)
+  where
+  limitSize i =
+    if i > 32
+      then fail "An IP range length must be between 0 and 32"
+      else return i
+
+
