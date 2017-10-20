@@ -1,5 +1,5 @@
 name: ip
-version: 0.9.3
+version: 1.0.0
 synopsis: Library for IP and MAC addresses
 homepage: https://github.com/andrewthad/haskell-ip#readme
 license: BSD3
@@ -32,7 +32,7 @@ description:
     persistent. Also, provides a `yesod-form` helper.
 
 library
-  hs-source-dirs:      src
+  hs-source-dirs: src
   exposed-modules:
     Net.Mac
     Net.IPv4
@@ -47,13 +47,13 @@ library
     Data.Text.Builder.Common.Internal
     Data.ByteString.Builder.Fixed
   build-depends:
-      base        >= 4.8  && < 5
+      base >= 4.8  && < 5
     , attoparsec
-    , aeson       >= 0.9  && < 1.3
-    , hashable    >= 1.2  && < 1.3
-    , text        >= 1.2  && < 1.3
-    , bytestring  >= 0.10 && < 0.11
-    , vector      >= 0.11 && < 0.13
+    , aeson >= 0.9  && < 1.3
+    , hashable >= 1.2  && < 1.3
+    , text >= 1.2  && < 1.3
+    , bytestring >= 0.10 && < 0.11
+    , vector >= 0.11 && < 0.13
     , primitive
   -- if impl(ghcjs)
   --   build-depends: ghcjs-base >= 0.2 && < 0.3
@@ -96,7 +96,7 @@ test-suite doctest
   default-language:    Haskell2010
 
 benchmark criterion
-  type:                exitcode-stdio-1.0
+  type: exitcode-stdio-1.0
   build-depends:
       base
     , ip
