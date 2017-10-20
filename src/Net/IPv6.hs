@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
+{-# OPTIONS_GHC -Wall #-}
+
 module Net.IPv6
   ( -- * Types
     IPv6(..)
@@ -7,6 +9,9 @@ module Net.IPv6
   , fromOctets
   , fromWord16s
   , toWord16s
+    -- * Special IP Addresses
+  , any
+  , loopback
     -- * Textual Conversion
     -- ** Text
   , encode
@@ -14,26 +19,83 @@ module Net.IPv6
   , parser
   ) where
 
-import qualified Net.Internal as Internal
-import Data.Bits
-import Data.Word
+import Prelude hiding (any)
 import Data.Bits
 import Data.List (intercalate, group)
 import Data.Word
+import Data.Char (chr)
 import Control.Applicative
 import Data.Text (Text)
-import Net.Internal (rightToMaybe)
+import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import Text.ParserCombinators.ReadPrec (prec,step)
 import qualified Data.Text as Text
 import qualified Data.Attoparsec.Text as Atto
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
 import Numeric (showHex)
 
+-- $setup
+--
+-- These are here to get doctest work.
+--
+-- >>> import qualified Prelude as P
+-- >>> import qualified Data.Text.IO as T
+--
+
 -- | A 128-bit Internet Protocol version 6 address.
 data IPv6 = IPv6
   { ipv6A :: {-# UNPACK #-} !Word64
   , ipv6B :: {-# UNPACK #-} !Word64
-  } deriving (Eq,Ord,Show,Read)
+  } deriving (Eq,Ord)
+
+instance Show IPv6 where
+  showsPrec p addr = showParen (p > 10)
+    $ showString "fromWord16s "
+    . showHexWord16 a
+    . showChar ' '
+    . showHexWord16 b
+    . showChar ' '
+    . showHexWord16 c
+    . showChar ' '
+    . showHexWord16 d
+    . showChar ' '
+    . showHexWord16 e
+    . showChar ' '
+    . showHexWord16 f
+    . showChar ' '
+    . showHexWord16 g
+    . showChar ' '
+    . showHexWord16 h
+    . showChar ' '
+    where
+    (a,b,c,d,e,f,g,h) = toWord16s addr
+
+showHexWord16 :: Word16 -> ShowS
+showHexWord16 w =
+    showString "0x"
+  . showChar (nibbleToHex (unsafeShiftR (fromIntegral w) 12))
+  . showChar (nibbleToHex ((unsafeShiftR (fromIntegral w) 8) .&. 0xF))
+  . showChar (nibbleToHex ((unsafeShiftR (fromIntegral w) 4) .&. 0xF))
+  . showChar (nibbleToHex ((fromIntegral w) .&. 0xF))
+
+-- invariant: argument must be less than 16
+nibbleToHex :: Word -> Char
+nibbleToHex w
+  | w < 10 = chr (fromIntegral (w + 48))
+  | otherwise = chr (fromIntegral (w + 87))
+
+instance Read IPv6 where
+  readPrec = parens $ prec 10 $ do
+    Ident "fromWord16s" <- lexP
+    a <- step readPrec
+    b <- step readPrec
+    c <- step readPrec
+    d <- step readPrec
+    e <- step readPrec
+    f <- step readPrec
+    g <- step readPrec
+    h <- step readPrec
+    return (fromWord16s a b c d e f g h)
 
 instance Aeson.ToJSON IPv6 where
   toJSON = Aeson.String . encode
@@ -43,6 +105,9 @@ instance Aeson.FromJSON IPv6 where
     Nothing -> fail "invalid IPv6 address"
     Just i -> return i
         
+rightToMaybe :: Either a b -> Maybe b
+rightToMaybe = either (const Nothing) Just
+
 fromOctets ::
      Word8 -> Word8 -> Word8 -> Word8
   -> Word8 -> Word8 -> Word8 -> Word8
@@ -50,19 +115,30 @@ fromOctets ::
   -> Word8 -> Word8 -> Word8 -> Word8
   -> IPv6
 fromOctets a b c d e f g h i j k l m n o p =
-  let !(w1,w2) = Internal.fromOctetsV6
+  let !(w1,w2) = fromOctetsV6
         (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
         (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
         (fromIntegral i) (fromIntegral j) (fromIntegral k) (fromIntegral l)
         (fromIntegral m) (fromIntegral n) (fromIntegral o) (fromIntegral p)
    in IPv6 w1 w2
 
+-- | Create an 'IPv6' address from the eight 16-bit fragments that make
+--   it up. This closely resembles the standard IPv6 notation, so
+--   is used for the 'Show' instance. Note that this lacks the formatting
+--   feature for suppress zeroes in an 'IPv6' address, but it should be
+--   readable enough for hacking in GHCi.
+--
+--   >>> let ip = fromWord16s 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1
+--   >>> ip
+--   fromWord16s 0x3124 0x0000 0x0000 0xdead 0xcafe 0x00ff 0xfe00 0x0001
+--   >>> T.putStrLn (encode ip)
+--   3124::dead:cafe:ff:fe00:1
 fromWord16s ::
      Word16 -> Word16 -> Word16 -> Word16
   -> Word16 -> Word16 -> Word16 -> Word16
   -> IPv6
 fromWord16s a b c d e f g h =
-  let !(w1,w2) = Internal.fromWord16sV6
+  let !(w1,w2) = fromWord16sV6
         (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
         (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
    in IPv6 w1 w2
@@ -78,6 +154,12 @@ toWord16s (IPv6 a b) =
   , fromIntegral (unsafeShiftR b 16)
   , fromIntegral b
   )
+
+loopback :: IPv6
+loopback = IPv6 0 1
+
+any :: IPv6
+any = IPv6 0 0
 
 -- | Encodes the IP, using zero-compression on the leftmost-longest string of
 -- zeroes in the address.
@@ -201,4 +283,47 @@ data Res
   = ResWord {-# UNPACK #-} !Word64
   | ResColon
   | ResDone
+
+fromOctetsV6 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> (Word64,Word64)
+fromOctetsV6 a b c d e f g h i j k l m n o p =
+  ( fromOctetsWord64 a b c d e f g h
+  , fromOctetsWord64 i j k l m n o p
+  )
+
+fromWord16sV6 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> (Word64,Word64)
+fromWord16sV6 a b c d e f g h =
+  ( fromWord16Word64 a b c d
+  , fromWord16Word64 e f g h
+  )
+
+fromOctetsWord64 ::
+     Word64 -> Word64 -> Word64 -> Word64
+  -> Word64 -> Word64 -> Word64 -> Word64
+  -> Word64
+fromOctetsWord64 a b c d e f g h = fromIntegral
+    ( shiftL a 56
+  .|. shiftL b 48
+  .|. shiftL c 40
+  .|. shiftL d 32
+  .|. shiftL e 24
+  .|. shiftL f 16
+  .|. shiftL g 8
+  .|. h
+    )
+
+fromWord16Word64 :: Word64 -> Word64 -> Word64 -> Word64 -> Word64
+fromWord16Word64 a b c d = fromIntegral
+    ( unsafeShiftL a 48
+  .|. unsafeShiftL b 32
+  .|. unsafeShiftL c 16
+  .|. d
+    )
 

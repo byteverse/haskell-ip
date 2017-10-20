@@ -20,9 +20,7 @@ description:
   typeclasses of its own. Neither does it prefix functions with the name
   of the type that they work on. Instead, functions of the same name are
   exported by several different modules, and it is expected that end users
-  disambiguate by importing these modules qualified. For example,
-  `Data.IPv4.ByteString.Char8` and `Data.IPv4.Text` have nearly identical
-  export lists.
+  disambiguate by importing these modules qualified.
   .
   The only module intended to be imported unqualified is `Net.Types`. The
   types in this package should not conflict with the types in
@@ -32,9 +30,6 @@ description:
   .
   * `yesod-ip`: Provides orphan instances needed to work with yesod and
     persistent. Also, provides a `yesod-form` helper.
-  .
-  * `impure-containers`: Provides a trie that can be used for looking
-    up which subnet an IP address belongs in.
 
 library
   hs-source-dirs:      src
@@ -45,7 +40,6 @@ library
     Net.IPv6
     Net.IP
     Net.Types
-    Net.Internal
   other-modules:
     Data.Word.Synthetic.Word12
     Data.Text.Builder.Fixed
@@ -82,7 +76,6 @@ test-suite test
     , test-framework-hunit
     , attoparsec
   other-modules:
-    ArbitraryInstances
     Naive
     IPv4Text1
     IPv4Text2

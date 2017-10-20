@@ -1,6 +1,14 @@
- {-# LANGUAGE DeriveGeneric #-}
- {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UnboxedTuples #-}
 
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+{-# OPTIONS_GHC -Wall #-}
 module Net.Mac
   ( -- * Convert
     fromOctets
@@ -21,35 +29,44 @@ module Net.Mac
   , encodeWithUtf8
   , decodeUtf8
   , decodeWithUtf8
-  , decodeLenientUtf8
   , builderUtf8
   , parserUtf8
   , parserWithUtf8
   , parserLenientUtf8
+    -- * Types
+  , Mac(..)
+  , MacCodec(..)
+  , MacGrouping(..)
   ) where
 
-import Net.Types (Mac(..),MacCodec(..),MacGrouping(..))
 import Data.Word
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement,unsafeShiftR)
+import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR)
 import Data.Text (Text)
 import Data.Word (Word8)
 import Data.Word.Synthetic.Word12 (Word12)
-import Data.Char (chr)
-import Net.Internal (rightToMaybe,c2w)
-import Data.Bits (unsafeShiftL,unsafeShiftR)
 import Data.Monoid
 import Data.ByteString (ByteString)
+import Data.Aeson (FromJSON(..),ToJSON(..))
+import Data.Hashable (Hashable)
+import GHC.Generics (Generic)
+import Data.Char (ord)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString as AB
-import qualified Net.Internal as Internal
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.ByteString.Builder.Fixed as BFB
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
+
+#if MIN_VERSION_aeson(1,0,0) 
+import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
+  ToJSONKeyFunction(..),FromJSONKeyFunction(..))
+#endif
 
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
-fromOctets a b c d e f = Mac $ Internal.unsafeWord48FromOctets
+fromOctets a b c d e f = Mac $ unsafeWord48FromOctets
   (fromIntegral a) (fromIntegral b) (fromIntegral c)
   (fromIntegral d) (fromIntegral e) (fromIntegral f)
 {-# INLINE fromOctets #-}
@@ -63,6 +80,12 @@ toOctets (Mac w) =
   , fromIntegral $ unsafeShiftR w 8
   , fromIntegral w
   )
+
+rightToMaybe :: Either a b -> Maybe b
+rightToMaybe = either (const Nothing) Just
+
+c2w :: Char -> Word8
+c2w = fromIntegral . ord
 
 encode :: Mac -> Text
 encode = encodeWith defCodec -- Internal.macToTextDefault w
@@ -108,12 +131,8 @@ parserWith (MacCodec g _) = case g of
   MacGroupingPairs c -> parserPairs c
   MacGroupingNoSeparator -> parserNoSeparator
 
-
 defCodec :: MacCodec
 defCodec = MacCodec (MacGroupingPairs ':') False
-
-w8ToChar :: Word8 -> Char
-w8ToChar = chr . fromIntegral
 
 parserQuadruples :: Char -> AT.Parser Mac
 parserQuadruples s = fromOctets
@@ -248,8 +267,10 @@ word12At i (Mac w) = fromIntegral (unsafeShiftR w i)
 encodeUtf8 :: Mac -> ByteString
 encodeUtf8 = encodeWithUtf8 defCodec
 
+-- | Lenient decoding of MAC address that accepts lowercase, uppercase,
+--   and any kind separator.
 decodeUtf8 :: ByteString -> Maybe Mac
-decodeUtf8 = decodeWithUtf8 defCodec
+decodeUtf8 = decodeLenientUtf8
 
 decodeWithUtf8 :: MacCodec -> ByteString -> Maybe Mac
 decodeWithUtf8 codec bs = rightToMaybe (AB.parseOnly (parserWithUtf8 codec <* AB.endOfInput) bs)
@@ -378,9 +399,6 @@ tryParseWord8Hex a w
 parseWord8Hex :: Word8 -> AB.Parser Word8
 parseWord8Hex = tryParseWord8Hex (fail "invalid hexadecimal character")
 
-defCodecUtf8 :: MacCodec
-defCodecUtf8 = MacCodec (MacGroupingPairs ':') False
-
 encodeWithUtf8 :: MacCodec -> Mac -> ByteString
 encodeWithUtf8 (MacCodec g u) m = case g of
   MacGroupingNoSeparator -> case u of
@@ -396,18 +414,6 @@ encodeWithUtf8 (MacCodec g u) m = case g of
   MacGroupingQuadruples c -> case u of
     True -> BFB.run (fixedBuilderQuadruplesUtf8 BFB.word8HexFixedUpper) (PairUtf8 (c2w c) m)
     False -> BFB.run (fixedBuilderQuadruplesUtf8 BFB.word8HexFixedLower) (PairUtf8 (c2w c) m)
-
-withCasedBuilder :: Bool -> (BFB.Builder Word8 -> a) -> a
-withCasedBuilder x f = case x of
-  True -> f BFB.word8HexFixedUpper
-  False -> f BFB.word8HexFixedLower
-{-# INLINE withCasedBuilder #-}
-
-withCasedBuilderTriple :: Bool -> (BFB.Builder Word12 -> a) -> a
-withCasedBuilderTriple x f = case x of
-  True -> f BFB.word12HexFixedUpper
-  False -> f BFB.word12HexFixedLower
-{-# INLINE withCasedBuilderTriple #-}
 
 data PairUtf8 = PairUtf8
   { pairSepUtf8 :: {-# UNPACK #-} !Word8
@@ -469,4 +475,67 @@ word8AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 word12AtUtf8 :: Int -> Mac -> Word12
 word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 {-# INLINE word12AtUtf8 #-}
+
+-- | A 48-bit MAC address. Do not use the data constructor for this
+--   type. It is not considered part of the stable API, and it
+--   allows you to construct invalid MAC addresses.
+newtype Mac = Mac { getMac :: Word64 }
+  deriving (Eq,Ord,Show,Read,Generic)
+
+data MacCodec = MacCodec
+  { macCodecGrouping :: !MacGrouping
+  , macCodecUpperCase :: !Bool
+  } deriving (Eq,Ord,Show,Read,Generic)
+
+-- | The format expected by the mac address parser. The 'Word8' taken
+--   by some of these constructors is the ascii value of the character
+--   to be used as the separator. This is typically a colon, a hyphen, or
+--   a space character. All decoding functions are case insensitive.
+data MacGrouping
+  = MacGroupingPairs !Char -- ^ Two-character groups, @FA:2B:40:09:8C:11@
+  | MacGroupingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
+  | MacGroupingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
+  | MacGroupingNoSeparator -- ^ No separator, @24AF4B5B0780@
+  deriving (Eq,Ord,Show,Read,Generic)
+
+instance Hashable Mac
+
+instance ToJSON Mac where
+  toJSON = Aeson.String . encode
+
+#if MIN_VERSION_aeson(1,0,0) 
+instance ToJSONKey Mac where
+  toJSONKey = ToJSONKeyText
+    encode
+    (\m -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 m <> BB.char7 '"')
+
+instance FromJSONKey Mac where
+  fromJSONKey = FromJSONKeyTextParser $ \t -> case decode t of
+    Nothing -> fail "invalid mac address"
+    Just mac -> return mac
+#endif
+
+instance FromJSON Mac where
+  parseJSON = attoparsecParseJSON parser
+
+attoparsecParseJSON :: AT.Parser a -> Aeson.Value -> Aeson.Parser a
+attoparsecParseJSON p v =
+  case v of
+    Aeson.String t ->
+      case AT.parseOnly p t of
+        Left err  -> fail err
+        Right res -> return res
+    _ -> fail "expected a String"
+
+-- Unchecked invariant: each of these Word64s must be smaller
+-- than 256.
+unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64
+unsafeWord48FromOctets a b c d e f =
+    fromIntegral
+  $ unsafeShiftL a 40
+  .|. unsafeShiftL b 32
+  .|. unsafeShiftL c 24
+  .|. unsafeShiftL d 16
+  .|. unsafeShiftL e 8
+  .|. f
 

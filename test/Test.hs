@@ -1,32 +1,31 @@
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+{-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
+
 module Main (main) where
 
 import Naive
-import Data.List (intercalate)
-import Test.QuickCheck (Gen, Arbitrary(..), choose)
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
+import Test.QuickCheck (Arbitrary(..),oneof,Gen,elements)
 import Test.HUnit (Assertion,(@?=))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
-import Data.Word
 import Data.Bifunctor
 import qualified Test.Framework.Providers.HUnit as PH
 
-import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..))
+import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..))
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Net.IPv4.Range as IPv4Range
 import qualified Net.Mac as Mac
-import qualified Net.Mac.Text as MacText
-import qualified Net.Mac.ByteString.Char8 as MacByteString
 
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString as AB
 
-import ArbitraryInstances ()
-import qualified Naive
 import qualified IPv4Text1
 import qualified IPv4Text2
 import qualified IPv4ByteString1
@@ -45,12 +44,12 @@ tests =
       ] ++ testDecodeFailures
     , testGroup "Currently used MAC Text encode/decode"
       [ testProperty "Isomorphism"
-          $ propEncodeDecodeIsoSettings MacText.encodeWith MacText.decodeWith
+          $ propEncodeDecodeIsoSettings Mac.encodeWith Mac.decodeWith
       , PH.testCase "Encode a MAC Address" testMacEncode
       ]
     , testGroup "Currently used MAC ByteString encode/decode"
       [ testProperty "Isomorphism"
-          $ propEncodeDecodeIsoSettings MacByteString.encodeWith MacByteString.decodeWith
+          $ propEncodeDecodeIsoSettings Mac.encodeWithUtf8 Mac.decodeWithUtf8
       , PH.testCase "Lenient Decoding" testLenientMacByteStringParser
       ]
     , testGroup "Naive IPv4 encode/decode"
@@ -141,7 +140,7 @@ testLenientMacByteStringParser = do
   where
   go a b c d e f str =
     Just (HexMac (Mac.fromOctets a b c d e f))
-    @?= fmap HexMac (MacByteString.decodeLenient (BC8.pack str))
+    @?= fmap HexMac (Mac.decodeUtf8 (BC8.pack str))
 
 testIPv4Parser :: Assertion
 testIPv4Parser = do
@@ -252,7 +251,7 @@ testDecodeFailures = flip map textBadIPv4 $ \str ->
   PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4.decode (Text.pack str) @?= Nothing
 
 testMacEncode :: Assertion
-testMacEncode = MacText.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
+testMacEncode = Mac.encode (Mac.fromOctets 0xFF 0x00 0xAB 0x12 0x99 0x0F)
             @?= Text.pack "ff:00:ab:12:99:0f"
 
 failure :: String -> Result
@@ -261,7 +260,7 @@ failure msg = failed
   , theException = Nothing
   }
 
-newtype HexMac = HexMac { getHexMac :: Mac }
+newtype HexMac = HexMac Mac
   deriving (Eq)
 
 instance Show HexMac where
@@ -275,7 +274,7 @@ instance Show HexMac where
         . showHex f
 
 
-newtype HexIPv6 = HexIPv6 { getHexIPv6 :: IPv6 }
+newtype HexIPv6 = HexIPv6 IPv6
   deriving (Eq)
 
 instance Show HexIPv6 where
@@ -290,9 +289,34 @@ instance Show HexIPv6 where
         . showHex g . showChar ':'
         . showHex h
 
-newtype Hex a = Hex { getHex :: a }
 
--- instance (Integral a, Show a) => Show (Hex a) where
---   show = showHex . getHex
+deriving instance Arbitrary IPv4
+instance Arbitrary Mac where
+  arbitrary = Mac.fromOctets
+    <$> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
 
+-- This instance can generate masks that exceed the recommended
+-- length of 32.
+instance Arbitrary IPv4Range where
+  arbitrary = fmap fromTuple arbitrary
+    where fromTuple (a,b) = IPv4Range a b
+
+instance Arbitrary MacCodec where
+  arbitrary = MacCodec <$> arbitrary <*> arbitrary
+
+instance Arbitrary MacGrouping where
+  arbitrary = oneof
+    [ MacGroupingPairs <$> arbitraryMacSeparator
+    , MacGroupingTriples <$> arbitraryMacSeparator
+    , MacGroupingQuadruples <$> arbitraryMacSeparator
+    , pure MacGroupingNoSeparator
+    ]
+
+arbitraryMacSeparator :: Gen Char
+arbitraryMacSeparator = elements [':','-','.','_']
 
