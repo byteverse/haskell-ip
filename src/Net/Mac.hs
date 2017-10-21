@@ -20,8 +20,6 @@ module Net.Mac
   , encodeWith
   , decode
   , decodeWith
-  , decodeEither
-  , decodeEitherWith
   , builder
   , parser
   , parserWith
@@ -33,7 +31,8 @@ module Net.Mac
   , builderUtf8
   , parserUtf8
   , parserWithUtf8
-  , parserLenientUtf8
+    -- ** ByteString
+  , decodeBytes
     -- * Types
   , Mac(..)
   , MacCodec(..)
@@ -51,6 +50,8 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Char (ord,chr)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
@@ -66,12 +67,24 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
   ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 #endif
 
+-- $setup
+--
+-- These are here to get doctest's property checking to work
+--
+-- >>> import Test.QuickCheck (Arbitrary(..))
+-- >>> import qualified Data.Text.IO as T
+-- >>> instance Arbitrary Mac where { arbitrary = fmap (Mac . (0xFFFFFFFFFFFF .&.)) arbitrary }
+
+-- | Create a 'Mac' address from six octets.
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
 fromOctets a b c d e f = Mac $ unsafeWord48FromOctets
   (fromIntegral a) (fromIntegral b) (fromIntegral c)
   (fromIntegral d) (fromIntegral e) (fromIntegral f)
-{-# INLINE fromOctets #-}
 
+-- | Convert a 'Mac' address to the six octets that make it up.
+--   This function and 'fromOctets' are inverses:
+--
+--   prop> m == (let (a,b,c,d,e,f) = toOctets m in fromOctets a b c d e f)
 toOctets :: Mac -> (Word8,Word8,Word8,Word8,Word8,Word8)
 toOctets (Mac w) =
   ( fromIntegral $ unsafeShiftR w 40
@@ -82,14 +95,30 @@ toOctets (Mac w) =
   , fromIntegral w
   )
 
+decodeBytes :: ByteString -> Maybe Mac
+decodeBytes bs = if B.length bs == 6
+  then Just $ fromOctets
+    (BU.unsafeIndex bs 0)
+    (BU.unsafeIndex bs 1)
+    (BU.unsafeIndex bs 2)
+    (BU.unsafeIndex bs 3)
+    (BU.unsafeIndex bs 4)
+    (BU.unsafeIndex bs 5)
+  else Nothing
+
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
 
 c2w :: Char -> Word8
 c2w = fromIntegral . ord
 
+-- | Encode a 'Mac' address lowercase hex, separating every two characters
+--   with a colon:
+--
+--   >>> T.putStrLn (encode (Mac 0xA47F247AB423))
+--   a4:7f:24:7a:b4:23
 encode :: Mac -> Text
-encode = encodeWith defCodec -- Internal.macToTextDefault w
+encode = encodeWith defCodec
 
 encodeWith :: MacCodec -> Mac -> Text
 encodeWith (MacCodec g u) m = case g of
@@ -106,12 +135,6 @@ encodeWith (MacCodec g u) m = case g of
   MacGroupingQuadruples c -> case u of
     True -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedUpper) (Pair c m)
     False -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedLower) (Pair c m)
-
-decodeEitherWith :: MacCodec -> Text -> Either String Mac
-decodeEitherWith codec t = AT.parseOnly (parserWith codec <* AT.endOfInput) t
-
-decodeEither :: Text -> Either String Mac
-decodeEither = decodeEitherWith defCodec
 
 decode :: Text -> Maybe Mac
 decode = decodeWith defCodec
@@ -284,10 +307,11 @@ decodeLenientUtf8 bs = rightToMaybe (AB.parseOnly (parserLenientUtf8 <* AB.endOf
 builderUtf8 :: Mac -> BB.Builder
 builderUtf8 = BB.byteString . encodeUtf8
 
--- | Parser for a 'Mac' address using with a colon as the
---   separator (i.e. @FA:43:B2:C0:0F:99@).
+-- | Lenient parser for a 'Mac' address using any character
+--   as the separator and accepting any digit grouping
+--   (i.e. @FA:43:B2:C0:0F:99@ or @A065.647B.87FA@).
 parserUtf8 :: AB.Parser Mac
-parserUtf8 = parserWithUtf8 defCodec
+parserUtf8 = parserLenientUtf8
 
 -- | Parser for a 'Mac' address using the provided settings.
 parserWithUtf8 :: MacCodec -> AB.Parser Mac
