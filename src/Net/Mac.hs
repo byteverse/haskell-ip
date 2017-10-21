@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -40,7 +41,7 @@ module Net.Mac
   ) where
 
 import Data.Word
-import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR)
+import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
 import Data.Text (Text)
 import Data.Word (Word8)
 import Data.Word.Synthetic.Word12 (Word12)
@@ -49,7 +50,7 @@ import Data.ByteString (ByteString)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
-import Data.Char (ord)
+import Data.Char (ord,chr)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
@@ -479,8 +480,31 @@ word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 -- | A 48-bit MAC address. Do not use the data constructor for this
 --   type. It is not considered part of the stable API, and it
 --   allows you to construct invalid MAC addresses.
-newtype Mac = Mac { getMac :: Word64 }
-  deriving (Eq,Ord,Show,Read,Generic)
+newtype Mac = Mac Word64
+  deriving (Eq,Ord,Read,Generic)
+
+-- interestingly, the derived Read instance for Mac is
+-- completely compatible with this custom Show instance.
+-- The only thing this instance does is to display the
+-- inner contents in hexadecimal and pad them out to
+-- 6 bytes in case it begins with several zeroes.
+instance Show Mac where
+  showsPrec p (Mac addr) = showParen (p > 10)
+    $ showString "Mac "
+    . showHexWord48 addr
+
+showHexWord48 :: Word64 -> ShowS
+showHexWord48 w = showString "0x" . go 11
+  where
+  go :: Int -> ShowS
+  go !ix = if ix >= 0
+    then showChar (nibbleToHex ((unsafeShiftR (fromIntegral w) (ix * 4)) .&. 0xF)) . go (ix - 1)
+    else id
+
+nibbleToHex :: Word -> Char
+nibbleToHex w
+  | w < 10 = chr (fromIntegral (w + 48))
+  | otherwise = chr (fromIntegral (w + 87))
 
 data MacCodec = MacCodec
   { macCodecGrouping :: !MacGrouping
