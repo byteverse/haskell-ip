@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 
-{-# OPTIONS_GHC -O2 -Wall -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
 {-| For concatenating fixed-width strings that are only a few
     characters each, this can be ten times faster than the builder
@@ -25,23 +25,12 @@ import Control.Monad.ST
 import Data.Monoid
 import Data.Word
 import Data.Bits
-import Text.Printf
-import Debug.Trace
 import Data.Char (ord)
 import Data.Word.Synthetic.Word12 (Word12)
-import Data.Vector (Vector)
-import Data.Foldable (fold)
 import Data.Text (Text)
-import qualified Data.Vector as Vector
 import qualified Data.Text as Text
-import qualified Data.Text.Lazy as LText
-import qualified Data.Text.Lazy.IO as LText
-import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.Lazy.Builder.Int as TBuilder
-import qualified Data.Text.IO as Text
 import qualified Data.Text.Array as A
 import qualified Data.Text.Internal as TI
-import qualified Data.Text.Internal.Unsafe.Char as TC
 import qualified Data.Text.Builder.Common.Internal as I
 
 data Builder a where

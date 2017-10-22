@@ -1,9 +1,9 @@
 module Net.IP
   ( -- * Pattern Matching
     case_
+    -- * Construction
   , ipv4
   , ipv6
-    -- * Construction
   , fromIPv4
   , fromIPv6
     -- * Textual Conversion
@@ -17,10 +17,11 @@ module Net.IP
 import Data.Bits
 import Net.IPv6 (IPv6(..))
 import Net.IPv4 (IPv4(..))
-import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
-import Text.ParserCombinators.ReadPrec (prec,step,(+++))
+import Text.Read (Read(..))
+import Text.ParserCombinators.ReadPrec ((+++))
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Text (Text)
+import Data.Word (Word8,Word16)
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Data.Aeson as Aeson
@@ -30,14 +31,17 @@ case_ f g (IP addr@(IPv6 w1 w2)) = if w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0
   then f (IPv4 (fromIntegral w2))
   else g addr
 
--- | If the address is an 'IPv4' address, return the address.
-ipv4 :: IP -> Maybe IPv4
-ipv4 = case_ Just (const Nothing)
+-- | Construct an 'IP' address from the four octets of
+--   an IPv4 address.
+ipv4 :: Word8 -> Word8 -> Word8 -> Word8 -> IP
+ipv4 a b c d = fromIPv4 (IPv4.fromOctets a b c d)
 
--- | If the address is an 'IPv6' address, and if it is not
---   an IPv4-mapped IPv6 address, return the address.
-ipv6 :: IP -> Maybe IPv6
-ipv6 = case_ (const Nothing) Just
+-- | Construct an 'IP' address from the eight 16-bit
+--   chunks of an IPv6 address.
+ipv6 :: Word16 -> Word16 -> Word16 -> Word16
+     -> Word16 -> Word16 -> Word16 -> Word16
+     -> IP
+ipv6 a b c d e f g h = fromIPv6 (IPv6.fromWord16s a b c d e f g h)
 
 fromIPv4 :: IPv4 -> IP
 fromIPv4 (IPv4 w) = IP (IPv6 0 (0x0000FFFF00000000 .|. fromIntegral w))
@@ -64,20 +68,10 @@ newtype IP = IP { getIP :: IPv6 }
   deriving (Eq,Ord)
 
 instance Show IP where
-  showsPrec p = case_
-    (\x -> showParen (p > 10) $ showString "fromIPv4 " . showsPrec 11 x)
-    (\x -> showParen (p > 10) $ showString "fromIPv6 " . showsPrec 11 x)
+  showsPrec p = case_ (showsPrec p) (showsPrec p)
 
 instance Read IP where
-  readPrec = parens $
-    ( prec 10 $ do
-        Ident "fromIPv4 " <- lexP
-        fmap fromIPv4 (step readPrec)
-    ) +++
-    ( prec 10 $ do
-        Ident "fromIPv6 " <- lexP
-        fmap fromIPv6 (step readPrec)
-    )
+  readPrec = fmap fromIPv4 readPrec +++ fmap fromIPv6 readPrec
 
 instance ToJSON IP where
   toJSON = Aeson.String . encode

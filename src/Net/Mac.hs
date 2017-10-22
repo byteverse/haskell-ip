@@ -12,7 +12,8 @@
 {-# OPTIONS_GHC -Wall #-}
 module Net.Mac
   ( -- * Convert
-    fromOctets
+    mac
+  , fromOctets
   , toOctets
     -- * Textual Conversion
     -- ** Text
@@ -50,6 +51,8 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Char (ord,chr)
+import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import Text.ParserCombinators.ReadPrec (prec,step)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Builder as BB
@@ -71,9 +74,16 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 --
 -- These are here to get doctest's property checking to work
 --
+-- >>> :set -XOverloadedStrings
 -- >>> import Test.QuickCheck (Arbitrary(..))
 -- >>> import qualified Data.Text.IO as T
+-- >>> import qualified Data.ByteString.Char8 as BC
 -- >>> instance Arbitrary Mac where { arbitrary = fmap (Mac . (0xFFFFFFFFFFFF .&.)) arbitrary }
+
+-- | Construct a 'Mac' address from a 'Word64'. Only the lower
+--   48 bits are used.
+mac :: Word64 -> Mac
+mac w = Mac (w .&. 0xFFFFFFFFFFFF)
 
 -- | Create a 'Mac' address from six octets.
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
@@ -95,6 +105,17 @@ toOctets (Mac w) =
   , fromIntegral w
   )
 
+-- | Decode a 'Mac' address from a 'ByteString'. Each byte is interpreted
+--   as an octet of the 'Mac' address. Consequently, 'ByteString's
+--   of length 6 successfully decode, and all other 'ByteString's fail
+--   to decode.
+--
+--   >>> decodeBytes (B.pack [0x6B,0x47,0x18,0x90,0x55,0xC3])
+--   Just (mac 0x6b47189055c3)
+--   >>> decodeBytes (B.replicate 6 0x3A)
+--   Just (mac 0x3a3a3a3a3a3a)
+--   >>> decodeBytes (B.replicate 7 0x3A)
+--   Nothing
 decodeBytes :: ByteString -> Maybe Mac
 decodeBytes bs = if B.length bs == 6
   then Just $ fromOctets
@@ -288,11 +309,23 @@ word12At :: Int -> Mac -> Word12
 word12At i (Mac w) = fromIntegral (unsafeShiftR w i)
 {-# INLINE word12At #-}
 
+-- | Encode a 'Mac' address, as lowercase hexadecimal digits
+--   separated by a colon:
+--
+--   >>> BC.putStrLn (encodeUtf8 (mac 0x64255A0F2C47))
+--   64:25:5a:0f:2c:47
 encodeUtf8 :: Mac -> ByteString
 encodeUtf8 = encodeWithUtf8 defCodec
 
 -- | Lenient decoding of MAC address that accepts lowercase, uppercase,
 --   and any kind separator.
+--
+--   >>> decodeUtf8 "A2:DE:AD:BE:EF:67"
+--   Just (mac 0xa2deadbeef67)
+--   >>> decodeUtf8 "13-a2-fe-a4-17-96"
+--   Just (mac 0x13a2fea41796)
+--   >>> decodeUtf8 "0A42.47BA.67C2"
+--   Just (mac 0x0a4247ba67c2)
 decodeUtf8 :: ByteString -> Maybe Mac
 decodeUtf8 = decodeLenientUtf8
 
@@ -505,17 +538,23 @@ word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 --   type. It is not considered part of the stable API, and it
 --   allows you to construct invalid MAC addresses.
 newtype Mac = Mac Word64
-  deriving (Eq,Ord,Read,Generic)
+  deriving (Eq,Ord,Generic)
 
--- interestingly, the derived Read instance for Mac is
--- completely compatible with this custom Show instance.
--- The only thing this instance does is to display the
+-- What this instance does is to display the
 -- inner contents in hexadecimal and pad them out to
 -- 6 bytes in case it begins with several zeroes.
+-- It also uses the smart constructor instead
+-- of the actual constructor
 instance Show Mac where
   showsPrec p (Mac addr) = showParen (p > 10)
-    $ showString "Mac "
+    $ showString "mac "
     . showHexWord48 addr
+
+instance Read Mac where
+  readPrec = parens $ prec 10 $ do
+    Ident "mac" <- lexP
+    w <- step readPrec
+    return (mac w)
 
 showHexWord48 :: Word64 -> ShowS
 showHexWord48 w = showString "0x" . go 11
@@ -560,7 +599,7 @@ instance ToJSONKey Mac where
 instance FromJSONKey Mac where
   fromJSONKey = FromJSONKeyTextParser $ \t -> case decode t of
     Nothing -> fail "invalid mac address"
-    Just mac -> return mac
+    Just addr -> return addr
 #endif
 
 instance FromJSON Mac where

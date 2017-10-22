@@ -59,7 +59,8 @@ import qualified Data.Text.Lazy as LText
 --
 -- >>> import qualified Prelude as P
 -- >>> import qualified Net.IPv4 as I
--- >>> import Net.IPv4 (fromOctets)
+-- >>> import qualified Data.Text.IO as T
+-- >>> import Net.IPv4 (fromOctets,ipv4)
 -- >>> import Test.QuickCheck (Arbitrary(..))
 -- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
 -- >>> instance Arbitrary IPv4Range where { arbitrary = IPv4Range <$> arbitrary <*> arbitrary }
@@ -108,7 +109,7 @@ member = flip contains
 -- | The inclusive lower bound of an 'IPv4Range'. This is conventionally
 --   understood to be the broadcast address of a subnet. For example:
 --
--- >>> I.print $ lowerInclusive $ IPv4Range (fromOctets 10 10 1 160) 25
+-- >>> T.putStrLn $ I.encode $ lowerInclusive $ IPv4Range (ipv4 10 10 1 160) 25
 -- 10.10.1.128
 --
 -- Note that the lower bound of a normalized 'IPv4Range' is simply the
@@ -149,7 +150,7 @@ wordSuccessorsM = go where
 -- | Convert an 'IPv4Range' into a list of the 'IPv4' addresses that
 --   are in it.
 -- >>> let r = IPv4Range (fromOctets 192 168 1 8) 30
--- >>> mapM_ I.print (toList r)
+-- >>> mapM_ (T.putStrLn . I.encode) (toList r)
 -- 192.168.1.8
 -- 192.168.1.9
 -- 192.168.1.10

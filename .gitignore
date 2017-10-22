@@ -1,6 +1,7 @@
 *.aux
 cabal-dev
 .cabal-sandbox
+cabal.project.local
 cabal.config
 cabal.sandbox.config
 *.chi

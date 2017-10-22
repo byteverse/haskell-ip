@@ -23,7 +23,8 @@
 
 module Net.IPv4
   ( -- * Conversion Functions
-    fromOctets
+    ipv4
+  , fromOctets
   , toOctets
     -- * Special IP Addresses
   , any
@@ -40,7 +41,6 @@ module Net.IPv4
   , builder
   , reader
   , parser
-  , print
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
@@ -54,7 +54,7 @@ module Net.IPv4
   , IPv4(..)
   ) where
 
-import Prelude hiding (any,print)
+import Prelude hiding (any)
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR)
 import Data.Word
 import Data.Hashable
@@ -77,7 +77,6 @@ import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import qualified Data.Text.Read as TextRead
 import qualified Data.ByteString.Builder as Builder
-import qualified Data.Text.IO as Text
 import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.Text.Read as Text (Reader)
 import qualified Data.Text.Lazy.Builder as TBuilder
@@ -107,6 +106,7 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 --
 -- >>> import Test.QuickCheck (Arbitrary(..))
 -- >>> import qualified Prelude as P
+-- >>> import qualified Data.Text.IO as T
 -- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
 --
 
@@ -117,12 +117,16 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 --   Additionally, it is used for the 'Show' and 'Read' instances
 --   of 'IPv4' to help keep things readable in GHCi.
 --
---   >>> let ip = fromOctets 192 168 1 1
---   >>> ip
---   fromOctets 192 168 1 1
---   >>> getIPv4 ip
+--   >>> let addr = ipv4 192 168 1 1
+--   >>> addr
+--   ipv4 192 168 1 1
+--   >>> getIPv4 addr
 --   3232235777
 --
+ipv4 :: Word8 -> Word8 -> Word8 -> Word8 -> IPv4
+ipv4 = fromOctets
+
+-- | An alias for the 'ipv4' smart constructor.
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> IPv4
 fromOctets a b c d = fromOctets'
   (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
@@ -211,12 +215,18 @@ mask32 = 0xFFFFFFFF
 public :: IPv4 -> Bool
 public = not . reserved
 
+-- | Encode an 'IPv4' address to 'Text' using dot-decimal notation:
+--
+--   >>> T.putStrLn (encode (ipv4 192 168 2 47))
+--   192.168.2.47
 encode :: IPv4 -> Text
 encode = toDotDecimalText
 
+-- | Decode an 'IPv4' address.
 decode :: Text -> Maybe IPv4
 decode = decodeIPv4TextMaybe
 
+-- | Encode an 'IPv4' address to a text 'TBuilder.Builder'.
 builder :: IPv4 -> TBuilder.Builder
 builder = toDotDecimalBuilder
 
@@ -226,10 +236,7 @@ reader = decodeIPv4TextReader
 parser :: AT.Parser IPv4
 parser = dotDecimalParser
 
--- | This exists mostly for testing purposes.
-print :: IPv4 -> IO ()
-print = Text.putStrLn . encode
-
+-- | Encode an 'IPv4' address to a UTF-8 encoded 'ByteString'.
 encodeUtf8 :: IPv4 -> ByteString
 encodeUtf8 = toBSPreAllocated
 
@@ -292,7 +299,7 @@ parserUtf8 = fromOctets'
   where
   limitSize i =
     if i > 255
-      then fail "All octets in an ip address must be between 0 and 255"
+      then fail "All octets in an ipv4 address must be between 0 and 255"
       else return i
 
 {- $string
@@ -318,7 +325,7 @@ newtype IPv4 = IPv4 { getIPv4 :: Word32 }
 
 instance Show IPv4 where
   showsPrec p addr = showParen (p > 10)
-    $ showString "fromOctets "
+    $ showString "ipv4 "
     . showsPrec 11 a
     . showChar ' '
     . showsPrec 11 b
@@ -331,7 +338,7 @@ instance Show IPv4 where
 
 instance Read IPv4 where
   readPrec = parens $ prec 10 $ do
-    Ident "fromOctets" <- lexP
+    Ident "ipv4" <- lexP
     a <- step readPrec
     b <- step readPrec
     c <- step readPrec
@@ -395,7 +402,7 @@ instance FromJSON IPv4 where
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     encode
-    (\ip -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 ip <> BB.char7 '"')
+    (\addr -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 addr <> BB.char7 '"')
 
 #if MIN_VERSION_aeson(1,0,0) 
 instance FromJSONKey IPv4 where
@@ -405,7 +412,7 @@ instance FromJSONKey IPv4 where
 aesonParser :: Text -> Aeson.Parser IPv4
 aesonParser t = case decode t of
   Nothing -> fail "Could not parse IPv4 address"
-  Just ip -> return ip
+  Just addr -> return addr
 
 
 ------------------------------------
