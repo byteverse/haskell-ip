@@ -1,3 +1,29 @@
+{-# OPTIONS_GHC -Wall #-}
+
+{-| An IP data type representing either an IPv4 address or
+    an IPv6 address. The user can think of this
+    as though it were a sum type. However, to minimize indirections,
+    it is actually implemented as an 'IPv6' address, with 'IPv4'
+    addresses being represented as an IPv4-mapped IPv6 addresses:
+
+    > +---------+---------+--------------+
+    > | 80 bits | 16 bits | 32 bits      |
+    > +---------+---------+--------------+
+    > | 00...00 | FFFF    | IPv4 address |
+    > +---------+---------+--------------+
+
+    All functions and instance methods that deal with textual conversion
+    will encode an 'IP' using either dot-decimal notation (for IPv4) or
+    RFC 5952 (for IPv6). They will decode an 'IP' from either format
+    as well. The 'Show' instance presents an address in as valid haskell code 
+    that resembles the formatted address:
+    
+    >>> decode "192.168.3.100"
+    Just (ipv4 192 168 3 100)
+    >>> decode "A3F5:12:F26::1466:8B91"
+    Just (ipv6 0xa3f5 0x0012 0x0f26 0x0000 0x0000 0x0000 0x1466 0x8b91)
+-}
+
 module Net.IP
   ( -- * Pattern Matching
     case_

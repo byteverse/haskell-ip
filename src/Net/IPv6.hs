@@ -67,7 +67,6 @@ instance Show IPv6 where
     . showHexWord16 g
     . showChar ' '
     . showHexWord16 h
-    . showChar ' '
     where
     (a,b,c,d,e,f,g,h) = toWord16s addr
 
