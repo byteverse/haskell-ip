@@ -6,6 +6,7 @@ module Net.IPv6
   ( -- * Types
     IPv6(..)
     -- * Convert
+  , ipv6
   , fromOctets
   , fromWord16s
   , toWord16s
@@ -50,7 +51,7 @@ data IPv6 = IPv6
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
-    $ showString "fromWord16s "
+    $ showString "ipv6 "
     . showHexWord16 a
     . showChar ' '
     . showHexWord16 b
@@ -66,7 +67,6 @@ instance Show IPv6 where
     . showHexWord16 g
     . showChar ' '
     . showHexWord16 h
-    . showChar ' '
     where
     (a,b,c,d,e,f,g,h) = toWord16s addr
 
@@ -86,7 +86,7 @@ nibbleToHex w
 
 instance Read IPv6 where
   readPrec = parens $ prec 10 $ do
-    Ident "fromWord16s" <- lexP
+    Ident "ipv6" <- lexP
     a <- step readPrec
     b <- step readPrec
     c <- step readPrec
@@ -128,11 +128,18 @@ fromOctets a b c d e f g h i j k l m n o p =
 --   feature for suppress zeroes in an 'IPv6' address, but it should be
 --   readable enough for hacking in GHCi.
 --
---   >>> let ip = fromWord16s 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1
---   >>> ip
---   fromWord16s 0x3124 0x0000 0x0000 0xdead 0xcafe 0x00ff 0xfe00 0x0001
---   >>> T.putStrLn (encode ip)
+--   >>> let addr = ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1
+--   >>> addr
+--   ipv6 0x3124 0x0000 0x0000 0xdead 0xcafe 0x00ff 0xfe00 0x0001
+--   >>> T.putStrLn (encode addr)
 --   3124::dead:cafe:ff:fe00:1
+ipv6 :: 
+     Word16 -> Word16 -> Word16 -> Word16
+  -> Word16 -> Word16 -> Word16 -> Word16
+  -> IPv6
+ipv6 = fromWord16s
+
+-- | An alias for the 'ipv6' smart constructor.
 fromWord16s ::
      Word16 -> Word16 -> Word16 -> Word16
   -> Word16 -> Word16 -> Word16 -> Word16

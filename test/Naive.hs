@@ -13,12 +13,9 @@ import Data.Word
 import Data.ByteString (ByteString)
 import Control.Monad.ST
 import Data.Text.Encoding (encodeUtf8)
-import qualified Data.ByteString.Char8  as BC8
-import qualified Data.ByteString        as ByteString
-import qualified Data.ByteString.Unsafe as ByteString
-import qualified Data.Text.Lazy         as LText
-import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.Array        as TArray
+import qualified Data.ByteString.Char8 as BC8
+import qualified Data.ByteString as ByteString
+import qualified Data.Text.Lazy as LText
 
 encodeByteString :: IPv4 -> ByteString
 encodeByteString = encodeUtf8 . encodeText

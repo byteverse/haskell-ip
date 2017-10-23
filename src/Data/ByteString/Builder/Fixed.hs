@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 
-{-# OPTIONS_GHC -O2 -Wall -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
 {-| For concatenating fixed-width strings that are only a few
     characters each, this can be six times faster than the builder
@@ -22,22 +22,17 @@ module Data.ByteString.Builder.Fixed
   , word12HexFixedUpper
   ) where
 
-import Control.Monad.ST
 import Data.Monoid
 import Data.Word
 import Data.Word.Synthetic.Word12 (Word12)
 import Data.Bits
 import Data.Char (ord)
 import Text.Printf
-import Debug.Trace
 import Data.ByteString.Internal (ByteString(..))
 import Foreign
 import Data.ByteString.Short (ShortByteString)
-import System.IO.Unsafe
 import qualified Data.ByteString.Internal as BI
-import qualified Data.ByteString.Builder as BBuilder
 import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as LByteString
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Short.Internal as SBS
 
@@ -138,10 +133,6 @@ char8 = BuilderFunction (BC8.pack "-") $ \i marr c -> pokeByteOff marr i (c2w c)
 word8 :: Builder Word8
 word8 = BuilderFunction (BC8.pack "-") $ \i marr w -> pokeByteOff marr i w
 {-# INLINE word8 #-}
-
-word8At :: Int -> Word64 -> Word8
-word8At i w = fromIntegral (unsafeShiftR w i)
-{-# INLINE word8At #-}
 
 -- | Taken from @Data.ByteString.Internal@. The same warnings
 --   apply here.

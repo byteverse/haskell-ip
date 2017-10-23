@@ -35,7 +35,6 @@ import           GHC.Arr
 import           GHC.Base
 import           GHC.Enum
 import           GHC.Num
-import           GHC.Ptr
 import           GHC.Read
 import           GHC.Real
 import           GHC.Show

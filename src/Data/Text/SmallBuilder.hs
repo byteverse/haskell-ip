@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 
-{-# OPTIONS_GHC -O2 -Wall -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
 {-| For concatenating fixed-width strings that are only a few
     characters each, this can be ten times faster than the builder

@@ -6,22 +6,25 @@
 module Main (main) where
 
 import Naive
+import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.QuickCheck (Arbitrary(..),oneof,Gen,elements)
+import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements)
 import Test.HUnit (Assertion,(@?=))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
+import Test.QuickCheck.Classes (jsonProps,showReadProps)
 import qualified Test.Framework.Providers.HUnit as PH
 
-import Net.Types (IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..))
+import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..))
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Net.IPv4.Range as IPv4Range
 import qualified Net.Mac as Mac
+import qualified Net.IP as IP
 
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.ByteString as AB
@@ -92,7 +95,28 @@ tests =
     , testProperty "Membership agrees with bounds" propMemberUpperLower
     , testProperty "Range contains self" propRangeSelf
     ]
+  , testGroup "Instances"
+    [ testGroup "IPv4"
+      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv4))
+      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv4))
+      ]
+    , testGroup "IPv6"
+      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv6))
+      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv6))
+      ]
+    , testGroup "IP"
+      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IP))
+      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IP))
+      ]
+    , testGroup "Mac"
+      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy Mac))
+      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy Mac))
+      ]
+    ]
   ]
+
+namedPropertiesToTest :: String -> [(String,Property)] -> Test
+namedPropertiesToTest name pairs = testGroup name (map (uncurry testProperty) pairs)
 
 propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
 propEncodeDecodeIso f g a = g (f a) == Just a
@@ -291,6 +315,18 @@ instance Show HexIPv6 where
 
 
 deriving instance Arbitrary IPv4
+
+instance Arbitrary IPv6 where
+  arbitrary = IPv6 <$> arbitrary <*> arbitrary
+
+-- Half of the test cases generated are IPv6 mapped
+-- IPv4 addresses.
+instance Arbitrary IP where
+  arbitrary = oneof
+    [ IP.fromIPv4 <$> arbitrary
+    , IP.fromIPv6 <$> arbitrary
+    ]
+
 instance Arbitrary Mac where
   arbitrary = Mac.fromOctets
     <$> arbitrary
