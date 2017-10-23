@@ -8,7 +8,8 @@
 {-# OPTIONS_GHC -Wall #-}
 module Net.IPv4.Range
   ( -- * Range functions
-    normalize
+    range
+  , normalize
   , contains
   , member
   , lowerInclusive
@@ -65,6 +66,11 @@ import qualified Data.Text.Lazy as LText
 -- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
 -- >>> instance Arbitrary IPv4Range where { arbitrary = IPv4Range <$> arbitrary <*> arbitrary }
 --
+
+-- | Smart constructor for 'IPv4Range'. Ensures the mask is appropriately
+--   sized and sets masked bits in the 'IPv4' to zero.
+range :: IPv4 -> Word8 -> IPv4Range
+range addr len = normalize (IPv4Range addr len)
 
 -- | Checks to see if an 'IPv4' address belongs in the 'IPv4Range'.
 --
