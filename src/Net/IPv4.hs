@@ -392,12 +392,12 @@ instance ToJSON IPv4 where
 instance FromJSON IPv4 where
   parseJSON = Aeson.withText "IPv4" aesonParser
 
+#if MIN_VERSION_aeson(1,0,0) 
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     encode
     (\ip -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 ip <> BB.char7 '"')
 
-#if MIN_VERSION_aeson(1,0,0) 
 instance FromJSONKey IPv4 where
   fromJSONKey = FromJSONKeyTextParser aesonParser
 #endif
