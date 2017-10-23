@@ -9,7 +9,7 @@ import Naive
 import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements)
+import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose)
 import Test.HUnit (Assertion,(@?=))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
@@ -343,7 +343,7 @@ instance Arbitrary Mac where
 -- This instance can generate masks that exceed the recommended
 -- length of 32.
 instance Arbitrary IPv4Range where
-  arbitrary = IPv4Range.range <$> arbitrary <*> arbitrary
+  arbitrary = IPv4Range.range <$> arbitrary <*> choose (0,32)
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary
