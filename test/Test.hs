@@ -100,6 +100,10 @@ tests =
       [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv4))
       , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv4))
       ]
+    , testGroup "IPv4Range"
+      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv4Range))
+      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv4Range))
+      ]
     , testGroup "IPv6"
       [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv6))
       , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv6))
@@ -339,8 +343,7 @@ instance Arbitrary Mac where
 -- This instance can generate masks that exceed the recommended
 -- length of 32.
 instance Arbitrary IPv4Range where
-  arbitrary = fmap fromTuple arbitrary
-    where fromTuple (a,b) = IPv4Range a b
+  arbitrary = IPv4Range.range <$> arbitrary <*> arbitrary
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary
