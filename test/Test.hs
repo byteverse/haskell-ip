@@ -14,7 +14,7 @@ import Test.HUnit (Assertion,(@?=))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
-import Test.QuickCheck.Classes (jsonProps,showReadProps)
+import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws)
 import qualified Test.Framework.Providers.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..))
@@ -97,30 +97,30 @@ tests =
     ]
   , testGroup "Instances"
     [ testGroup "IPv4"
-      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv4))
-      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv4))
+      [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4))
+      , lawsToTest (showReadLaws (Proxy :: Proxy IPv4))
       ]
     , testGroup "IPv4Range"
-      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv4Range))
-      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv4Range))
+      [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4Range))
+      , lawsToTest (showReadLaws (Proxy :: Proxy IPv4Range))
       ]
     , testGroup "IPv6"
-      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IPv6))
-      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IPv6))
+      [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6))
+      , lawsToTest (showReadLaws (Proxy :: Proxy IPv6))
       ]
     , testGroup "IP"
-      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy IP))
-      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy IP))
+      [ lawsToTest (jsonLaws (Proxy :: Proxy IP))
+      , lawsToTest (showReadLaws (Proxy :: Proxy IP))
       ]
     , testGroup "Mac"
-      [ namedPropertiesToTest "JSON" (jsonProps (Proxy :: Proxy Mac))
-      , namedPropertiesToTest "Show Read" (showReadProps (Proxy :: Proxy Mac))
+      [ lawsToTest (jsonLaws (Proxy :: Proxy Mac))
+      , lawsToTest (showReadLaws (Proxy :: Proxy Mac))
       ]
     ]
   ]
 
-namedPropertiesToTest :: String -> [(String,Property)] -> Test
-namedPropertiesToTest name pairs = testGroup name (map (uncurry testProperty) pairs)
+lawsToTest :: Laws -> Test
+lawsToTest (Laws name pairs) = testGroup name (map (uncurry testProperty) pairs)
 
 propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
 propEncodeDecodeIso f g a = g (f a) == Just a

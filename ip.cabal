@@ -1,5 +1,5 @@
 name: ip
-version: 1.1.0
+version: 1.1.1
 synopsis: Library for IP and MAC addresses
 homepage: https://github.com/andrewthad/haskell-ip#readme
 license: BSD3
@@ -70,7 +70,7 @@ test-suite test
     , test-framework
     , test-framework-quickcheck2
     , QuickCheck
-    , quickcheck-classes
+    , quickcheck-classes >= 0.3 && < 0.4
     , text
     , bytestring
     , HUnit

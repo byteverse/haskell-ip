@@ -1,6 +1,8 @@
 resolver: lts-9.3
 packages:
 - '.'
-extra-deps: []
+extra-deps:
+- 'quickcheck-classes-0.3.1'
+- 'prim-array-0.2.1'
 flags: {}
 extra-package-dbs: []
