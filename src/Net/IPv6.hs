@@ -18,9 +18,11 @@ module Net.IPv6
   , encode
   , decode
   , parser
+    -- ** Printing
+  , print
   ) where
 
-import Prelude hiding (any)
+import Prelude hiding (any, print)
 import Data.Bits
 import Data.List (intercalate, group)
 import Data.Word
@@ -30,6 +32,7 @@ import Data.Text (Text)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as TIO
 import qualified Data.Attoparsec.Text as Atto
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
@@ -69,6 +72,9 @@ instance Show IPv6 where
     . showHexWord16 h
     where
     (a,b,c,d,e,f,g,h) = toWord16s addr
+
+print :: IPv6 -> IO ()
+print = TIO.putStrLn . encode
 
 showHexWord16 :: Word16 -> ShowS
 showHexWord16 w =
