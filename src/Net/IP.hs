@@ -36,10 +36,13 @@ module Net.IP
     -- ** Text
   , encode
   , decode
+    -- ** Printing
+  , print
     -- * Types
   , IP(..)
   ) where
 
+import Prelude hiding (print)
 import Data.Bits
 import Net.IPv6 (IPv6(..))
 import Net.IPv4 (IPv4(..))
@@ -51,6 +54,7 @@ import Data.Word (Word8,Word16)
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 import qualified Data.Aeson as Aeson
+import qualified Data.Text.IO as TIO
 
 case_ :: (IPv4 -> a) -> (IPv6 -> a) -> IP -> a
 case_ f g (IP addr@(IPv6 w1 w2)) = if w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
@@ -84,6 +88,9 @@ decode t = case IPv4.decode t of
     Nothing -> Nothing
     Just v6 -> Just (fromIPv6 v6)
   Just v4 -> Just (fromIPv4 v4)
+
+print :: IP -> IO ()
+print = TIO.putStrLn . encode
 
 -- | A 32-bit 'IPv4' address or a 128-bit 'IPv6' address. Internally, this
 --   is just represented as an 'IPv6' address. The functions provided

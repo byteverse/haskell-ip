@@ -40,7 +40,7 @@ module Net.IPv4
   , decode
   , builder
   , reader
-  , parser
+  , parser 
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
@@ -50,11 +50,13 @@ module Net.IPv4
     -- $string
   , encodeString
   , decodeString
+    -- ** Printing
+  , print
     -- * Types
   , IPv4(..)
   ) where
 
-import Prelude hiding (any)
+import Prelude hiding (any, print)
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR)
 import Data.Word
 import Data.Hashable
@@ -94,6 +96,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Text.Array as TArray
+import qualified Data.Text.IO as TIO
 
 #if MIN_VERSION_aeson(1,0,0) 
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
@@ -345,6 +348,8 @@ instance Read IPv4 where
     d <- step readPrec
     return (fromOctets a b c d)
     
+print :: IPv4 -> IO ()
+print = TIO.putStrLn . encode
 
 newtype instance UVector.MVector s IPv4 = MV_IPv4 (PVector.MVector s IPv4)
 newtype instance UVector.Vector IPv4 = V_IPv4 (PVector.Vector IPv4)

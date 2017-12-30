@@ -22,17 +22,13 @@ module Data.Text.Builder.Variable
   , word8
   ) where
 
-import Data.Monoid
 import Data.Word
 import Data.Text (Text)
-import Text.Printf (printf)
 import Control.Monad.ST
 import Data.Char (ord)
 import Data.Vector (Vector)
-import Data.Function (on)
 import Data.Maybe (fromMaybe)
 import qualified Data.Vector as Vector
-import qualified Data.Text as Text
 import qualified Data.Text.Array as A
 import qualified Data.Text.Builder.Common.Internal as I
 import qualified Data.Text.Internal as TI
@@ -112,7 +108,7 @@ vector tDef v =
       xDef = I.portableUntext tDef
    in Builder
         (Vector.maximum $ Vector.map I.portableTextLength $ Vector.cons tDef v)
-        $ \pos marr i -> do
+        $ \_ marr i -> do
           let (arr,len) = fromMaybe xDef (xs Vector.!? i)
               finalIx = i + len
           A.copyI marr i arr 0 finalIx
