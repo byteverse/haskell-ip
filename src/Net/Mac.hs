@@ -34,12 +34,15 @@ module Net.Mac
   , parserWithUtf8
     -- ** ByteString
   , decodeBytes
+    -- ** Printing
+  , print
     -- * Types
   , Mac(..)
   , MacCodec(..)
   , MacGrouping(..)
   ) where
 
+import Prelude hiding (print)
 import Data.Word
 import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
 import Data.Text (Text)
@@ -64,6 +67,7 @@ import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.ByteString.Builder.Fixed as BFB
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Text.IO as TIO
 
 #if MIN_VERSION_aeson(1,0,0) 
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
@@ -555,6 +559,9 @@ instance Read Mac where
     Ident "mac" <- lexP
     w <- step readPrec
     return (mac w)
+
+print :: Mac -> IO ()
+print = TIO.putStrLn . encode
 
 showHexWord48 :: Word64 -> ShowS
 showHexWord48 w = showString "0x" . go 11
