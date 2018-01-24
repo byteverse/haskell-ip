@@ -9,7 +9,11 @@ module Net.IPv6
   , ipv6
   , fromOctets
   , fromWord16s
+  , fromWord32s
+  , fromTupleWord16s
+  , fromTupleWord32s
   , toWord16s
+  , toWord32s
     -- * Special IP Addresses
   , any
   , loopback
@@ -150,6 +154,7 @@ fromWord16s a b c d e f g h =
         (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
    in IPv6 w1 w2
 
+-- | Convert an 'IPv6' to eight 16-bit words.
 toWord16s :: IPv6 -> (Word16,Word16,Word16,Word16,Word16,Word16,Word16,Word16)
 toWord16s (IPv6 a b) =
   ( fromIntegral (unsafeShiftR a 48)
@@ -159,6 +164,31 @@ toWord16s (IPv6 a b) =
   , fromIntegral (unsafeShiftR b 48)
   , fromIntegral (unsafeShiftR b 32)
   , fromIntegral (unsafeShiftR b 16)
+  , fromIntegral b
+  )
+
+-- | Uncurried variant of 'fromWord16s'.
+fromTupleWord16s :: (Word16,Word16,Word16,Word16,Word16,Word16,Word16,Word16) -> IPv6
+fromTupleWord16s (a,b,c,d,e,f,g,h) = fromWord16s a b c d e f g h
+
+-- | Build an 'IPv6' from four 32-bit words. The leftmost argument
+--   is the high word and the rightword is the low word.
+fromWord32s :: Word32 -> Word32 -> Word32 -> Word32 -> IPv6
+fromWord32s a b c d =
+  let !(w1,w2) = fromWord32sV6
+        (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
+   in IPv6 w1 w2
+
+-- | Uncurried variant of 'fromWord32s'.
+fromTupleWord32s :: (Word32,Word32,Word32,Word32) -> IPv6
+fromTupleWord32s (a,b,c,d) = fromWord32s a b c d
+
+-- | Convert an 'IPv6' to four 32-bit words.
+toWord32s :: IPv6 -> (Word32,Word32,Word32,Word32)
+toWord32s (IPv6 a b) =
+  ( fromIntegral (unsafeShiftR a 32)
+  , fromIntegral a
+  , fromIntegral (unsafeShiftR b 32)
   , fromIntegral b
   )
 
@@ -311,6 +341,12 @@ fromWord16sV6 a b c d e f g h =
   , fromWord16Word64 e f g h
   )
 
+fromWord32sV6 :: Word64 -> Word64 -> Word64 -> Word64 -> (Word64,Word64)
+fromWord32sV6 a b c d =
+  ( fromWord32Word64 a b
+  , fromWord32Word64 c d
+  )
+
 fromOctetsWord64 ::
      Word64 -> Word64 -> Word64 -> Word64
   -> Word64 -> Word64 -> Word64 -> Word64
@@ -333,4 +369,7 @@ fromWord16Word64 a b c d = fromIntegral
   .|. unsafeShiftL c 16
   .|. d
     )
+
+fromWord32Word64 :: Word64 -> Word64 -> Word64
+fromWord32Word64 a b = fromIntegral (unsafeShiftL a 32 .|. b)
 

@@ -25,6 +25,7 @@ module Net.IPv4
   ( -- * Conversion Functions
     ipv4
   , fromOctets
+  , fromTupleOctets
   , toOctets
     -- * Special IP Addresses
   , any
@@ -130,6 +131,10 @@ ipv4 = fromOctets
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> IPv4
 fromOctets a b c d = fromOctets'
   (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
+
+-- | An uncurried variant of 'fromOctets'.
+fromTupleOctets :: (Word8,Word8,Word8,Word8) -> IPv4
+fromTupleOctets (a,b,c,d) = fromOctets a b c d
 
 -- | Convert an 'IPv4' address into a quadruple of octets. The first
 --   element in the quadruple is the most significant octet. The last
@@ -319,7 +324,10 @@ decodeString :: String -> Maybe IPv4
 decodeString = decode . Text.pack
 
 
--- | A 32-bit Internet Protocol version 4 address.
+-- | A 32-bit Internet Protocol version 4 address. To use this with the
+--   @network@ library, it is necessary to use @Network.Socket.htonl@ to
+--   convert the underlying 'Word32' from host byte order to network byte
+--   order.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits,Storable)
 
