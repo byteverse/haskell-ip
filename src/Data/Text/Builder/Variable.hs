@@ -99,11 +99,11 @@ word8 = Builder 3 $ \pos marr w -> if
 {-# INLINE word8 #-}
 
 -- This has not yet been tested.
-vector ::
+_vector ::
      Text -- ^ Default, used when index is out of range
   -> Vector Text -- ^ Texts to index into
   -> Builder Int
-vector tDef v =
+_vector tDef v =
   let xs = Vector.map I.portableUntext v
       xDef = I.portableUntext tDef
    in Builder
@@ -113,7 +113,7 @@ vector tDef v =
               finalIx = i + len
           A.copyI marr i arr 0 finalIx
           return finalIx
-{-# INLINE vector #-}
+{-# INLINE _vector #-}
 
 i2w :: Integral a => a -> Word16
 i2w v = asciiZero + fromIntegral v

@@ -5,17 +5,8 @@ import Data.Text (Text)
 import qualified Net.IPv4 as IPv4
 import qualified Data.Text as Text
 import Text.Read (readMaybe)
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
-import Data.Monoid ((<>))
-import Data.Text.Lazy.Builder.Int (decimal)
-import Data.Text.Internal (Text(..))
-import Data.Word
 import Data.ByteString (ByteString)
-import Control.Monad.ST
 import Data.Text.Encoding (encodeUtf8)
-import qualified Data.ByteString.Char8 as BC8
-import qualified Data.ByteString as ByteString
-import qualified Data.Text.Lazy as LText
 
 encodeByteString :: IPv4 -> ByteString
 encodeByteString = encodeUtf8 . encodeText

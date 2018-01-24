@@ -2,20 +2,7 @@ module Main (main) where
 
 import Criterion.Main
 import Net.Types (IPv4(..),MacGrouping(..),MacCodec(..))
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
-import Data.Monoid ((<>))
-import Data.Text.Lazy.Builder.Int (decimal)
-import Data.Text.Internal (Text(..))
-import Data.Word
-import Data.ByteString (ByteString)
-import Control.Monad.ST
 import qualified Data.Text as Text
-import qualified Data.ByteString.Char8 as BC8
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Unsafe as ByteString
-import qualified Data.Text.Lazy as LText
-import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.Array as TArray
 import qualified Net.Mac as Mac
 import qualified Net.IPv4 as IPv4
 

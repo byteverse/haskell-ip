@@ -29,7 +29,6 @@ where
 import           Data.Bits
 import           Data.Data
 import           Data.Maybe
-import           Foreign.Storable
 
 import           GHC.Arr
 import           GHC.Base

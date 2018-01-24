@@ -2,22 +2,15 @@ module IPv4Text1 where
 
 import Net.Types (IPv4(..))
 import Data.Text (Text)
-import qualified Net.IPv4 as IPv4
-import qualified Data.Text as Text
-import Text.Read (readMaybe)
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
 import Data.Monoid ((<>))
-import Data.Text.Lazy.Builder.Int (decimal)
 import Data.Text.Internal (Text(..))
 import Data.Word
 import Data.ByteString (ByteString)
 import Control.Monad.ST
-import Data.Text.Encoding (encodeUtf8)
+import Data.Bits (shiftR,(.&.))
 import qualified Data.ByteString.Char8  as BC8
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Unsafe as ByteString
-import qualified Data.Text.Lazy         as LText
-import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Array        as TArray
 
 ------------------------
@@ -34,7 +27,6 @@ encode (IPv4 w) =
       w2 = fromIntegral $ 255 .&. shiftR w 16
       w3 = fromIntegral $ 255 .&. shiftR w 8
       w4 = fromIntegral $ 255 .&. w
-      dot = 46
       (arr,len) = runST $ do
         marr <- TArray.new 15
         i1 <- putAndCount 0 w1 marr

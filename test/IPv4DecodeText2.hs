@@ -1,20 +1,10 @@
 module IPv4DecodeText2 where
 
 import Net.Types
-import Data.Monoid ((<>))
 import Data.Word
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,complement)
-import Control.Monad.ST
+import Data.Bits (shiftL,(.|.))
 import Data.Text.Internal (Text(..))
-import Data.Text.Lazy.Builder.Int (decimal)
-import Control.Monad
-import qualified Data.Text              as Text
-import qualified Data.Text.Lazy         as LText
 import qualified Data.Attoparsec.Text   as AT
-import qualified Data.Text.Array        as TArray
-import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.Read         as TextRead
-import qualified Data.Text.Lazy.Builder.Int as TBuilder
 
 dotDecimalParser :: AT.Parser Word32
 dotDecimalParser = fromOctets'
