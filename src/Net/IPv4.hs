@@ -55,6 +55,8 @@ module Net.IPv4
   , print
     -- * Types
   , IPv4(..)
+    -- * Interoperability
+    -- $interoperability
   ) where
 
 import Prelude hiding (any, print)
@@ -154,7 +156,7 @@ toOctets (IPv4 w) =
 any :: IPv4
 any = IPv4 0
 
--- | The loopback IP address: @127.0.0.1@
+-- | The local loopback IP address: @127.0.0.1@
 loopback :: IPv4
 loopback = fromOctets 127 0 0 1
 
@@ -587,4 +589,26 @@ putAndCount pos w marr
 
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
+
+{- $interoperability
+ 
+The @<http://hackage.haskell.org/package/network network>@ library is commonly
+used to open sockets and communicate over them. In the @Network.Socket@ module,
+it provides a type synonym @HostAddress@ that, like 'IPv4', is used
+to represent an IPv4 address. However, while 'IPv4' uses a big-endian representation
+for ip addresses, @HostAddress@ has platform dependent endianness.
+Consequently, it is necessary to convert between the two as follows:
+
+> import Network.Socket (HostAddress,htonl,ntohl)
+>
+> toHostAddr :: IPv4 -> HostAddress
+> toHostAddr (IPv4 w) = htonl w
+> 
+> fromHostAddr :: HostAddress -> IPv4
+> fromHostAddr w = IPv4 (ntohl w)
+
+These functions are not included with this library since it would require
+picking up a dependency on @network@.
+
+-}
 
