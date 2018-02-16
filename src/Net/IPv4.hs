@@ -41,7 +41,7 @@ module Net.IPv4
   , decode
   , builder
   , reader
-  , parser 
+  , parser
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
@@ -74,12 +74,12 @@ import Foreign.Storable (poke)
 import Data.Monoid ((<>))
 import Data.Text.Encoding (decodeUtf8')
 import Foreign.Storable (Storable)
-import Data.Bits (Bits,FiniteBits)
 import Data.Primitive.Types (Prim)
 import Control.Monad.ST (ST,runST)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import Text.ParserCombinators.ReadPrec (prec,step)
+import qualified Data.Bits as Bits
 import qualified Data.Text.Read as TextRead
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Unsafe as ByteString
@@ -101,7 +101,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.Text.Array as TArray
 import qualified Data.Text.IO as TIO
 
-#if MIN_VERSION_aeson(1,0,0) 
+#if MIN_VERSION_aeson(1,0,0)
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
   ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 #endif
@@ -313,7 +313,7 @@ parserUtf8 = fromOctets'
       else return i
 
 {- $string
- 
+
     These functions exist for the convenience of those who need a
     'String' representation of an 'IPv4' address. Using them
     is discouraged unless the end user is working with a library
@@ -334,7 +334,7 @@ decodeString = decode . Text.pack
 --   convert the underlying 'Word32' from host byte order to network byte
 --   order.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
-  deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Bits,FiniteBits,Storable)
+  deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable)
 
 instance Show IPv4 where
   showsPrec p addr = showParen (p > 10)
@@ -357,7 +357,7 @@ instance Read IPv4 where
     c <- step readPrec
     d <- step readPrec
     return (fromOctets a b c d)
-    
+
 print :: IPv4 -> IO ()
 print = TIO.putStrLn . encode
 
@@ -414,7 +414,7 @@ instance ToJSON IPv4 where
 instance FromJSON IPv4 where
   parseJSON = Aeson.withText "IPv4" aesonParser
 
-#if MIN_VERSION_aeson(1,0,0) 
+#if MIN_VERSION_aeson(1,0,0)
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     encode
@@ -429,6 +429,27 @@ aesonParser t = case decode t of
   Nothing -> fail "Could not parse IPv4 address"
   Just addr -> return addr
 
+ipv4Bitwise :: (Word32 -> Word32 -> Word32) -> IPv4 -> IPv4 -> IPv4
+ipv4Bitwise fun l r = IPv4 $ (getIPv4 l) `fun` (getIPv4 r)
+
+-- | Note: we use network order (big endian) as opposed to host order (little
+--   endian) which differs from the underlying IPv4 type representation.
+instance Bits.Bits IPv4 where
+    (.&.) = ipv4Bitwise (.&.)
+    (.|.) = ipv4Bitwise (.|.)
+    xor = ipv4Bitwise Bits.xor
+    complement = IPv4 . Bits.complement . getIPv4
+    shift ip i = IPv4 $ Bits.shift (getIPv4 ip) i
+    rotate ip i = IPv4 $ Bits.rotate (getIPv4 ip) i
+    bitSize = Bits.finiteBitSize
+    bitSizeMaybe = Bits.bitSizeMaybe . getIPv4
+    isSigned = Bits.isSigned . getIPv4
+    testBit ip i = Bits.testBit (getIPv4 ip) $ Bits.finiteBitSize ip - 1 - i
+    bit i = IPv4 $ Bits.bit $ Bits.finiteBitSize any - 1 - i
+    popCount = Bits.popCount . getIPv4
+
+instance Bits.FiniteBits IPv4 where
+    finiteBitSize = Bits.finiteBitSize . getIPv4
 
 ------------------------------------
 -- Internal functions, not exported
@@ -591,7 +612,7 @@ rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
 
 {- $interoperability
- 
+
 The @<http://hackage.haskell.org/package/network network>@ library is commonly
 used to open sockets and communicate over them. In the @Network.Socket@ module,
 it provides a type synonym @HostAddress@ that, like 'IPv4', is used
@@ -603,7 +624,7 @@ Consequently, it is necessary to convert between the two as follows:
 >
 > toHostAddr :: IPv4 -> HostAddress
 > toHostAddr (IPv4 w) = htonl w
-> 
+>
 > fromHostAddr :: HostAddress -> IPv4
 > fromHostAddr w = IPv4 (ntohl w)
 
