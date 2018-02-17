@@ -43,6 +43,7 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import GHC.Generics (Generic)
 import Data.Monoid ((<>))
 import qualified Net.IPv4 as IPv4
+import qualified Data.Bits as Bits
 import qualified Data.Text.IO as Text
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Text.Lazy.Builder as TBuilder
@@ -163,12 +164,12 @@ wordSuccessorsM = go where
 -- 192.168.1.11
 
 toList :: IPv4Range -> [IPv4]
-toList (IPv4Range ip len) = 
+toList (IPv4Range ip len) =
   let totalAddrs = countAddrs len
    in wordSuccessors totalAddrs ip
 
 toGenerator :: MonadPlus m => IPv4Range -> m IPv4
-toGenerator (IPv4Range ip len) =  
+toGenerator (IPv4Range ip len) =
   let totalAddrs = countAddrs len
    in wordSuccessorsM totalAddrs ip
 
@@ -365,6 +366,47 @@ instance GVector.Vector UVector.Vector IPv4Range where
   elemseq _ (IPv4Range a b)
       = GVector.elemseq (undefined :: UVector.Vector a) a
         . GVector.elemseq (undefined :: UVector.Vector b) b
+
+rangeBitwise :: (IPv4 -> IPv4 -> IPv4) -> IPv4Range -> IPv4Range -> IPv4Range
+rangeBitwise fun l r = range ip len
+  where
+    -- Normalise first
+    l' = normalize l
+    r' = normalize r
+    ip = (ipv4RangeBase l') `fun` (ipv4RangeBase r')
+    len = maximum [ipv4RangeLength l, ipv4RangeLength r]
+
+rangeRebase :: (IPv4 -> IPv4) -> IPv4Range -> IPv4Range
+rangeRebase fun r = range (fun $ ipv4RangeBase r) (ipv4RangeLength r)
+
+-- | Notes:
+--
+--     * bit operations use network order (big endian),
+--
+--     * do not operate on host bits,
+--
+--     * return a normalized range dropping host bits,
+--
+--     * and "promote operands" by extending the length to the larger of two
+--       ranges.
+--
+instance Bits.Bits IPv4Range where
+  (.&.) = rangeBitwise (.&.)
+  (.|.) = rangeBitwise (.|.)
+  xor = rangeBitwise Bits.xor
+  complement = rangeRebase Bits.complement
+  shift r i = rangeRebase (flip Bits.shift i) r
+  rotate r i = rangeRebase (flip Bits.rotate i) r
+  bitSize = Bits.finiteBitSize
+  bitSizeMaybe = Just . Bits.finiteBitSize
+  isSigned = Bits.isSigned . ipv4RangeBase
+  testBit ip i = Bits.testBit (ipv4RangeBase ip) i
+  bit i = IPv4Range (Bits.bit i) $ fromIntegral $ i + 1
+  popCount = Bits.popCount . ipv4RangeBase . normalize
+
+-- | Note: the size is determined by the range length
+instance Bits.FiniteBits IPv4Range where
+  finiteBitSize = fromIntegral . ipv4RangeLength
 
 -----------------
 -- Internal Stuff
