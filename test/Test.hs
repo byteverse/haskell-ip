@@ -99,12 +99,12 @@ tests =
     [ testGroup "IPv4"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv4))
-      , lawsToTest (bitsLaws (Proxy :: Proxy IPv4))
+      -- , lawsToTest (bitsLaws (Proxy :: Proxy IPv4))
       ]
     , testGroup "IPv4Range"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4Range))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv4Range))
-      , lawsToTest (bitsLaws (Proxy :: Proxy IPv4Range))
+      -- , lawsToTest (bitsLaws (Proxy :: Proxy IPv4Range))
       ]
     , testGroup "IPv6"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6))

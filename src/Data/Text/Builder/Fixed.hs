@@ -28,6 +28,7 @@ import Data.Bits
 import Data.Char (ord)
 import Data.Word.Synthetic.Word12 (Word12)
 import Data.Text (Text)
+import qualified Data.Semigroup as Semigroup
 import qualified Data.Text as Text
 import qualified Data.Text.Array as A
 import qualified Data.Text.Internal as TI
@@ -37,21 +38,29 @@ data Builder a where
   BuilderStatic :: Text -> Builder a
   BuilderFunction :: Text -> (forall s. Int -> A.MArray s -> a -> ST s ()) -> Builder a
 
+{-# INLINE appendBuilder #-}
+appendBuilder :: Builder a -> Builder a -> Builder a
+appendBuilder x y = case x of
+  BuilderStatic t1 -> case y of
+    BuilderStatic t2 -> BuilderStatic (t1 <> t2)
+    BuilderFunction t2 f ->
+      let len1 = I.portableTextLength t1
+       in BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
+  BuilderFunction t1 f1 -> case y of
+    BuilderStatic t2 -> BuilderFunction (t1 <> t2) f1
+    BuilderFunction t2 f2 ->
+      let len1 = I.portableTextLength t1
+       in BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
+
+instance Semigroup.Semigroup (Builder a) where
+  {-# INLINE (<>) #-}
+  (<>) = appendBuilder
+
 instance Monoid (Builder a) where
   {-# INLINE mempty #-}
   mempty = BuilderStatic Text.empty
   {-# INLINE mappend #-}
-  mappend x y = case x of
-    BuilderStatic t1 -> case y of
-      BuilderStatic t2 -> BuilderStatic (t1 <> t2)
-      BuilderFunction t2 f ->
-        let len1 = I.portableTextLength t1
-         in BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
-    BuilderFunction t1 f1 -> case y of
-      BuilderStatic t2 -> BuilderFunction (t1 <> t2) f1
-      BuilderFunction t2 f2 ->
-        let len1 = I.portableTextLength t1
-         in BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
+  mappend = (Semigroup.<>)
 
 fromText :: Text -> Builder a
 fromText = BuilderStatic

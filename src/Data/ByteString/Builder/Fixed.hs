@@ -31,6 +31,7 @@ import Text.Printf
 import Data.ByteString.Internal (ByteString(..))
 import Foreign
 import Data.ByteString.Short (ShortByteString)
+import qualified Data.Semigroup as Semigroup
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC8
@@ -40,17 +41,25 @@ data Builder a where
   BuilderStatic :: !ByteString -> Builder a
   BuilderFunction :: !ByteString -> !(Int -> Ptr Word8 -> a -> IO ()) -> Builder a
 
+{-# INLINE appendBuilder #-}
+appendBuilder :: Builder a -> Builder a -> Builder a
+appendBuilder x y = case x of
+  BuilderStatic t1@(PS _ _ len1) -> case y of
+    BuilderStatic t2 -> BuilderStatic (t1 <> t2)
+    BuilderFunction t2 f -> BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
+  BuilderFunction t1@(PS _ _ len1) f1 -> case y of
+    BuilderStatic t2 -> BuilderFunction (t1 <> t2) f1
+    BuilderFunction t2 f2 -> BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
+
+instance Semigroup.Semigroup (Builder a) where
+  {-# INLINE (<>) #-}
+  (<>) = appendBuilder
+
 instance Monoid (Builder a) where
   {-# INLINE mempty #-}
   mempty = BuilderStatic ByteString.empty
   {-# INLINE mappend #-}
-  mappend x y = case x of
-    BuilderStatic t1@(PS _ _ len1) -> case y of
-      BuilderStatic t2 -> BuilderStatic (t1 <> t2)
-      BuilderFunction t2 f -> BuilderFunction (t1 <> t2) (\ix marr a -> f (ix + len1) marr a)
-    BuilderFunction t1@(PS _ _ len1) f1 -> case y of
-      BuilderStatic t2 -> BuilderFunction (t1 <> t2) f1
-      BuilderFunction t2 f2 -> BuilderFunction (t1 <> t2) (\ix marr a -> f1 ix marr a >> f2 (ix + len1) marr a)
+  mappend = (Semigroup.<>)
 
 contramapBuilder :: (b -> a) -> Builder a -> Builder b
 contramapBuilder f x = case x of

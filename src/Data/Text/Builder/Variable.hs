@@ -29,6 +29,7 @@ import Data.Char (ord)
 import Data.Vector (Vector)
 import Data.Maybe (fromMaybe)
 import qualified Data.Vector as Vector
+import qualified Data.Semigroup as Semigroup
 import qualified Data.Text.Array as A
 import qualified Data.Text.Builder.Common.Internal as I
 import qualified Data.Text.Internal as TI
@@ -38,14 +39,22 @@ data Builder a
       {-# UNPACK #-} !Int -- the maximum length, not a character count
       !(forall s. Int -> A.MArray s -> a -> ST s Int)
 
+{-# INLINE appendBuilder #-}
+appendBuilder :: Builder a -> Builder a -> Builder a
+appendBuilder (Builder len1 f) (Builder len2 g) =
+  Builder (len1 + len2) $ \ix1 marr a -> do
+    ix2 <- f ix1 marr a
+    g ix2 marr a
+
+instance Semigroup.Semigroup (Builder a) where
+  {-# INLINE (<>) #-}
+  (<>) = appendBuilder
+
 instance Monoid (Builder a) where
   {-# INLINE mempty #-}
   mempty = Builder 0 (\i _ _ -> return i)
   {-# INLINE mappend #-}
-  mappend (Builder len1 f) (Builder len2 g) =
-    Builder (len1 + len2) $ \ix1 marr a -> do
-      ix2 <- f ix1 marr a
-      g ix2 marr a
+  mappend = (Semigroup.<>)
 
 run :: Builder a -> a -> Text
 run (Builder maxLen f) = \a ->

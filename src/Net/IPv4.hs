@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wall #-}
