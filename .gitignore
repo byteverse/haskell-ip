@@ -37,3 +37,4 @@ TAGS
 
 docs/db/unthreat
 out.html
+.ghc*
