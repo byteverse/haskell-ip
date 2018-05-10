@@ -1,9 +1,10 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 {-# LANGUAGE DeriveGeneric #-}
@@ -54,8 +55,15 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Char (ord,chr)
+import Data.Primitive.Types (Prim(..))
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import Text.ParserCombinators.ReadPrec (prec,step)
+import GHC.Word (Word16(W16#))
+import GHC.Int (Int(I#))
+import Data.Primitive.Addr (Addr(..),writeOffAddr)
+import Data.Primitive.ByteArray (MutableByteArray(..),writeByteArray)
+import Control.Monad.Primitive (PrimState,PrimBase,internal)
+import Control.Monad.ST (ST)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Builder as BB
@@ -68,6 +76,9 @@ import qualified Data.ByteString.Builder.Fixed as BFB
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Text.IO as TIO
+
+import GHC.Exts (Word#,Int#,State#,MutableByteArray#,Addr#,(*#),(+#),indexWord16Array#,readWord16Array#,
+  indexWord16OffAddr#,readWord16OffAddr#,writeWord16Array#,writeWord16OffAddr#)
 
 #if MIN_VERSION_aeson(1,0,0) 
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
@@ -543,6 +554,96 @@ word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 --   allows you to construct invalid MAC addresses.
 newtype Mac = Mac Word64
   deriving (Eq,Ord,Generic)
+
+-- | This only preserves the lower 6 bytes of the 8-byte word that backs a mac address.
+-- It runs slower than it would if it used a full 8-byte word, but it consumes less
+-- space. When storing millions of mac addresses, this is a good trade to make. When
+-- storing a small number of mac address, it might be preferable to make a primitive
+-- array of 'Word64' instead and use the mac address data constructor to coerce between
+-- the two.
+instance Prim Mac where
+  sizeOf# _ = 6#
+  alignment# _ = 2#
+  indexByteArray# arr i0 = macFromWord16#
+    (indexWord16Array# arr i)
+    (indexWord16Array# arr (i +# 1#))
+    (indexWord16Array# arr (i +# 2#))
+    where !i = 3# *# i0
+  readByteArray# arr i0 s0 = case readWord16Array# arr i s0 of
+    (# s1, a #) -> case readWord16Array# arr (i +# 1#) s1 of
+      (# s2, b #) -> case readWord16Array# arr (i +# 2#) s2 of
+        (# s3, c #) -> (# s3, macFromWord16# a b c #)
+    where !i = 3# *# i0
+  writeByteArray# arr i0 m s0 = case writeWord16Array# arr i (macToWord16A# m) s0 of
+    s1 -> case writeWord16Array# arr (i +# 1#) (macToWord16B# m) s1 of
+      s2 -> writeWord16Array# arr (i +# 2#) (macToWord16C# m) s2
+    where !i = 3# *# i0
+  indexOffAddr# arr i0 = macFromWord16#
+    (indexWord16OffAddr# arr i)
+    (indexWord16OffAddr# arr (i +# 1#))
+    (indexWord16OffAddr# arr (i +# 2#))
+    where !i = 3# *# i0
+  readOffAddr# arr i0 s0 = case readWord16OffAddr# arr i s0 of
+    (# s1, a #) -> case readWord16OffAddr# arr (i +# 1#) s1 of
+      (# s2, b #) -> case readWord16OffAddr# arr (i +# 2#) s2 of
+        (# s3, c #) -> (# s3, macFromWord16# a b c #)
+    where !i = 3# *# i0
+  writeOffAddr# arr i0 m s0 = case writeWord16OffAddr# arr i (macToWord16A# m) s0 of
+    s1 -> case writeWord16OffAddr# arr (i +# 1#) (macToWord16B# m) s1 of
+      s2 -> writeWord16OffAddr# arr (i +# 2#) (macToWord16C# m) s2
+    where !i = 3# *# i0
+  setByteArray# = defaultSetByteArray#
+  setOffAddr# = defaultSetOffAddr#
+  
+macToWord16A# :: Mac -> Word#
+macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of
+  W16# x -> x
+  
+macToWord16B# :: Mac -> Word#
+macToWord16B# (Mac w) = case word64ToWord16 (unsafeShiftR w 16) of
+  W16# x -> x
+
+macToWord16C# :: Mac -> Word#
+macToWord16C# (Mac w) = case word64ToWord16 w of
+  W16# x -> x
+  
+macFromWord16# :: Word# -> Word# -> Word# -> Mac
+macFromWord16# a b c = Mac
+    $ (unsafeShiftL (word16ToWord64 (W16# a)) 32)
+  .|. (unsafeShiftL (word16ToWord64 (W16# b)) 16)
+  .|. (word16ToWord64 (W16# c))
+
+word16ToWord64 :: Word16 -> Word64
+word16ToWord64 = fromIntegral
+
+word64ToWord16 :: Word64 -> Word16
+word64ToWord16 = fromIntegral
+
+defaultSetByteArray# :: forall s a. Prim a => MutableByteArray# s -> Int# -> Int# -> a -> State# s -> State# s
+defaultSetByteArray# arr# i# len# ident = internal_ (go 0)
+  where
+  !len = I# len#
+  !i = I# i#
+  !arr = MutableByteArray arr#
+  go :: Int -> ST s ()
+  go !ix = if ix < len
+    then writeByteArray arr (i + ix) ident >> go (i + 1)
+    else return ()
+
+defaultSetOffAddr# :: forall s a. Prim a => Addr# -> Int# -> Int# -> a -> State# s -> State# s
+defaultSetOffAddr# addr# i# len# ident = internal_ (go 0)
+  where
+  !len = I# len#
+  !i = I# i#
+  !addr = Addr addr#
+  go :: Int -> ST s ()
+  go !ix = if ix < len
+    then writeOffAddr addr (i + ix) ident >> go (i + 1)
+    else return ()
+
+internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
+internal_ m s = case internal m s of
+  (# s', () #) -> s'
 
 -- What this instance does is to display the
 -- inner contents in hexadecimal and pad them out to
