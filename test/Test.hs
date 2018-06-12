@@ -109,6 +109,7 @@ tests =
     , testGroup "IPv6"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv6))
+      , lawsToTest (primLaws (Proxy :: Proxy IPv6))
       ]
     , testGroup "IP"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IP))
