@@ -93,7 +93,7 @@ test-suite spec
       base
     , ip
     , hspec
-    , hspec >= 2.4.4 && < 2.5
+    , hspec >= 2.4.4
   other-modules:
     Net.IPv4Spec
     Net.IPv4.RangeSpec
