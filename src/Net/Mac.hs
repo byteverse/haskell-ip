@@ -56,14 +56,10 @@ import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Data.Char (ord,chr)
 import Data.Primitive.Types (Prim(..))
+import GHC.Exts
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import GHC.Word (Word16(W16#))
-import GHC.Int (Int(I#))
-import Data.Primitive.Addr (Addr(..),writeOffAddr)
-import Data.Primitive.ByteArray (MutableByteArray(..),writeByteArray)
-import Control.Monad.Primitive (PrimState,PrimBase,internal)
-import Control.Monad.ST (ST)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Builder as BB
@@ -76,9 +72,6 @@ import qualified Data.ByteString.Builder.Fixed as BFB
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Text.IO as TIO
-
-import GHC.Exts (Word#,Int#,State#,MutableByteArray#,Addr#,(*#),(+#),indexWord16Array#,readWord16Array#,
-  indexWord16OffAddr#,readWord16OffAddr#,writeWord16Array#,writeWord16OffAddr#)
 
 #if MIN_VERSION_aeson(1,0,0) 
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
@@ -592,9 +585,20 @@ instance Prim Mac where
     s1 -> case writeWord16OffAddr# arr (i +# 1#) (macToWord16B# m) s1 of
       s2 -> writeWord16OffAddr# arr (i +# 2#) (macToWord16C# m) s2
     where !i = 3# *# i0
-  setByteArray# = defaultSetByteArray#
-  setOffAddr# = defaultSetOffAddr#
-  
+  setByteArray# arr# i# len# ident = go 0#
+    where
+      go ix# s0 = if isTrue# (ix# <# len#)
+        then case writeByteArray# arr# (i# +# ix#) ident s0 of
+          s1 -> go (ix# +# 1#) s1
+        else s0
+  setOffAddr# addr# i# len# ident = go 0#
+    where
+      go ix# s0 = if isTrue# (ix# <# len#)
+        then case writeOffAddr# addr# (i# +# ix#) ident s0 of
+          s1 -> go (ix# +# 1#) s1
+        else s0
+
+
 macToWord16A# :: Mac -> Word#
 macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of
   W16# x -> x
@@ -618,32 +622,6 @@ word16ToWord64 = fromIntegral
 
 word64ToWord16 :: Word64 -> Word16
 word64ToWord16 = fromIntegral
-
-defaultSetByteArray# :: forall s a. Prim a => MutableByteArray# s -> Int# -> Int# -> a -> State# s -> State# s
-defaultSetByteArray# arr# i# len# ident = internal_ (go 0)
-  where
-  !len = I# len#
-  !i = I# i#
-  !arr = MutableByteArray arr#
-  go :: Int -> ST s ()
-  go !ix = if ix < len
-    then writeByteArray arr (i + ix) ident >> go (i + 1)
-    else return ()
-
-defaultSetOffAddr# :: forall s a. Prim a => Addr# -> Int# -> Int# -> a -> State# s -> State# s
-defaultSetOffAddr# addr# i# len# ident = internal_ (go 0)
-  where
-  !len = I# len#
-  !i = I# i#
-  !addr = Addr addr#
-  go :: Int -> ST s ()
-  go !ix = if ix < len
-    then writeOffAddr addr (i + ix) ident >> go (i + 1)
-    else return ()
-
-internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
-internal_ m s = case internal m s of
-  (# s', () #) -> s'
 
 -- What this instance does is to display the
 -- inner contents in hexadecimal and pad them out to
