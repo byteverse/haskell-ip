@@ -1,4 +1,8 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE InstanceSigs        #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UnboxedTuples       #-}
 
 {-# OPTIONS_GHC -Wall #-}
 
@@ -26,21 +30,28 @@ module Net.IPv6
   , print
   ) where
 
-import Prelude hiding (any, print)
-import Data.Bits
-import Data.List (intercalate, group)
-import Data.Word
-import Data.Char (chr)
 import Control.Applicative
+import Control.Monad.Primitive
+import Control.Monad.ST
+import Data.Bits
+import Data.Char (chr)
+import Data.List (intercalate, group)
+import Data.Primitive.Addr
+import Data.Primitive.ByteArray
+import Data.Primitive.Types (Prim(..))
 import Data.Text (Text)
-import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import Data.Word
+import GHC.Prim
+import GHC.Types
+import Numeric (showHex)
+import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as TIO
-import qualified Data.Attoparsec.Text as Atto
+import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
-import Numeric (showHex)
+import qualified Data.Attoparsec.Text as Atto
+import qualified Data.Text as Text
+import qualified Data.Text.IO as TIO
 
 -- $setup
 --
@@ -76,6 +87,61 @@ instance Show IPv6 where
     . showHexWord16 h
     where
     (a,b,c,d,e,f,g,h) = toWord16s addr
+
+instance Prim IPv6 where
+  sizeOf# _ = 2# *# sizeOf# (undefined :: Word64)
+  alignment# _ = alignment# (undefined :: Word64)
+  indexByteArray# arr# i# =
+    let i = I# i#
+        arr = ByteArray arr#
+    in IPv6 (indexByteArray arr (2 * i + 0)) (indexByteArray arr (2 * i + 1))
+  readByteArray# :: forall s. () => MutableByteArray# s -> Int# -> State# s -> (# State# s, IPv6 #)
+  readByteArray# arr# i# = internal $ do
+    let i = I# i#
+        arr = MutableByteArray arr#
+    a <- readByteArray arr (2 * i + 0) :: ST s Word64
+    b <- readByteArray arr (2 * i + 1)
+    return (IPv6 a b)
+  writeByteArray# :: forall s. () => MutableByteArray# s -> Int# -> IPv6 -> State# s -> State# s
+  writeByteArray# arr# i# (IPv6 a b) = internal_ $ do
+    let i = I# i#
+        arr = MutableByteArray arr#
+    writeByteArray arr (2 * i + 0) a
+    writeByteArray arr (2 * i + 1) b :: ST s ()
+  setByteArray# arr# i# len# ident = go 0#
+    where
+      go ix# s0 = if isTrue# (ix# <# len#)
+        then case writeByteArray# arr# (i# +# ix#) ident s0 of
+          s1 -> go (ix# +# 1#) s1
+        else s0
+  indexOffAddr# :: Addr# -> Int# -> IPv6
+  indexOffAddr# addr# i# =
+    let i = I# i#
+        addr = Addr addr#
+    in IPv6 (indexOffAddr addr (2 * i + 0)) (indexOffAddr addr (2 * i + 1))
+  readOffAddr# :: forall s. () => Addr# -> Int# -> State# s -> (# State# s, IPv6 #)
+  readOffAddr# addr# i# = internal $ do
+    let i = I# i#
+        addr = Addr addr#
+    a <- readOffAddr addr (2 * i + 0) :: ST s Word64
+    b <- readOffAddr addr (2 * i + 1)
+    return (IPv6 a b)
+  writeOffAddr# :: forall s. () => Addr# -> Int# -> IPv6 -> State# s -> State# s
+  writeOffAddr# addr# i# (IPv6 a b) = internal_ $ do
+    let i = I# i#
+        addr = Addr addr#
+    writeOffAddr addr (2 * i + 0) a
+    writeOffAddr addr (2 * i + 1) b :: ST s ()
+  setOffAddr# addr# i# len# ident = go 0#
+    where
+      go ix# s0 = if isTrue# (ix# <# len#)
+        then case writeOffAddr# addr# (i# +# ix#) ident s0 of
+          s1 -> go (ix# +# 1#) s1
+        else s0
+
+internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
+internal_ m s = case internal m s of
+  (# s', _ #) -> s'
 
 print :: IPv6 -> IO ()
 print = TIO.putStrLn . encode
