@@ -30,6 +30,8 @@ module Net.IPv6
   , print
   ) where
 
+import qualified Net.IPv4 as IPv4
+
 import Control.Applicative
 import Control.Monad.Primitive
 import Control.Monad.ST
@@ -273,8 +275,13 @@ any = IPv6 0 0
 -- | Encodes the IP, using zero-compression on the leftmost-longest string of
 -- zeroes in the address.
 encode :: IPv6 -> Text
-encode ip = toText [w1, w2, w3, w4, w5, w6, w7, w8]
+encode ip =
+  if isIPv4MappedAddress
+  -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
+  then Text.pack "::ffff:" `mappend` IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
+  else toText [w1, w2, w3, w4, w5, w6, w7, w8]
   where
+  isIPv4MappedAddress = w1 == 0 && w2 == 0 && w3 == 0 && w4 == 0 && w5 == 0 && w6 == 0xFFFF
   (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip
   toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
     where

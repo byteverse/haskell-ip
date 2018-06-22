@@ -260,6 +260,10 @@ testIPv6Encode = do
     "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
     "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
 
+    -- per https://tools.ietf.org/html/rfc5952#section-5
+    "::ffff:0:0" `roundTripsTo` "::ffff:0.0.0.0"
+    "::ffff:00ff:ff00" `roundTripsTo` "::ffff:0.255.255.0"
+
    where
    roundTripsTo s sExpected =
      case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
