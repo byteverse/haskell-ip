@@ -221,6 +221,14 @@ testIPv6ParserFailure = do
   go "1111:2222:3333:4444:5555:6666::7777:8888"
   go "1111:2222:3333:4444:5555:6666:7777:8888:9999"
   go "1111:2222:3333:4444:5555:6666:7777:8888::9999"
+
+  go "1:127.0.0.1" -- not enough
+  go "1:2:3:127.0.0.1"
+  go "1:2:3:4:127.0.0.1"
+  go "1:2:3:4:5:127.0.0.1"
+
+  go "1:2:3:4:5:6:7:127.0.0.1" -- too much
+  go "1:2:3:4:5:6:7:8:127.0.0.1"
   where
   go str =
     Left ()
@@ -260,9 +268,14 @@ testIPv6Encode = do
     "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
     "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
 
+    -- decimal notation in IPv6 addresses:
+    "1:2:3:4:5:6:0.7.0.8" `roundTripsTo` "1:2:3:4:5:6:7:8"
+    "::0.0.0.0" `roundTripsTo` "::"
+
     -- per https://tools.ietf.org/html/rfc5952#section-5
     "::ffff:0:0" `roundTripsTo` "::ffff:0.0.0.0"
     "::ffff:00ff:ff00" `roundTripsTo` "::ffff:0.255.255.0"
+    "::ffff:203.0.113.17" `roundTripsTo` "::ffff:203.0.113.17"
 
    where
    roundTripsTo s sExpected =
