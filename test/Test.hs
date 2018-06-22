@@ -10,7 +10,7 @@ import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose)
-import Test.HUnit (Assertion,(@?=))
+import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
@@ -172,7 +172,7 @@ testLenientMacByteStringParser = do
   where
   go a b c d e f str =
     Just (HexMac (Mac.fromOctets a b c d e f))
-    @?= fmap HexMac (Mac.decodeUtf8 (BC8.pack str))
+    @=? fmap HexMac (Mac.decodeUtf8 (BC8.pack str))
 
 testIPv4Parser :: Assertion
 testIPv4Parser = do
@@ -181,7 +181,7 @@ testIPv4Parser = do
   where
   go a b c d str =
     Right (IPv4.fromOctets a b c d)
-    @?= (AB.parseOnly
+    @=? (AB.parseOnly
           (IPv4.parserUtf8 <* AT.endOfInput)
           (BC8.pack str)
         )
@@ -210,7 +210,7 @@ testIPv6Parser = do
   where
   go a b c d e f g h str =
     Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
-    @?= fmap HexIPv6
+    @=? fmap HexIPv6
       (AT.parseOnly
         (IPv6.parser <* AT.endOfInput)
         (Text.pack str)
@@ -224,7 +224,7 @@ testIPv6ParserFailure = do
   where
   go str =
     Left ()
-    @?= bimap (\_ -> ()) HexIPv6
+    @=? bimap (\_ -> ()) HexIPv6
       (AT.parseOnly
         (IPv6.parser <* AT.endOfInput)
         (Text.pack str)
