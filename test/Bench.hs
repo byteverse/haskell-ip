@@ -6,7 +6,6 @@ import qualified Data.Text as Text
 import qualified Net.Mac as Mac
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
-import qualified Data.Attoparsec.Text as Atto
 
 import qualified Naive
 import qualified IPv4Text1
@@ -57,11 +56,9 @@ main = do
       , bench "Preallocated" $ whnf IPv4.encodeUtf8 ipAddr
       ]
     , bgroup "IPv6 from Text"
-      [ bench "New '::'" $ whnf (parseAll IPv6.parser) ip6Text
-      , bench "New '1:2:3:4:5:6:7:8'" $ whnf (parseAll IPv6.parser) ip6TextBigger
-      , bench "New '1:2::7:8'" $ whnf (parseAll IPv6.parser) ip6TextSkip
-      , bench "New 'a:b::c:d'" $ whnf (parseAll IPv6.parser) ip6TextHex
+      [ bench "New '::'" $ whnf IPv6.decode ip6Text
+      , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.decode ip6TextBigger
+      , bench "New '1:2::7:8'" $ whnf IPv6.decode ip6TextSkip
+      , bench "New 'a:b::c:d'" $ whnf IPv6.decode ip6TextHex
       ]
     ]
-  where 
-  parseAll p = Atto.parseOnly (p <* Atto.endOfInput)
