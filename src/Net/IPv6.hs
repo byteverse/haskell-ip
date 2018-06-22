@@ -276,6 +276,15 @@ any = IPv6 0 0
 
 -- | Encodes the IP, using zero-compression on the leftmost-longest string of
 -- zeroes in the address.
+-- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
+-- this uses mixed notation when encoding an IPv4-mapped IPv6 address:
+--
+-- >>> T.putStrLn $ encode $ fromWord16s 0xDEAD 0xBEEF 0x0 0x0 0x0 0x0 0x0 0x1234
+-- dead:beef::1234
+-- >>> T.putStrLn $ encode $ fromWord16s 0x0 0x0 0x0 0x0 0x0 0xFFFF 0x6437 0xA5B4
+-- ::ffff:100.55.165.180
+-- >>> T.putStrLn $ encode $ fromWord16s 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0
+-- ::
 encode :: IPv6 -> Text
 encode ip =
   if isIPv4MappedAddress
@@ -301,6 +310,9 @@ encode ip =
     longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
     grouped = map (\x -> (head x, length x)) (group ws)
 
+-- | Decode an IPv6 address. This accepts both standard IPv6
+-- notation (with zero compression) and mixed notation for
+-- IPv4-mapped IPv6 addresses.
 decode :: Text -> Maybe IPv6
 decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 
