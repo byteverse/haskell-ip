@@ -86,9 +86,7 @@ range addr len = normalize (IPv4Range addr len)
 -- 10.0.5.0/28
 fromBounds :: IPv4 -> IPv4 -> IPv4Range
 fromBounds (IPv4 a) (IPv4 b) =
-  let lo = min a b
-      hi = max a b
-   in normalize (IPv4Range (IPv4 lo) (maskFromBounds lo hi))
+  normalize (IPv4Range (IPv4 a) (maskFromBounds a b))
 
 maskFromBounds :: Word32 -> Word32 -> Word8
 maskFromBounds lo hi = fromIntegral (Bits.countLeadingZeros (Bits.xor lo hi))
