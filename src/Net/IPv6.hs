@@ -45,8 +45,7 @@ import Data.Primitive.ByteArray
 import Data.Primitive.Types (Prim(..))
 import Data.Text (Text)
 import Data.Word
-import GHC.Prim
-import GHC.Types
+import GHC.Exts
 import Numeric (showHex)
 import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
