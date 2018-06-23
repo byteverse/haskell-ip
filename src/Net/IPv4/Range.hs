@@ -9,6 +9,7 @@
 module Net.IPv4.Range
   ( -- * Range functions
     range
+  , fromBounds
   , normalize
   , contains
   , member
@@ -72,6 +73,25 @@ import qualified Data.Text.Lazy as LText
 --   sized and sets masked bits in the 'IPv4' to zero.
 range :: IPv4 -> Word8 -> IPv4Range
 range addr len = normalize (IPv4Range addr len)
+
+-- | Given an inclusive lower and upper ip address, create the smallest
+-- 'IPv4Range' that contains the two. This is helpful in situations where
+-- input given as a range like @192.168.16.0-192.168.19.255@ needs to be
+-- handled. This makes the range broader if it cannot be represented in
+-- CIDR notation.
+--
+-- >>> print $ fromBounds (fromOctets 192 168 16 0) (fromOctets 192 168 19 255)
+-- 192.168.16.0/22
+-- >>> print $ fromBounds (fromOctets 10 0 5 7) (fromOctets 10 0 5 14)
+-- 10.0.5.0/28
+fromBounds :: IPv4 -> IPv4 -> IPv4Range
+fromBounds (IPv4 a) (IPv4 b) =
+  let lo = min a b
+      hi = max a b
+   in normalize (IPv4Range (IPv4 lo) (maskFromBounds lo hi))
+
+maskFromBounds :: Word32 -> Word32 -> Word8
+maskFromBounds lo hi = fromIntegral (Bits.countLeadingZeros (Bits.xor lo hi))
 
 -- | Checks to see if an 'IPv4' address belongs in the 'IPv4Range'.
 --
