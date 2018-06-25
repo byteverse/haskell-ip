@@ -321,21 +321,23 @@ parser = startIP >>= makeIP
   -- handles the case where an IP starts with ::
   startIP :: Atto.Parser ([Word16], Maybe [Word16])
   startIP = 
-    (\ends -> ([], Just ends)) <$> (Atto.char ':' *> Atto.char ':' *> restOfIP []) <|>
+    (Atto.char ':' *> Atto.char ':' *> afterDoubleColon []) <|>
     fullIP []
 
-  -- a full IP that might contain ::
+  -- a full IP that might contain double-colon:
   fullIP :: [Word16] -> Atto.Parser ([Word16], Maybe [Word16])
   fullIP starts =
     ((\x -> (x ++ starts, Nothing)) <$> ipv4) <|>
     startPart starts
 
-  -- an IP that cannot contain ::
+  -- just after double-colon: either has the rest of the IP or ends
+  afterDoubleColon starts = (\ends -> (starts, Just ends)) <$> (restOfIP [] <|> pure [])
+
+  -- the rest of an IP that cannot contain double-colon:
   restOfIP :: [Word16] -> Atto.Parser [Word16]
   restOfIP ends =
     ((\x -> x ++ ends) <$> ipv4) <|>
-    endPart ends <|>
-    pure ends
+    endPart ends
   
   ipv4 = ipv4ToWord16s <$> IPv4.parser
   ipv4ToWord16s (IPv4 ip) = [fromIntegral (ip .&. 0xFFFF), fromIntegral (ip `unsafeShiftR` 16)]
@@ -350,7 +352,7 @@ parser = startIP >>= makeIP
         Atto.peekChar >>= \case
           Just ':' -> do
             _ <- Atto.anyChar -- will be ':' 
-            (\ends -> (result, Just ends)) <$> restOfIP []
+            afterDoubleColon result
           _ ->
             fullIP result
       _ ->

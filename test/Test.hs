@@ -218,16 +218,29 @@ testIPv6Parser = do
 
 testIPv6ParserFailure :: Assertion
 testIPv6ParserFailure = do
+  -- must not start or end in colon:
+  go ":::"
+  go "1::2:"
+  go ":1::2"
+  go "1:::"
+  go ":1::"
+  go "::1:"
+  go "1:2:3:4:5:6:7:8:"
+  go ":1:2:3:4:5:6:7:8"
+
+  -- Incorrect numbers of parts:
   go "1111:2222:3333:4444:5555:6666::7777:8888"
   go "1111:2222:3333:4444:5555:6666:7777:8888:9999"
   go "1111:2222:3333:4444:5555:6666:7777:8888::9999"
 
-  go "1:127.0.0.1" -- not enough
+  -- IPv4 decimal embedded, with not enough parts:
+  go "1:127.0.0.1"
   go "1:2:3:127.0.0.1"
   go "1:2:3:4:127.0.0.1"
   go "1:2:3:4:5:127.0.0.1"
 
-  go "1:2:3:4:5:6:7:127.0.0.1" -- too much
+  -- IPv4 decimal embedded, with too many parts:
+  go "1:2:3:4:5:6:7:127.0.0.1"
   go "1:2:3:4:5:6:7:8:127.0.0.1"
   where
   go str =
