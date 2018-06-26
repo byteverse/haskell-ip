@@ -316,85 +316,40 @@ decode :: Text -> Maybe IPv6
 decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 
 parser :: Atto.Parser IPv6
-parser = startIP >>= makeIP
+parser = makeIP <$> ip
   where
-  -- handles the case where an IP starts with ::
-  startIP :: Atto.Parser ([Word16], Maybe [Word16])
-  startIP = 
-    (Atto.char ':' *> Atto.char ':' *> afterDoubleColon []) <|>
-    fullIP []
+  makeIP [w1, w2, w3, w4, w5, w6, w7, w8] = fromWord16s w1 w2 w3 w4 w5 w6 w7 w8
 
-  -- a full IP that might contain double-colon:
-  fullIP :: [Word16] -> Atto.Parser ([Word16], Maybe [Word16])
-  fullIP starts =
-    ((\x -> (x ++ starts, Nothing)) <$> ipv4) <|>
-    startPart starts
+  ip = (Atto.char ':' *> Atto.char ':' *> doubleColon 0) <|> part 0
 
-  -- just after double-colon: either has the rest of the IP or ends
-  afterDoubleColon starts = (\ends -> (starts, Just ends)) <$> (restOfIP [] <|> pure [])
-
-  -- the rest of an IP that cannot contain double-colon:
-  restOfIP :: [Word16] -> Atto.Parser [Word16]
-  restOfIP ends =
-    ((\x -> x ++ ends) <$> ipv4) <|>
-    endPart ends
-  
-  ipv4 = ipv4ToWord16s <$> IPv4.parser
-  ipv4ToWord16s (IPv4 ip) = [fromIntegral (ip .&. 0xFFFF), fromIntegral (ip `unsafeShiftR` 16)]
-  
-  -- a colon-separated part before ::
-  startPart (starts) = do
-    part <- Atto.hexadecimal
-    let result = (part : starts)
-    Atto.peekChar >>= \case 
-      Just ':' -> do
-        _ <- Atto.anyChar -- will be ':'
-        Atto.peekChar >>= \case
-          Just ':' -> do
-            _ <- Atto.anyChar -- will be ':' 
-            afterDoubleColon result
-          _ ->
-            fullIP result
-      _ ->
-        pure (result, Nothing)
-
-  -- a colon-separated part after ::
-  endPart ends = do
-    part <- Atto.hexadecimal
-    let result = part : ends
-    Atto.peekChar >>= \case 
-      Just ':' -> do
-        _ <- Atto.anyChar -- will be ':'
-        Atto.peekChar >>= \case
-          Just ':' -> do
-            fail "Cannot use double colon for omitting zeroes more than once in an IPv6 address"
-          _ ->
-            restOfIP result
-      _ ->
-        pure result
-
-  makeIP :: ([Word16], Maybe [Word16]) -> Atto.Parser IPv6
-  makeIP (starts, mends) =
-    case mends of 
-      -- Nothing indicates we never encountered double-colon, so we must have
-      -- all 8 parts:
-      Nothing -> do
-        if numStarts /= 8
-        then fail "not enough colon-separated parts in IPv6 address"
-        else
-          let [w1, w2, w3, w4, w5, w6, w7, w8] = reverse starts in
-          pure (fromWord16s w1 w2 w3 w4 w5 w6 w7 w8)
-      -- otherwise, we did encounter a double-colon, so we expand it to fill:
-      Just ends ->
-        let numEnds = length ends in
-        case compare (numStarts + numEnds) 8 of
-          GT -> fail "too many colon-separated parts in IPv6 address"
-          EQ -> fail "unnecessary double-colon in IPv6 address"
-          LT -> 
-            let [w1, w2, w3, w4, w5, w6, w7, w8] = reverse starts ++ replicate (8 - (numStarts + numEnds)) 0 ++ reverse ends in
-            pure (fromWord16s w1 w2 w3 w4 w5 w6 w7 w8)
+  part n =
+    case n of
+      -- max 8 parts in an IPv6 address
+      7 -> pure <$> Atto.hexadecimal
+      -- after 6 parts it could end in IPv4 dotted notation
+      6 -> ipv4 <|> hexPart
+      _ -> hexPart
     where
-    numStarts = length starts
+    hexPart =
+      (:) <$> Atto.hexadecimal
+          <*> (Atto.char ':' *>
+               ((Atto.char ':' *> doubleColon (n+1)) <|>
+               part (n+1)))
+
+  doubleColon count = do
+    rest <- afterDoubleColon <|> pure []
+    let fillerLength = (8 - count - length rest)
+    if fillerLength <= 0
+    then fail "too many parts in IPv6 address"
+    else pure (replicate fillerLength 0 ++ rest)
+
+  -- after double colon, IPv4 dotted notation could appear anywhere
+  afterDoubleColon =
+    ipv4 <|>
+    (:) <$> Atto.hexadecimal <*> ((Atto.char ':' *> afterDoubleColon) <|> pure [])
+
+  ipv4 = ipv4ToWord16s <$> IPv4.parser
+  ipv4ToWord16s (IPv4 word) = [fromIntegral (word `unsafeShiftR` 16), fromIntegral (word .&. 0xFFFF)]
 
 fromOctetsV6 ::
      Word64 -> Word64 -> Word64 -> Word64
