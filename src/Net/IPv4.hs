@@ -74,9 +74,9 @@ module Net.IPv4
     -- *** Text
   , encodeRange
   , decodeRange
-  , rangeBuilder
-  , rangeParser
-  , rangePrint
+  , builderRange
+  , parserRange
+  , printRange
     -- * Types
   , IPv4(..)
   , IPv4Range(..)
@@ -139,7 +139,7 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
 -- >>> import qualified Prelude as P
 -- >>> import qualified Data.Text.IO as T
 -- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
---
+-- >>> instance Arbitrary IPv4Range where { arbitrary = IPv4Range <$> arbitrary <*> arbitrary }
 
 -- | Create an 'IPv4' address from four octets. The first argument
 --   is the most significant octet. The last argument is the least
@@ -663,7 +663,6 @@ picking up a dependency on @network@.
 -- These are here to get doctest's property checking to work.
 --
 -- >>> import qualified Prelude as P
--- >>> import qualified Net.IPv4 as I
 -- >>> import qualified Data.Text.IO as T
 -- >>> import Net.IPv4 (fromOctets,ipv4)
 -- >>> import Test.QuickCheck (Arbitrary(..))
@@ -682,9 +681,9 @@ range addr len = normalize (IPv4Range addr len)
 -- handled. This makes the range broader if it cannot be represented in
 -- CIDR notation.
 --
--- >>> rangePrint $ fromBounds (fromOctets 192 168 16 0) (fromOctets 192 168 19 255)
+-- >>> printRange $ fromBounds (fromOctets 192 168 16 0) (fromOctets 192 168 19 255)
 -- 192.168.16.0/22
--- >>> rangePrint $ fromBounds (fromOctets 10 0 5 7) (fromOctets 10 0 5 14)
+-- >>> printRange $ fromBounds (fromOctets 10 0 5 7) (fromOctets 10 0 5 14)
 -- 10.0.5.0/28
 fromBounds :: IPv4 -> IPv4 -> IPv4Range
 fromBounds (IPv4 a) (IPv4 b) =
@@ -707,7 +706,7 @@ maskFromBounds lo hi = fromIntegral (Bits.countLeadingZeros (Bits.xor lo hi))
 -- For example, you might test elements in a list for membership like this:
 --
 -- >>> let r = IPv4Range (fromOctets 10 10 10 6) 31
--- >>> mapM_ (P.rangePrint . contains r) (take 5 $ iterate succ $ fromOctets 10 10 10 5)
+-- >>> mapM_ (P.print . contains r) (take 5 $ iterate succ $ fromOctets 10 10 10 5)
 -- False
 -- True
 -- True
@@ -736,7 +735,7 @@ member = flip contains
 -- | The inclusive lower bound of an 'IPv4Range'. This is conventionally
 --   understood to be the broadcast address of a subnet. For example:
 --
--- >>> T.putStrLn $ I.encodeRange $ lowerInclusive $ IPv4Range (ipv4 10 10 1 160) 25
+-- >>> T.putStrLn $ encode $ lowerInclusive $ IPv4Range (ipv4 10 10 1 160) 25
 -- 10.10.1.128
 --
 -- Note that the lower bound of a normalized 'IPv4Range' is simply the
@@ -777,7 +776,7 @@ wordSuccessorsM = go where
 -- | Convert an 'IPv4Range' into a list of the 'IPv4' addresses that
 --   are in it.
 -- >>> let r = IPv4Range (fromOctets 192 168 1 8) 30
--- >>> mapM_ (T.putStrLn . I.encodeRange) (toList r)
+-- >>> mapM_ (T.putStrLn . encode) (toList r)
 -- 192.168.1.8
 -- 192.168.1.9
 -- 192.168.1.10
@@ -809,9 +808,9 @@ private16 = IPv4Range (fromOctets 192 168 0 0) 16
 -- 'IPv4' inside the 'IPv4Range' is changed so that the insignificant
 -- bits are zeroed out. For example:
 --
--- >>> rangePrint $ normalize $ IPv4Range (fromOctets 192 168 1 19) 24
+-- >>> printRange $ normalize $ IPv4Range (fromOctets 192 168 1 19) 24
 -- 192.168.1.0/24
--- >>> rangePrint $ normalize $ IPv4Range (fromOctets 192 168 1 163) 28
+-- >>> printRange $ normalize $ IPv4Range (fromOctets 192 168 1 163) 28
 -- 192.168.1.160/28
 --
 -- The second effect of this is that the mask length is lowered to
@@ -833,13 +832,13 @@ encodeRange :: IPv4Range -> Text
 encodeRange = rangeToDotDecimalText
 
 decodeRange :: Text -> Maybe IPv4Range
-decodeRange = rightToMaybe . AT.parseOnly (rangeParser <* AT.endOfInput)
+decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
 
-rangeBuilder :: IPv4Range -> TBuilder.Builder
-rangeBuilder = rangeToDotDecimalBuilder
+builderRange :: IPv4Range -> TBuilder.Builder
+builderRange = rangeToDotDecimalBuilder
 
-rangeParser :: AT.Parser IPv4Range
-rangeParser = do
+parserRange :: AT.Parser IPv4Range
+parserRange = do
   ip <- parser
   _ <- AT.char '/'
   theMask <- AT.decimal >>= limitSize
@@ -851,8 +850,8 @@ rangeParser = do
       else return i
 
 -- | This exists mostly for testing purposes.
-rangePrint :: IPv4Range -> IO ()
-rangePrint = TIO.putStrLn . encodeRange
+printRange :: IPv4Range -> IO ()
+printRange = TIO.putStrLn . encodeRange
 
 -- | The length should be between 0 and 32. These bounds are inclusive.
 --   This expectation is not in any way enforced by this library because
