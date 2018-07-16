@@ -11,8 +11,7 @@ module Net.Types
   ) where
 
 import Net.IPv6 (IPv6(..))
-import Net.IPv4 (IPv4(..))
-import Net.IPv4.Range (IPv4Range(..))
+import Net.IPv4 (IPv4(..), IPv4Range(..))
 import Net.IP (IP(..))
 import Net.Mac (Mac(..),MacCodec(..),MacGrouping(..))
 
