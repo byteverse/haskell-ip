@@ -22,7 +22,6 @@ import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
-import qualified Net.IPv4.Range as IPv4Range
 import qualified Net.Mac as Mac
 import qualified Net.IP as IP
 
@@ -90,7 +89,7 @@ tests =
     ]
   , testGroup "IP Range Operations"
     [ testProperty "Idempotence of normalizing IPv4 range"
-        $ propIdempotence IPv4Range.normalize
+        $ propIdempotence IPv4.normalize
     , testProperty "Normalize does not affect membership" propNormalizeMember
     , testProperty "Membership agrees with bounds" propMemberUpperLower
     , testProperty "Range contains self" propRangeSelf
@@ -150,14 +149,14 @@ propIdempotence :: Eq a => (a -> a) -> a -> Bool
 propIdempotence f a = f a == f (f a)
 
 propNormalizeMember :: IPv4 -> IPv4Range -> Bool
-propNormalizeMember i r = IPv4Range.member i r == IPv4Range.member i (IPv4Range.normalize r)
+propNormalizeMember i r = IPv4.member i r == IPv4.member i (IPv4.normalize r)
 
 propMemberUpperLower :: IPv4 -> IPv4Range -> Bool
 propMemberUpperLower i r =
-  (i >= IPv4Range.lowerInclusive r && i <= IPv4Range.upperInclusive r) == IPv4Range.member i r
+  (i >= IPv4.lowerInclusive r && i <= IPv4.upperInclusive r) == IPv4.member i r
 
 propRangeSelf :: IPv4Range -> Bool
-propRangeSelf r = IPv4Range.member (ipv4RangeBase r) r == True
+propRangeSelf r = IPv4.member (ipv4RangeBase r) r == True
 
 testIPv4Decode :: Assertion
 testIPv4Decode = IPv4.decode (Text.pack "124.222.255.0")
@@ -394,7 +393,7 @@ instance Arbitrary Mac where
 -- This instance can generate masks that exceed the recommended
 -- length of 32.
 instance Arbitrary IPv4Range where
-  arbitrary = IPv4Range.range <$> arbitrary <*> choose (0,32)
+  arbitrary = IPv4.range <$> arbitrary <*> choose (0,32)
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary
