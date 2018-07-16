@@ -36,7 +36,6 @@ library
   exposed-modules:
     Net.Mac
     Net.IPv4
-    Net.IPv4.Range
     Net.IPv6
     Net.IP
     Net.Types
