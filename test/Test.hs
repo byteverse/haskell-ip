@@ -270,47 +270,48 @@ testIPv6ParserFailure = do
 testIPv6Encode :: Assertion
 testIPv6Encode = do
 
-    -- degenerate cases:
-    "::" `roundTripsTo` "::"
-    "1234::" `roundTripsTo` "1234::"
-    "::1234" `roundTripsTo` "::1234"
+  -- degenerate cases:
+  "::" `roundTripsTo` "::"
+  "1234::" `roundTripsTo` "1234::"
+  "::1234" `roundTripsTo` "::1234"
 
-    -- zero-compression works:
-    "1234:1234:0000:0000:0000:0000:3456:3434" `roundTripsTo` "1234:1234::3456:3434"
+  -- zero-compression works:
+  "1234:1234:0000:0000:0000:0000:3456:3434" `roundTripsTo` "1234:1234::3456:3434"
 
-    -- picks first case:
-    "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234::1234:0:1234:0:123:1234"
+  -- picks first case:
+  "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234::1234:0:1234:0:123:1234"
 
-    -- picks longest case:
-    "1234:0000:1234:0000:0:0000:0123:1234" `roundTripsTo` "1234:0:1234::123:1234"
+  -- picks longest case:
+  "1234:0000:1234:0000:0:0000:0123:1234" `roundTripsTo` "1234:0:1234::123:1234"
 
-    -- can exclude all but first and last:
-    "1234::1234" `roundTripsTo` "1234::1234"
+  -- can exclude all but first and last:
+  "1234::1234" `roundTripsTo` "1234::1234"
 
-    -- prefers leftmost part to zero-compress:
-    "1:2:0:0:5::8" `roundTripsTo` "1:2::5:0:0:8"
+  -- prefers leftmost part to zero-compress:
+  "1:2:0:0:5::8" `roundTripsTo` "1:2::5:0:0:8"
 
-    -- can work with no zeroes:
-    "1:2:3:4:5:6:7:8" `roundTripsTo` "1:2:3:4:5:6:7:8"
+  -- can work with no zeroes:
+  "1:2:3:4:5:6:7:8" `roundTripsTo` "1:2:3:4:5:6:7:8"
 
-    -- works with only first or last:
-    "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
-    "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
+  -- works with only first or last:
+  "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
+  "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
 
-    -- decimal notation in IPv6 addresses:
-    "1:2:3:4:5:6:0.7.0.8" `roundTripsTo` "1:2:3:4:5:6:7:8"
-    "::0.0.0.0" `roundTripsTo` "::"
+  -- decimal notation in IPv6 addresses:
+  "1:2:3:4:5:6:0.7.0.8" `roundTripsTo` "1:2:3:4:5:6:7:8"
+  "::0.0.0.0" `roundTripsTo` "::"
 
-    -- per https://tools.ietf.org/html/rfc5952#section-5
-    "::ffff:0:0" `roundTripsTo` "::ffff:0.0.0.0"
-    "::ffff:00ff:ff00" `roundTripsTo` "::ffff:0.255.255.0"
-    "::ffff:203.0.113.17" `roundTripsTo` "::ffff:203.0.113.17"
+  -- per https://tools.ietf.org/html/rfc5952#section-5
+  "::ffff:0:0" `roundTripsTo` "::ffff:0.0.0.0"
+  "::ffff:00ff:ff00" `roundTripsTo` "::ffff:0.255.255.0"
+  "::ffff:203.0.113.17" `roundTripsTo` "::ffff:203.0.113.17"
+  "1234:5678::10.0.1.2" `roundTripsTo` "1234:5678::a00:102"
 
-   where
-   roundTripsTo s sExpected =
-     case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
-        Right result -> IPv6.encode result @?= Text.pack sExpected
-        Left failMsg -> fail ("failed to parse '" ++ s ++ "': " ++ failMsg)
+ where
+ roundTripsTo s sExpected =
+   case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
+      Right result -> IPv6.encode result @?= Text.pack sExpected
+      Left failMsg -> fail ("failed to parse '" ++ s ++ "': " ++ failMsg)
 
 textBadIPv4 :: [String]
 textBadIPv4 =
