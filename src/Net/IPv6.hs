@@ -319,9 +319,11 @@ parser :: Atto.Parser IPv6
 parser = makeIP <$> ip
   where
   makeIP [w1, w2, w3, w4, w5, w6, w7, w8] = fromWord16s w1 w2 w3 w4 w5 w6 w7 w8
+  makeIP _ = error "Net.IPv6.parser: Implementation error. Please open a bug report."
 
   ip = (Atto.char ':' *> Atto.char ':' *> doubleColon 0) <|> part 0
 
+  part :: Int -> Atto.Parser [Word16]
   part n =
     case n of
       -- max 8 parts in an IPv6 address
@@ -330,25 +332,34 @@ parser = makeIP <$> ip
       6 -> ipv4 <|> hexPart
       _ -> hexPart
     where
-    hexPart =
-      (:) <$> Atto.hexadecimal
-          <*> (Atto.char ':' *>
-               ((Atto.char ':' *> doubleColon (n+1)) <|>
-               part (n+1)))
+    hexPart = (:)
+      <$> Atto.hexadecimal
+      <*> (Atto.char ':' *>
+            (
+             (Atto.char ':' *> doubleColon (n+1))
+             <|>
+             part (n+1)
+            )
+          )
 
+  doubleColon :: Int -> Atto.Parser [Word16]
   doubleColon count = do
     rest <- afterDoubleColon <|> pure []
     let fillerLength = (8 - count - length rest)
     if fillerLength <= 0
-    then fail "too many parts in IPv6 address"
-    else pure (replicate fillerLength 0 ++ rest)
+      then fail "too many parts in IPv6 address"
+      else pure (replicate fillerLength 0 ++ rest)
 
   -- after double colon, IPv4 dotted notation could appear anywhere
+  afterDoubleColon :: Atto.Parser [Word16]
   afterDoubleColon =
     ipv4 <|>
     (:) <$> Atto.hexadecimal <*> ((Atto.char ':' *> afterDoubleColon) <|> pure [])
 
+  ipv4 :: Atto.Parser [Word16]
   ipv4 = ipv4ToWord16s <$> IPv4.parser
+
+  ipv4ToWord16s :: IPv4 -> [Word16]
   ipv4ToWord16s (IPv4 word) = [fromIntegral (word `unsafeShiftR` 16), fromIntegral (word .&. 0xFFFF)]
 
 fromOctetsV6 ::
