@@ -4,14 +4,14 @@
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples       #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE CPP                 #-}
 
 {-# OPTIONS_GHC -Wall #-}
 
 module Net.IPv6
-  ( -- * Types
-    IPv6(..)
-    -- * Convert
-  , ipv6
+  ( -- * Convert
+    ipv6
   , fromOctets
   , fromWord16s
   , fromWord32s
@@ -29,6 +29,24 @@ module Net.IPv6
   , parser
     -- ** Printing
   , print
+    -- * IPv6 Ranges
+    -- ** Range functions
+  , range
+  , fromBounds
+  , normalize
+  , contains
+  , member
+  , lowerInclusive
+  , upperInclusive
+    -- ** Textual Conversion
+    -- *** Text
+  , encodeRange
+  , decodeRange
+  , parserRange
+  , printRange
+    -- * Types
+  , IPv6(..)
+  , IPv6Range(..)
   ) where
 
 import Net.IPv4 (IPv4(..))
@@ -38,6 +56,7 @@ import Control.Applicative
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.Char (chr)
 import Data.List (intercalate, group)
 import Data.Primitive.Addr
@@ -45,14 +64,18 @@ import Data.Primitive.ByteArray
 import Data.Primitive.Types (Prim(..))
 import Data.Text (Text)
 import Data.Word
+import GHC.Enum (predError, succError)
 import GHC.Exts
+import GHC.Generics (Generic)
 import Numeric (showHex)
 import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
+import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.Text as Atto
+import qualified Data.ByteString.Char8 as BC8
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
 
@@ -62,6 +85,9 @@ import qualified Data.Text.IO as TIO
 --
 -- >>> import qualified Prelude as P
 -- >>> import qualified Data.Text.IO as T
+-- >>> import Test.QuickCheck (Arbitrary(..))
+-- >>> instance Arbitrary IPv6 where { arbitrary = IPv6 <$> arbitrary <*> arbitrary }
+-- >>> instance Arbitrary IPv6Range where { arbitrary = IPv6Range <$> arbitrary <*> arbitrary }
 --
 
 -- | A 128-bit Internet Protocol version 6 address.
@@ -69,6 +95,31 @@ data IPv6 = IPv6
   { ipv6A :: {-# UNPACK #-} !Word64
   , ipv6B :: {-# UNPACK #-} !Word64
   } deriving (Eq,Ord)
+
+instance Enum IPv6 where
+  succ (IPv6 a b) 
+    | a == maxBound && b == maxBound = succError "Word128"
+    | otherwise =
+        case b + 1 of
+          0 -> IPv6 (b + 1) 0
+          s -> IPv6 a s
+  {-# INLINABLE toEnum #-}
+  toEnum :: Int -> IPv6
+  toEnum i = IPv6 0 (toEnum i)
+
+  {-# INLINABLE fromEnum #-}
+  fromEnum :: IPv6 -> Int
+  fromEnum (IPv6 _ b) = fromEnum b
+
+  -- toEnum (IPv6 a b) =
+  -- fromEnum (IPv6 a b) =
+  pred (IPv6 a b)
+    | a == 0 && b == 0 = predError "Word128"
+    | otherwise =
+        case b of
+          0 -> IPv6 (a - 1) maxBound
+          _ -> IPv6 a (b - 1)
+
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
@@ -413,4 +464,119 @@ fromWord16Word64 a b c d = fromIntegral
 
 fromWord32Word64 :: Word64 -> Word64 -> Word64
 fromWord32Word64 a b = fromIntegral (unsafeShiftL a 32 .|. b)
+
+data IPv6Range = IPv6Range
+  { ipv6RangeBase   :: {-# UNPACK #-} !IPv6
+  , ipv6RangeLength :: {-# UNPACK #-} !Word8
+  } deriving (Eq,Ord,Show,Read,Generic)
+
+mask :: Word8 -> Word64
+mask = complement . shiftR 0xffffffffffffffff . fromIntegral
+
+normalize :: IPv6Range -> IPv6Range
+normalize (IPv6Range (IPv6 w1 w2) len) =
+  let len' = min len 128
+      w1' = w1 .&. mask len'
+      w2' = w2 .&. mask len'
+   in IPv6Range (IPv6 w1' w2') len'
+
+encodeRange :: IPv6Range -> Text
+encodeRange x = encode (ipv6RangeBase x) <> Text.pack "/" <> (Text.pack $ (show . fromEnum) $ ipv6RangeLength x)
+
+decodeRange :: Text -> Maybe IPv6Range
+decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
+
+parserRange :: AT.Parser IPv6Range
+parserRange = do
+  ip <- parser
+  _ <- AT.char '/'
+  theMask <- AT.decimal >>= limitSize
+  return (normalize (IPv6Range ip theMask))
+  where
+  limitSize i =
+    if i > 128
+      then fail "An IP range length must be between 0 and 128"
+      else return i
+
+twoDigits :: ByteString
+twoDigits = foldMap (BC8.pack . printf "%02d") $ enumFromTo (0 :: Int) 99
+{-# NOINLINE twoDigits #-}
+
+threeDigits :: ByteString
+threeDigits = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 999
+{-# NOINLINE threeDigits #-}
+
+i2w :: Integral a => a -> Word16
+i2w v = zero + fromIntegral v
+
+zero :: Word16
+zero = 48
+
+-- | Checks to see if an 'IPv6' address belongs in the 'IPv6Range'.
+--
+-- >>> let ip = ipv6 0x2001 0x0db8 0x0db8 0x1094 0x2051 0x0000 0x0000 0x0001
+-- >>> let iprange mask = IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) mask
+-- >>> contains (iprange 8) ip
+-- True
+-- >>> contains (iprange 48) ip
+-- False
+--
+-- Typically, element-testing functions are written to take the element
+-- as the first argument and the set as the second argument. This is intentionally
+-- written the other way for better performance when iterating over a collection.
+-- For example, you might test elements in a list for membership like this:
+--
+-- >>> let r = IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) 8
+-- >>> fmap (contains r) (take 5 $ iterate succ $ ipv6 0x2001 0x0db8 0x0000 0x0000 0xffff 0xffff 0xffff 0xffff)
+-- [True,False,False,False,False]
+--
+-- The implementation of 'contains' ensures that (with GHC), the bitmask
+-- creation and range normalization only occur once in the above example.
+-- They are reused as the list is iterated.
+contains :: IPv6Range -> IPv6 -> Bool
+contains (IPv6Range (IPv6 wsubnet w2) len) =
+  let theMask = mask len
+      wsubnetNormalized = wsubnet .&. theMask
+   in \(IPv6 w w2) -> (w .&. theMask) == wsubnetNormalized
+
+-- | This is provided to mirror the interface provided by @Data.Set@. It
+-- behaves just like 'contains' but with flipped arguments.
+--
+-- prop> member ip r == contains r ip
+member :: IPv6 -> IPv6Range -> Bool
+member = flip contains
+
+-- | The inclusive lower bound of an 'IPv6Range'. This is conventionally
+--   understood to be the broadcast address of a subnet. For example:
+--
+-- >>> T.putStrLn $ encode $ lowerInclusive $ IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) 25
+-- 2001:d80::
+--
+-- Note that the lower bound of a normalized 'IPv4Range' is simply the
+-- ip address of the range:
+--
+-- prop> lowerInclusive r == ipv6RangeBase (normalize r)
+lowerInclusive :: IPv6Range -> IPv6
+lowerInclusive (IPv6Range (IPv6 w1 w2) len) =
+  IPv6 (w1 .&. mask len) (w2 .&. mask len)
+
+upperInclusive :: IPv6Range -> IPv6
+upperInclusive (IPv6Range (IPv6 w1 w2) len) =
+  let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
+      theMask = complement theInvertedMask
+   in IPv6 (w1 .&. theMask) ((w2 .&. theMask) .|. theInvertedMask)
+
+-- | This exists mostly for testing purposes.
+printRange :: IPv6Range -> IO ()
+printRange = TIO.putStrLn . encodeRange
+
+range :: IPv6 -> Word8 -> IPv6Range
+range addr len = normalize (IPv6Range addr len)
+
+fromBounds :: IPv6 -> IPv6 -> IPv6Range
+fromBounds (IPv6 a1 a2) (IPv6 b1 b2) =
+  normalize (IPv6Range (IPv6 a1 a2) (maskFromBounds a1 b1))
+
+maskFromBounds :: Word64 -> Word64 -> Word8
+maskFromBounds lo hi = fromIntegral (countLeadingZeros (xor lo hi))
 
