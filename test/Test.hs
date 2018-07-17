@@ -6,6 +6,7 @@
 module Main (main) where
 
 import Naive
+import Control.Applicative (liftA2)
 import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -17,7 +18,7 @@ import Data.Bifunctor
 import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws)
 import qualified Test.Framework.Providers.HUnit as PH
 
-import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..))
+import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
@@ -87,12 +88,24 @@ tests =
       , PH.testCase "Parser Failure Test Cases" testIPv6ParserFailure
       ]
     ]
-  , testGroup "IP Range Operations"
+  , testGroup "IPv4 Range Operations"
     [ testProperty "Idempotence of normalizing IPv4 range"
         $ propIdempotence IPv4.normalize
     , testProperty "Normalize does not affect membership" propNormalizeMember
     , testProperty "Membership agrees with bounds" propMemberUpperLower
     , testProperty "Range contains self" propRangeSelf
+    ]
+  , testGroup "IPv6 Range Operations"
+    [ testProperty "Idempotence of normalizing IPv6 range"
+        $ propIdempotence IPv6.normalize
+    , testProperty "Normalize does not affect membership" $ \i r ->
+        IPv6.member i r == IPv6.member i (IPv6.normalize r)
+    , testProperty "Membership agrees with bounds" $ \i r ->
+        (i >= IPv6.lowerInclusive r && i <= IPv6.upperInclusive r) == IPv6.member i r
+    , testProperty "Range contains self" $ \r ->
+        IPv6.member (ipv6RangeBase r) r == True
+    , testProperty "Idempotence of upperInclusive-lowerInclusive and fromBounds" $ \r ->
+        IPv6.fromBounds (IPv6.lowerInclusive r) (IPv6.upperInclusive r) == r
     ]
   , testGroup "Instances"
     [ testGroup "IPv4"
@@ -372,6 +385,11 @@ deriving instance Arbitrary IPv4
 
 instance Arbitrary IPv6 where
   arbitrary = IPv6 <$> arbitrary <*> arbitrary
+  shrink (IPv6 a b) = filter (/= IPv6 a b)
+    [ IPv6 0 0
+    , IPv6 (div a 2) b
+    , IPv6 a (div b 2)
+    ]
 
 -- Half of the test cases generated are IPv6 mapped
 -- IPv4 addresses.
@@ -394,6 +412,13 @@ instance Arbitrary Mac where
 -- length of 32.
 instance Arbitrary IPv4Range where
   arbitrary = IPv4.range <$> arbitrary <*> choose (0,32)
+
+instance Arbitrary IPv6Range where
+  arbitrary = IPv6.range <$> arbitrary <*> choose (0,128)
+  shrink (IPv6Range addr mask) = liftA2 IPv6Range
+    (shrink addr)
+    (filter (/= mask) [0,div mask 2,if mask > 0 then mask - 1 else 0])
+    
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary

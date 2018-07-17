@@ -98,28 +98,29 @@ data IPv6 = IPv6
 
 instance Enum IPv6 where
   succ (IPv6 a b) 
-    | a == maxBound && b == maxBound = succError "Word128"
+    | a == maxBound && b == maxBound = succError "IPv6"
     | otherwise =
         case b + 1 of
           0 -> IPv6 (b + 1) 0
           s -> IPv6 a s
-  {-# INLINABLE toEnum #-}
-  toEnum :: Int -> IPv6
-  toEnum i = IPv6 0 (toEnum i)
 
-  {-# INLINABLE fromEnum #-}
-  fromEnum :: IPv6 -> Int
-  fromEnum (IPv6 _ b) = fromEnum b
-
-  -- toEnum (IPv6 a b) =
-  -- fromEnum (IPv6 a b) =
   pred (IPv6 a b)
-    | a == 0 && b == 0 = predError "Word128"
+    | a == 0 && b == 0 = predError "IPv6"
     | otherwise =
         case b of
           0 -> IPv6 (a - 1) maxBound
           _ -> IPv6 a (b - 1)
 
+  toEnum :: Int -> IPv6
+  toEnum i = IPv6 0 (toEnum i)
+
+  fromEnum :: IPv6 -> Int
+  fromEnum (IPv6 _ b) = fromEnum b
+
+
+instance Bounded IPv6 where
+  minBound = IPv6 0 0
+  maxBound = IPv6 maxBound maxBound
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
