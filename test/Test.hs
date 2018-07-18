@@ -15,7 +15,7 @@ import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
-import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws)
+import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws,boundedEnumLaws)
 import qualified Test.Framework.Providers.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
@@ -122,6 +122,7 @@ tests =
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv6))
       , lawsToTest (primLaws (Proxy :: Proxy IPv6))
+      , lawsToTest (boundedEnumLaws (Proxy :: Proxy IPv6))
       ]
     , testGroup "IP"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IP))
