@@ -87,6 +87,7 @@ module Net.IPv4
 import Control.Monad
 import Control.Monad.ST (ST,runST)
 import Data.Aeson (FromJSON(..),ToJSON(..))
+import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
 import Data.ByteString (ByteString)
 import Data.Hashable
@@ -125,11 +126,6 @@ import qualified Data.Vector.Generic.Mutable as MGVector
 import qualified Data.Vector.Primitive as PVector
 import qualified Data.Vector.Unboxed as UVector
 import qualified Data.Vector.Unboxed.Mutable as MUVector
-
-#if MIN_VERSION_aeson(1,0,0)
-import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
-  ToJSONKeyFunction(..),FromJSONKeyFunction(..))
-#endif
 
 -- $setup
 --

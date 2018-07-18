@@ -117,6 +117,24 @@ instance Enum IPv6 where
   fromEnum :: IPv6 -> Int
   fromEnum (IPv6 _ b) = fromEnum b
 
+  {-# INLINE enumFrom #-}
+  enumFrom x = unfoldrLast (Just maxBound) (\b -> if b < maxBound then Just (b,succ b) else Nothing) x
+  {-# INLINE enumFromTo #-}
+  enumFromTo x y = unfoldrLast (if x <= y then Just y else Nothing) (\b -> if b < y then Just (b,succ b) else Nothing) x
+
+-- This is like unfoldr except that it adds an additional element
+-- at the end.
+unfoldrLast :: Maybe a -> (b -> Maybe (a, b)) -> b -> [a]
+{-# INLINE unfoldrLast #-}
+unfoldrLast a0 f b0 = build
+  (\c n ->
+    let go b = case f b of
+          Just (a, new_b) -> a `c` go new_b
+          Nothing -> case a0 of
+            Nothing -> n
+            Just x -> x `c` n
+     in go b0
+  )
 
 instance Bounded IPv6 where
   minBound = IPv6 0 0
