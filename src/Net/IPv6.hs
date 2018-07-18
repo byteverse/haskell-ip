@@ -101,7 +101,7 @@ instance Enum IPv6 where
     | a == maxBound && b == maxBound = succError "IPv6"
     | otherwise =
         case b + 1 of
-          0 -> IPv6 (b + 1) 0
+          0 -> IPv6 (a + 1) 0
           s -> IPv6 a s
 
   pred (IPv6 a b)
@@ -477,9 +477,10 @@ mask = complement . shiftR 0xffffffffffffffff . fromIntegral
 normalize :: IPv6Range -> IPv6Range
 normalize (IPv6Range (IPv6 w1 w2) len) =
   let len' = min len 128
-      w1' = w1 .&. mask len'
-      w2' = w2 .&. mask len'
-   in IPv6Range (IPv6 w1' w2') len'
+      norm
+        | len' < 64 =  (IPv6Range (IPv6 (w1 .&. mask len') (w2 .&. mask 0)) len')
+        | otherwise =  (IPv6Range (IPv6 (w1 .&. mask 64) (w2 .&. mask (len' - 64))) len')
+  in norm
 
 encodeRange :: IPv6Range -> Text
 encodeRange x = encode (ipv6RangeBase x) <> Text.pack "/" <> (Text.pack $ (show . fromEnum) $ ipv6RangeLength x)
@@ -527,9 +528,9 @@ zero = 48
 -- written the other way for better performance when iterating over a collection.
 -- For example, you might test elements in a list for membership like this:
 --
--- >>> let r = IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) 8
--- >>> fmap (contains r) (take 5 $ iterate succ $ ipv6 0x2001 0x0db8 0x0000 0x0000 0xffff 0xffff 0xffff 0xffff)
--- [True,False,False,False,False]
+-- >>> let r = IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) 64
+-- >>> fmap (contains r) (take 5 $ iterate succ $ ipv6 0x2001 0x0db8 0x0000 0x0000 0xffff 0xffff 0xffff 0xfffe)
+-- [True,True,False,False,False]
 --
 -- The implementation of 'contains' ensures that (with GHC), the bitmask
 -- creation and range normalization only occur once in the above example.
@@ -559,13 +560,19 @@ member = flip contains
 -- prop> lowerInclusive r == ipv6RangeBase (normalize r)
 lowerInclusive :: IPv6Range -> IPv6
 lowerInclusive (IPv6Range (IPv6 w1 w2) len) =
-  IPv6 (w1 .&. mask len) (w2 .&. mask len)
+  ipv6RangeBase (normalize (IPv6Range (IPv6 w1 w2) len))
 
 upperInclusive :: IPv6Range -> IPv6
 upperInclusive (IPv6Range (IPv6 w1 w2) len) =
-  let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
-      theMask = complement theInvertedMask
-   in IPv6 (w1 .&. theMask) ((w2 .&. theMask) .|. theInvertedMask)
+  let len' = min 128 len
+      theInvertedMask :: Word64
+      theInvertedMask = shiftR 0xffffffffffffffff (fromIntegral len')
+      theInvertedMask2 = shiftR 0xffffffffffffffff ((fromIntegral len')-64)
+      themask = complement theInvertedMask
+      upper
+        | len' < 64 =  IPv6 ((w1 .|. theInvertedMask)) ((w2 .|. shiftR 0xffffffffffffffff 0))
+        | otherwise =  IPv6 (w1) (w2 .|. theInvertedMask2)
+  in upper
 
 -- | This exists mostly for testing purposes.
 printRange :: IPv6Range -> IO ()
@@ -576,8 +583,13 @@ range addr len = normalize (IPv6Range addr len)
 
 fromBounds :: IPv6 -> IPv6 -> IPv6Range
 fromBounds (IPv6 a1 a2) (IPv6 b1 b2) =
-  normalize (IPv6Range (IPv6 a1 a2) (maskFromBounds a1 b1))
+  normalize (IPv6Range (IPv6 a1 a2) (maskFromBounds a1 b1 a2 b2))
 
-maskFromBounds :: Word64 -> Word64 -> Word8
-maskFromBounds lo hi = fromIntegral (countLeadingZeros (xor lo hi))
+maskFromBounds :: Word64 -> Word64 -> Word64 -> Word64 -> Word8
+maskFromBounds lo1 hi1 lo2 hi2 =
+  let x = countLeadingZeros (xor lo1 hi1)
+      check
+        | x < 64    = fromIntegral x
+        | otherwise = fromIntegral $ x + (countLeadingZeros (xor lo2 hi2))
+  in check
 
