@@ -10,7 +10,7 @@ import Control.Applicative (liftA2)
 import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose)
+import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose,(===))
 import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
@@ -105,7 +105,7 @@ tests =
     , testProperty "Range contains self" $ \r ->
         IPv6.member (ipv6RangeBase r) r == True
     , testProperty "Idempotence of upperInclusive-lowerInclusive and fromBounds" $ \r ->
-        IPv6.fromBounds (IPv6.lowerInclusive r) (IPv6.upperInclusive r) == r
+        IPv6.fromBounds (IPv6.lowerInclusive r) (IPv6.upperInclusive r) === r
     ]
   , testGroup "Instances"
     [ testGroup "IPv4"
@@ -416,7 +416,7 @@ instance Arbitrary IPv4Range where
 
 instance Arbitrary IPv6Range where
   arbitrary = IPv6.range <$> arbitrary <*> choose (0,128)
-  shrink (IPv6Range addr mask) = liftA2 IPv6Range
+  shrink (IPv6Range addr mask) = liftA2 IPv6.range
     (shrink addr)
     (filter (/= mask) [0,div mask 2,if mask > 0 then mask - 1 else 0])
     
