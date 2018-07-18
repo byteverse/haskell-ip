@@ -106,6 +106,17 @@ tests =
         IPv6.member (ipv6RangeBase r) r == True
     , testProperty "Idempotence of upperInclusive-lowerInclusive and fromBounds" $ \r ->
         IPv6.fromBounds (IPv6.lowerInclusive r) (IPv6.upperInclusive r) === r
+    , testGroup "Cases"
+      [ PH.testCase "A" $ False @=? IPv6.contains
+          (IPv6.range (IPv6.ipv6 0 0 0 1 0 0 0 0) 64)
+          (IPv6.ipv6 0 0 0 0 0 0 0 0)
+      , PH.testCase "B" $ True @=? IPv6.contains
+          (IPv6.range (IPv6.ipv6 0 0 0 0 0 0 0 0) 126)
+          (IPv6.ipv6 0 0 0 0 0 0 0 1)
+      , PH.testCase "C" $ False @=? IPv6.contains
+          (IPv6.range (IPv6.ipv6 0 0 0 0 0 0 0 0) 125)
+          (IPv6.ipv6 0 0 0 0 0 0 0 0xFFFF)
+      ]
     ]
   , testGroup "Instances"
     [ testGroup "IPv4"

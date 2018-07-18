@@ -96,6 +96,11 @@ data IPv6 = IPv6
   , ipv6B :: {-# UNPACK #-} !Word64
   } deriving (Eq,Ord)
 
+-- | Since 'IPv6' has more inhabitants than 'Int', the
+-- implementation of 'fromEnum' discards information.
+-- Currently, 'enumFromThen' and 'enumFromThenTo' emit
+-- an error, but this could be remedied if someone
+-- wants to provide an implementation of them.
 instance Enum IPv6 where
   succ (IPv6 a b) 
     | a == maxBound && b == maxBound = succError "IPv6"
@@ -121,6 +126,9 @@ instance Enum IPv6 where
   enumFrom x = unfoldrLast (Just maxBound) (\b -> if b < maxBound then Just (b,succ b) else Nothing) x
   {-# INLINE enumFromTo #-}
   enumFromTo x y = unfoldrLast (if x <= y then Just y else Nothing) (\b -> if b < y then Just (b,succ b) else Nothing) x
+
+  enumFromThen = error "IPv6 currently lacks an implementation of enumFromThen"
+  enumFromThenTo = error "IPv6 currently lacks an implementation of enumFromThenTo"
 
 -- This is like unfoldr except that it adds an additional element
 -- at the end.
@@ -490,7 +498,9 @@ data IPv6Range = IPv6Range
   } deriving (Eq,Ord,Show,Read,Generic)
 
 mask :: Word8 -> Word64
-mask = complement . shiftR 0xffffffffffffffff . fromIntegral
+mask w = if w > 63
+  then 0xffffffffffffffff 
+  else complement (shiftR 0xffffffffffffffff (fromIntegral w))
 
 normalize :: IPv6Range -> IPv6Range
 normalize (IPv6Range (IPv6 w1 w2) len) =
@@ -518,20 +528,6 @@ parserRange = do
       then fail "An IP range length must be between 0 and 128"
       else return i
 
-twoDigits :: ByteString
-twoDigits = foldMap (BC8.pack . printf "%02d") $ enumFromTo (0 :: Int) 99
-{-# NOINLINE twoDigits #-}
-
-threeDigits :: ByteString
-threeDigits = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 999
-{-# NOINLINE threeDigits #-}
-
-i2w :: Integral a => a -> Word16
-i2w v = zero + fromIntegral v
-
-zero :: Word16
-zero = 48
-
 -- | Checks to see if an 'IPv6' address belongs in the 'IPv6Range'.
 --
 -- >>> let ip = ipv6 0x2001 0x0db8 0x0db8 0x1094 0x2051 0x0000 0x0000 0x0001
@@ -554,10 +550,17 @@ zero = 48
 -- creation and range normalization only occur once in the above example.
 -- They are reused as the list is iterated.
 contains :: IPv6Range -> IPv6 -> Bool
-contains (IPv6Range (IPv6 wsubnet w2) len) =
-  let theMask = mask len
-      wsubnetNormalized = wsubnet .&. theMask
-   in \(IPv6 w w2) -> (w .&. theMask) == wsubnetNormalized
+contains (IPv6Range (IPv6 wsubnetA wsubnetB) len) = 
+  let lenA = if len > 64 then 64 else len
+      lenB = if len > 64 then len - 64 else 0
+      theMaskA = mask lenA
+      theMaskB = mask lenB
+      wsubnetNormalizedA = wsubnetA .&. theMaskA
+      wsubnetNormalizedB = wsubnetB .&. theMaskB
+   in \(IPv6 wA wB) ->
+        (wA .&. theMaskA) == wsubnetNormalizedA
+        &&
+        (wB .&. theMaskB) == wsubnetNormalizedB
 
 -- | This is provided to mirror the interface provided by @Data.Set@. It
 -- behaves just like 'contains' but with flipped arguments.
@@ -586,7 +589,6 @@ upperInclusive (IPv6Range (IPv6 w1 w2) len) =
       theInvertedMask :: Word64
       theInvertedMask = shiftR 0xffffffffffffffff (fromIntegral len')
       theInvertedMask2 = shiftR 0xffffffffffffffff ((fromIntegral len')-64)
-      themask = complement theInvertedMask
       upper
         | len' < 64 =  IPv6 ((w1 .|. theInvertedMask)) ((w2 .|. shiftR 0xffffffffffffffff 0))
         | otherwise =  IPv6 (w1) (w2 .|. theInvertedMask2)
