@@ -67,7 +67,7 @@ test-suite test
     , test-framework
     , test-framework-quickcheck2
     , QuickCheck
-    , quickcheck-classes >= 0.3 && < 0.5
+    , quickcheck-classes >= 0.4.13 && < 0.5
     , text
     , bytestring
     , HUnit
