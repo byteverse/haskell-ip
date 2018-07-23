@@ -44,39 +44,39 @@ module Net.Mac
   ) where
 
 import Prelude hiding (print)
-import Data.Word
+
+import Data.Aeson (FromJSON(..),ToJSON(..))
+import Data.Aeson (ToJSONKey(..),FromJSONKey(..))
+import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
+import Data.ByteString (ByteString)
+import Data.Char (ord,chr)
+import Data.Hashable (Hashable)
+import Data.Monoid
+import Data.Primitive.Types (Prim(..))
 import Data.Text (Text)
+import Data.Word
 import Data.Word (Word8)
 import Data.Word.Synthetic.Word12 (Word12)
-import Data.Monoid
-import Data.ByteString (ByteString)
-import Data.Aeson (FromJSON(..),ToJSON(..))
-import Data.Hashable (Hashable)
-import GHC.Generics (Generic)
-import Data.Char (ord,chr)
-import Data.Primitive.Types (Prim(..))
+import GHC.Enum (predError, succError)
 import GHC.Exts
-import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
-import Text.ParserCombinators.ReadPrec (prec,step)
+import GHC.Generics (Generic)
 import GHC.Word (Word16(W16#))
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Unsafe as BU
-import qualified Data.ByteString.Builder as BB
-import qualified Data.Attoparsec.ByteString as ABW
-import qualified Data.Attoparsec.Text as AT
-import qualified Data.Attoparsec.ByteString as AB
-import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text.Builder.Fixed as TFB
-import qualified Data.ByteString.Builder.Fixed as BFB
+import Text.ParserCombinators.ReadPrec (prec,step)
+import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Attoparsec.ByteString as AB
+import qualified Data.Attoparsec.ByteString as ABW
+import qualified Data.Attoparsec.Text as AT
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Builder.Fixed as BFB
+import qualified Data.ByteString.Unsafe as BU
+import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.Text.IO as TIO
-
-#if MIN_VERSION_aeson(1,0,0) 
-import Data.Aeson (ToJSONKey(..),FromJSONKey(..),
-  ToJSONKeyFunction(..),FromJSONKeyFunction(..))
-#endif
+import qualified Data.Text.Lazy.Builder as TBuilder
 
 -- $setup
 --
@@ -638,6 +638,20 @@ instance Read Mac where
     Ident "mac" <- lexP
     w <- step readPrec
     return (mac w)
+
+instance Bounded Mac where
+  minBound = Mac 0
+  maxBound = Mac 0xFFFFFFFFFFFF
+
+instance Enum Mac where
+  succ m@(Mac x)
+    | m == maxBound = succError "Mac"
+    | otherwise = Mac (x + 1)
+  pred m@(Mac x)
+    | m == minBound = predError "Mac"
+    | otherwise = Mac (x - 1)
+  toEnum i = Mac (toEnum i)
+  fromEnum (Mac x) = fromEnum x
 
 print :: Mac -> IO ()
 print = TIO.putStrLn . encode
