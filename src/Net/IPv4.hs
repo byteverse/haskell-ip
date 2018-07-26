@@ -84,6 +84,7 @@ module Net.IPv4
     -- $interoperability
   ) where
 
+import Control.DeepSeq (NFData)
 import Control.Monad
 import Control.Monad.ST (ST,runST)
 import Data.Aeson (FromJSON(..),ToJSON(..))
@@ -356,6 +357,8 @@ decodeString = decode . Text.pack
 --   order.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable)
+
+instance NFdata IPv4
 
 instance Show IPv4 where
   showsPrec p addr = showParen (p > 10)
@@ -858,7 +861,7 @@ data IPv4Range = IPv4Range
   , ipv4RangeLength :: {-# UNPACK #-} !Word8
   } deriving (Eq,Ord,Show,Read,Generic)
 
-
+instance NFData IPv4Range
 instance Hashable IPv4Range
 
 instance ToJSON IPv4Range where
