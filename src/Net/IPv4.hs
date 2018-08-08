@@ -358,7 +358,7 @@ decodeString = decode . Text.pack
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
   deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable)
 
-instance NFdata IPv4
+instance NFData IPv4
 
 instance Show IPv4 where
   showsPrec p addr = showParen (p > 10)

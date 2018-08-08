@@ -45,6 +45,7 @@ module Net.Mac
 
 import Prelude hiding (print)
 
+import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..))
 import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
@@ -53,6 +54,9 @@ import Data.ByteString (ByteString)
 import Data.Char (ord,chr)
 import Data.Hashable (Hashable)
 import Data.Primitive.Types (Prim(..))
+#if !MIN_VERSION_base(4,11,0)
+import Data.Semigroup ((<>))
+#endif
 import Data.Text (Text)
 import Data.Word
 import Data.Word (Word8)

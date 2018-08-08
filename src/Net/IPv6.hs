@@ -63,6 +63,9 @@ import Data.List (intercalate, group)
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Primitive.Types (Prim(..))
+#if !MIN_VERSION_base(4,11,0)
+import Data.Semigroup ((<>))
+#endif
 import Data.Text (Text)
 import Data.Word
 import GHC.Enum (predError, succError)
