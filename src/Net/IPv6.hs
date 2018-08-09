@@ -62,6 +62,7 @@ import Data.List (intercalate, group)
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Primitive.Types (Prim(..))
+import Data.Semigroup ((<>))
 import Data.Text (Text)
 import Data.Word
 import GHC.Enum (predError, succError)

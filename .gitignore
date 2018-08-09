@@ -38,3 +38,6 @@ TAGS
 docs/db/unthreat
 out.html
 .ghc*
+example.hs
+example
+list.txt
