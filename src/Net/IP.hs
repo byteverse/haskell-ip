@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 {-# OPTIONS_GHC -Wall #-}
 
 {-| An IP data type representing either an IPv4 address or
@@ -43,7 +45,9 @@ module Net.IP
   ) where
 
 import Prelude hiding (print)
+import Control.DeepSeq (NFData)
 import Data.Bits
+import GHC.Generics (Generic)
 import Net.IPv6 (IPv6(..))
 import Net.IPv4 (IPv4(..))
 import Text.Read (Read(..))
@@ -98,7 +102,9 @@ print = TIO.putStrLn . encode
 --   of this type. All functions and typeclass methods that convert
 --   'IP' values to text will display it as an 'IPv4' address if possible.
 newtype IP = IP { getIP :: IPv6 }
-  deriving (Eq,Ord)
+  deriving (Eq,Ord,Generic)
+
+instance NFData IP
 
 instance Show IP where
   showsPrec p = case_ (showsPrec p) (showsPrec p)

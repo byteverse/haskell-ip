@@ -45,6 +45,7 @@ module Net.Mac
 
 import Prelude hiding (print)
 
+import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..))
 import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
@@ -52,8 +53,10 @@ import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
 import Data.ByteString (ByteString)
 import Data.Char (ord,chr)
 import Data.Hashable (Hashable)
-import Data.Monoid
 import Data.Primitive.Types (Prim(..))
+#if !MIN_VERSION_base(4,11,0)
+import Data.Semigroup ((<>))
+#endif
 import Data.Text (Text)
 import Data.Word
 import Data.Word (Word8)
@@ -548,6 +551,8 @@ word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 newtype Mac = Mac Word64
   deriving (Eq,Ord,Generic)
 
+instance NFData Mac
+
 -- | This only preserves the lower 6 bytes of the 8-byte word that backs a mac address.
 -- It runs slower than it would if it used a full 8-byte word, but it consumes less
 -- space. When storing millions of mac addresses, this is a good trade to make. When
@@ -597,7 +602,6 @@ instance Prim Mac where
         then case writeOffAddr# addr# (i# +# ix#) ident s0 of
           s1 -> go (ix# +# 1#) s1
         else s0
-
 
 macToWord16A# :: Mac -> Word#
 macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of

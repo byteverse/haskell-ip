@@ -1,11 +1,12 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE InstanceSigs        #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE UnboxedTuples       #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE CPP                 #-}
 
 {-# OPTIONS_GHC -Wall #-}
 
@@ -53,16 +54,18 @@ import Net.IPv4 (IPv4(..))
 import qualified Net.IPv4 as IPv4
 
 import Control.Applicative
+import Control.DeepSeq (NFData)
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Bits
-import Data.ByteString (ByteString)
 import Data.Char (chr)
 import Data.List (intercalate, group)
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Primitive.Types (Prim(..))
+#if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup ((<>))
+#endif
 import Data.Text (Text)
 import Data.Word
 import GHC.Enum (predError, succError)
@@ -71,12 +74,10 @@ import GHC.Generics (Generic)
 import Numeric (showHex)
 import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
-import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.Text as Atto
-import qualified Data.ByteString.Char8 as BC8
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
 
@@ -95,7 +96,9 @@ import qualified Data.Text.IO as TIO
 data IPv6 = IPv6
   { ipv6A :: {-# UNPACK #-} !Word64
   , ipv6B :: {-# UNPACK #-} !Word64
-  } deriving (Eq,Ord)
+  } deriving (Eq,Ord,Generic)
+
+instance NFData IPv6
 
 -- | Since 'IPv6' has more inhabitants than 'Int', the
 -- implementation of 'fromEnum' discards information.
@@ -497,6 +500,8 @@ data IPv6Range = IPv6Range
   { ipv6RangeBase   :: {-# UNPACK #-} !IPv6
   , ipv6RangeLength :: {-# UNPACK #-} !Word8
   } deriving (Eq,Ord,Show,Read,Generic)
+
+instance NFData IPv6Range
 
 mask :: Word8 -> Word64
 mask w = if w > 63
