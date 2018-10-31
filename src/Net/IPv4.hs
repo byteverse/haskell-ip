@@ -1,11 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -Wall #-}
 {-| An IPv4 data type
