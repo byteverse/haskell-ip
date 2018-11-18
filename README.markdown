@@ -1,3 +1,5 @@
+[![Hackage](https://img.shields.io/hackage/v/ip.svg)](https://hackage.haskell.org/package/ip)
+
 # Instructions
 
 Look at the [haddocks](http://hackage.haskell.org/package/ip) for this 
