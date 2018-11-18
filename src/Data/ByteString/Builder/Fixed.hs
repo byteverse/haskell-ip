@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,7 +23,9 @@ module Data.ByteString.Builder.Fixed
   , word12HexFixedUpper
   ) where
 
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Word
 import Data.Word.Synthetic.Word12 (Word12)
 import Data.Bits

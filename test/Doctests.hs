@@ -10,4 +10,5 @@ main = doctest
   , "src/Data/Text/Builder/Fixed.hs"
   , "src/Data/ByteString/Builder/Fixed.hs"
   , "src/Net/Mac.hs"
+  , "-XCPP"
   ]

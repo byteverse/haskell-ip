@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,7 +23,9 @@ module Data.Text.Builder.Fixed
   ) where
 
 import Control.Monad.ST
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
+#endif
 import Data.Word
 import Data.Bits
 import Data.Char (ord)
