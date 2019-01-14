@@ -68,7 +68,7 @@ test-suite test
     , test-framework
     , test-framework-quickcheck2
     , QuickCheck
-    , quickcheck-classes >= 0.4.13 && < 0.5
+    , quickcheck-classes >= 0.4.13 && < 0.7.0.0
     , text
     , bytestring
     , HUnit
@@ -89,7 +89,6 @@ test-suite spec
   build-depends:
       base
     , ip
-    , hspec
     , hspec >= 2.4.4
   other-modules:
     Net.IPv4Spec
