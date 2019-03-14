@@ -7,6 +7,7 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 ## [1.4.2] - 2019-03-14
 - Fix existing `spec` test suite.
 - 100% haddock coverage, along with significantly more doctest coverage.
+- Add `Net.IPv4.localhost` and `Net.IPv6.localhost`, aliases for `loopback`.
 
 ## [1.4.1] - 2018-08-19
 - Add `Enum` and `Bounded` instances for `Mac`.
