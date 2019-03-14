@@ -1,3 +1,4 @@
+cabal-version: 2.0
 name: ip
 version: 1.4.1
 synopsis: Library for IP and MAC addresses
@@ -9,7 +10,6 @@ maintainer: andrew.thaddeus@gmail.com
 copyright: 2016 Andrew Martin
 category: web
 build-type: Simple
-cabal-version: >=1.10
 description:
   The `ip` package provides types and functions for dealing with
   IPv4 addresses, CIDR blocks, and MAC addresses. We provide instances
@@ -89,12 +89,13 @@ test-suite spec
   build-depends:
       base
     , ip
-    , hspec >= 2.4.4
+    , hspec >= 2.7
   other-modules:
     Net.IPv4Spec
     Net.IPv4.RangeSpec
   ghc-options: -Wall -O2
   default-language: Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover >= 2.7
 
 test-suite doctest
   type: exitcode-stdio-1.0

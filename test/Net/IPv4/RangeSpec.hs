@@ -3,7 +3,6 @@ module Net.IPv4.RangeSpec (spec) where
 import Prelude hiding (any)
 import Data.Bits
 import Net.IPv4
-import Net.IPv4.Range
 import Test.Hspec
 
 spec :: Spec
