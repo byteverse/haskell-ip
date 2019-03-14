@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -7,10 +9,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
-{-# OPTIONS_GHC -Wall #-}
+{-| This module provides the Mac data type and functions for working
+    with it.
+-}
 module Net.Mac
   ( -- * Convert
     mac
@@ -80,6 +81,7 @@ import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.Builder as TBuilder
+import qualified Data.Text as Text
 
 -- $setup
 --
@@ -144,14 +146,21 @@ rightToMaybe = either (const Nothing) Just
 c2w :: Char -> Word8
 c2w = fromIntegral . ord
 
--- | Encode a 'Mac' address lowercase hex, separating every two characters
---   with a colon:
+-- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
 --
 --   >>> T.putStrLn (encode (Mac 0xA47F247AB423))
 --   a4:7f:24:7a:b4:23
 encode :: Mac -> Text
 encode = encodeWith defCodec
 
+-- | Encode a 'Mac' address using the given 'MacCodec'.
+--
+--   >>> m = Mac 0xA47F247AB423
+--   >>> T.putStrLn $ encodeWith defCodec m
+--   a4:7f:24:7a:b4:23
+--
+--   >>> T.putStrLn $ encodeWith (MacCodec (MacGroupingTriples '-') True) m
+--   A47-F24-7AB-423
 encodeWith :: MacCodec -> Mac -> Text
 encodeWith (MacCodec g u) m = case g of
   MacGroupingNoSeparator -> case u of
@@ -168,18 +177,49 @@ encodeWith (MacCodec g u) m = case g of
     True -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedUpper) (Pair c m)
     False -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedLower) (Pair c m)
 
+-- | Decode a 'Mac' address using the default 'MacCodec' 'defCodec'.
+--
+--   >>> decode (Text.pack "a4:7f:24:7a:b4:23")
+--   Just (mac 0xa47f247ab423)
+--
+--   >>> decode (Text.pack "a47-f24-7ab-423")
+--   Nothing
 decode :: Text -> Maybe Mac
 decode = decodeWith defCodec
 
+-- | Decode a 'Mac' address from 'Text' using the given 'MacCodec'.
+--
+-- >>> decodeWith defCodec (Text.pack "a4:7f:24:7a:b4:23")
+-- Just (mac 0xa47f247ab423)
+--
+-- >>> decodeWith (MacCodec MacGroupingNoSeparator False) (Text.pack "a47f247ab423")
+-- Just (mac 0xa47f247ab423)
 decodeWith :: MacCodec -> Text -> Maybe Mac
 decodeWith codec t = rightToMaybe (AT.parseOnly (parserWith codec <* AT.endOfInput) t)
 
+-- | Encode a 'Mac' address as a 'TBuilder.Builder'.
 builder :: Mac -> TBuilder.Builder
 builder = TBuilder.fromText . encode
 
+-- | Parse a 'Mac' address using a 'AT.Parser'.
+--
+--   >>> AT.parseOnly parser (Text.pack "a4:7f:24:7a:b4:23")
+--   Right (mac 0xa47f247ab423)
+--
+--   >>> AT.parseOnly parser (Text.pack "a47-f24-7ab-423")
+--   Left "':': Failed reading: satisfy"
 parser :: AT.Parser Mac
 parser = parserWith defCodec
 
+-- | Parser a 'Mac' address using the given 'MacCodec'.
+--
+--   >>> p1 = parserWith defCodec
+--   >>> AT.parseOnly p1 (Text.pack "a4:7f:24:7a:b4:23")
+--   Right (mac 0xa47f247ab423)
+--
+--   >>> p2 = parserWith (MacCodec MacGroupingNoSeparator False)
+--   >>> AT.parseOnly p2 (Text.pack "a47f247ab423")
+--   Right (mac 0xa47f247ab423)
 parserWith :: MacCodec -> AT.Parser Mac
 parserWith (MacCodec g _) = case g of
   MacGroupingQuadruples c -> parserQuadruples c
@@ -187,6 +227,10 @@ parserWith (MacCodec g _) = case g of
   MacGroupingPairs c -> parserPairs c
   MacGroupingNoSeparator -> parserNoSeparator
 
+-- | The default 'MacCodec': all characters are lowercase hex, separated by colons into pairs.
+--
+--   >>> T.putStrLn $ encodeWith defCodec (Mac 0xa47f247ab423)
+--   a4:7f:24:7a:b4:23
 defCodec :: MacCodec
 defCodec = MacCodec (MacGroupingPairs ':') False
 
@@ -320,8 +364,7 @@ word12At :: Int -> Mac -> Word12
 word12At i (Mac w) = fromIntegral (unsafeShiftR w i)
 {-# INLINE word12At #-}
 
--- | Encode a 'Mac' address, as lowercase hexadecimal digits
---   separated by a colon:
+-- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
 --
 --   >>> BC.putStrLn (encodeUtf8 (mac 0x64255A0F2C47))
 --   64:25:5a:0f:2c:47
@@ -340,6 +383,13 @@ encodeUtf8 = encodeWithUtf8 defCodec
 decodeUtf8 :: ByteString -> Maybe Mac
 decodeUtf8 = decodeLenientUtf8
 
+-- | Decode a 'ByteString' as a 'Mac' address using the given 'MacCodec'.
+--
+--   >>> decodeWithUtf8 defCodec (BC.pack "64:25:5a:0f:2c:47")
+--   Just (mac 0x64255a0f2c47)
+--
+--   >>> decodeWithUtf8 (MacCodec MacGroupingNoSeparator False) (BC.pack "64255a0f2c47")
+--   Just (mac 0x64255a0f2c47)
 decodeWithUtf8 :: MacCodec -> ByteString -> Maybe Mac
 decodeWithUtf8 codec bs = rightToMaybe (AB.parseOnly (parserWithUtf8 codec <* AB.endOfInput) bs)
 
@@ -468,6 +518,14 @@ tryParseWord8Hex a w
 parseWord8Hex :: Word8 -> AB.Parser Word8
 parseWord8Hex = tryParseWord8Hex (fail "invalid hexadecimal character")
 
+-- | Encode a 'Mac' address as a 'ByteString' using the given 'MacCodec'.
+--
+--   >>> m = Mac 0xA47F247AB423
+--   >>> BC.putStrLn $ encodeWithUtf8 defCodec m
+--   a4:7f:24:7a:b4:23
+--
+--   >>> BC.putStrLn $ encodeWithUtf8 (MacCodec (MacGroupingTriples '-') True) m
+--   A47-F24-7AB-423
 encodeWithUtf8 :: MacCodec -> Mac -> ByteString
 encodeWithUtf8 (MacCodec g u) m = case g of
   MacGroupingNoSeparator -> case u of
@@ -657,6 +715,7 @@ instance Enum Mac where
   toEnum i = Mac (toEnum i)
   fromEnum (Mac x) = fromEnum x
 
+-- | Print a 'Mac' address using the textual encoding.
 print :: Mac -> IO ()
 print = TIO.putStrLn . encode
 
@@ -673,6 +732,8 @@ nibbleToHex w
   | w < 10 = chr (fromIntegral (w + 48))
   | otherwise = chr (fromIntegral (w + 87))
 
+-- | A 'MacCodec' allows users to control the encoding/decoding
+--   of their 'Mac' addresses.
 data MacCodec = MacCodec
   { macCodecGrouping :: !MacGrouping
   , macCodecUpperCase :: !Bool

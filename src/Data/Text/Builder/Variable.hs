@@ -8,7 +8,7 @@
     than the builder provided by the @text@ library. However,
     data whose textual encoding has no known upper bound cannot
     be encoded by the builder provided here. For example, it
-    is possible to provide decimal builders for types like 'Int8' and
+    is possible to provide decimal builders for types like 'Data.Int.Int8' and
     'Word16', whose lengths are respectively bounded by
     4 and 5. However, this is not possible for 'Integer', since
     its decimal representation could be arbitrarily long.

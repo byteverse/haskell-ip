@@ -8,8 +8,9 @@
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE UnboxedTuples       #-}
 
-{-# OPTIONS_GHC -Wall #-}
-
+{-| This module provides the IPv6 data type and functions for working
+    with it.
+-}
 module Net.IPv6
   ( -- * Convert
     ipv6
@@ -23,6 +24,7 @@ module Net.IPv6
     -- * Special IP Addresses
   , any
   , loopback
+  , localhost
     -- * Textual Conversion
     -- ** Text
   , encode
@@ -228,6 +230,7 @@ internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
 internal_ m s = case internal m s of
   (# s', _ #) -> s'
 
+-- | Print an 'IPv6' using the textual encoding.
 print :: IPv6 -> IO ()
 print = TIO.putStrLn . encode
 
@@ -269,6 +272,14 @@ instance Aeson.FromJSON IPv6 where
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
 
+-- | This could be useful for the rare occasion
+--   in which one could construct an 'IPv6' from
+--   octets.
+--
+--   Note that while @Net.IPv4.'Net.IPv4.fromOctets' = Net.IPv4.'Net.IPv4.ipv4'@,
+--   @Net.IPv6.fromOctets /= Net.IPv6.ipv6@. While this should be obvious
+--   from their types, it is worth mentioning since the similarity in naming
+--   might be confusing.
 fromOctets ::
      Word8 -> Word8 -> Word8 -> Word8
   -> Word8 -> Word8 -> Word8 -> Word8
@@ -349,9 +360,24 @@ toWord32s (IPv6 a b) =
   , fromIntegral b
   )
 
+-- | The local loopback IP address.
+--
+--   >>> loopback
+--   ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001
 loopback :: IPv6
 loopback = IPv6 0 1
 
+-- | A useful alias for 'loopback'.
+--
+--   >>> localhost
+--   ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001
+localhost :: IPv6
+localhost = loopback
+
+-- | The IP address representing any host.
+--   
+--   >>> any 
+--   ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
 any :: IPv6
 any = IPv6 0 0
 
@@ -397,6 +423,11 @@ encode ip =
 decode :: Text -> Maybe IPv6
 decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 
+-- | Parse an 'IPv6' using 'Atto.Parser'.
+--
+--   >>> ip = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
+--   >>> Atto.parseOnly parser (Text.pack "dead:beef:3240:a426:ba68:1cd0:4263:109b")
+--   Right (ipv6 0xdead 0xbeef 0x3240 0xa426 0xba68 0x1cd0 0x4263 0x109b)
 parser :: Atto.Parser IPv6
 parser = makeIP <$> ip
   where
@@ -496,6 +527,8 @@ fromWord16Word64 a b c d = fromIntegral
 fromWord32Word64 :: Word64 -> Word64 -> Word64
 fromWord32Word64 a b = fromIntegral (unsafeShiftL a 32 .|. b)
 
+-- | An 'IPv6Range'. It is made up of the first 'IPv6' in the range
+--   and its length.
 data IPv6Range = IPv6Range
   { ipv6RangeBase   :: {-# UNPACK #-} !IPv6
   , ipv6RangeLength :: {-# UNPACK #-} !Word8
@@ -508,6 +541,25 @@ mask w = if w > 63
   then 0xffffffffffffffff 
   else complement (shiftR 0xffffffffffffffff (fromIntegral w))
 
+-- | Normalize an 'IPv6Range'. The first result of this is that the
+--   'IPv6' inside the 'IPv6Range' is changed so that the insignificant
+--   bits are zeroed out. For example:
+--
+--   >>> addr1 = ipv6 0x0192 0x0168 0x0001 0x0019 0x0000 0x0000 0x0000 0x0000
+--   >>> addr2 = ipv6 0x0192 0x0168 0x0001 0x0163 0x0000 0x0000 0x0000 0x0000
+--   >>> printRange $ normalize $ IPv6Range addr1 24
+--   192:100::/24 
+--   >>> printRange $ normalize $ IPv6Range addr2 28
+--   192:160::/28
+--
+--   The second effect of this is that the mask length is lowered to be 128
+--   or smaller. Working with 'IPv6Range's that have not been normalized does
+--   not cause any issues for this library, although other applications may
+--   reject such ranges (especially those with a mask length above 128).
+--
+--   Note that 'normalize is idempotent, that is:
+--
+--   prop> normalize r == (normalize . normalize) r
 normalize :: IPv6Range -> IPv6Range
 normalize (IPv6Range (IPv6 w1 w2) len) =
   let len' = min len 128
@@ -516,12 +568,23 @@ normalize (IPv6Range (IPv6 w1 w2) len) =
         | otherwise =  (IPv6Range (IPv6 (w1 .&. mask 64) (w2 .&. mask (len' - 64))) len')
   in norm
 
+-- | Encode an 'IPv6Range' as 'Text'.
+--
+--   >>> addr = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
+--   >>> T.putStrLn $ encodeRange $ IPv6Range addr 28
+--   dead:beef:3240:a426:ba68:1cd0:4263:109b/28
 encodeRange :: IPv6Range -> Text
 encodeRange x = encode (ipv6RangeBase x) <> Text.pack "/" <> (Text.pack $ (show . fromEnum) $ ipv6RangeLength x)
 
+-- | Decode an 'IPv6Range' from 'Text'.
+--
+--   >>> addr = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
+--   >>> fmap encodeRange $ decodeRange (Text.pack "dead:beef:3240:a426:ba68:1cd0:4263:109b/28")
+--   Just "dead:bee0::/28"
 decodeRange :: Text -> Maybe IPv6Range
 decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
 
+-- | Parse an 'IPv6Range' using a 'AT.Parser'.
 parserRange :: AT.Parser IPv6Range
 parserRange = do
   ip <- parser
@@ -581,7 +644,7 @@ member = flip contains
 -- >>> T.putStrLn $ encode $ lowerInclusive $ IPv6Range (ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001) 25
 -- 2001:d80::
 --
--- Note that the lower bound of a normalized 'IPv4Range' is simply the
+-- Note that the lower bound of a normalized 'IPv6Range' is simply the
 -- ip address of the range:
 --
 -- prop> lowerInclusive r == ipv6RangeBase (normalize r)
@@ -589,6 +652,12 @@ lowerInclusive :: IPv6Range -> IPv6
 lowerInclusive (IPv6Range (IPv6 w1 w2) len) =
   ipv6RangeBase (normalize (IPv6Range (IPv6 w1 w2) len))
 
+-- | The inclusive upper bound of an 'IPv6Range'.
+--
+--   >>> let addr = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
+--   >>> T.putStrLn $ encode $ upperInclusive $ IPv6Range addr 25
+--   dead:beff:ffff:ffff:ffff:ffff:ffff:ffff
+--
 upperInclusive :: IPv6Range -> IPv6
 upperInclusive (IPv6Range (IPv6 w1 w2) len) =
   let len' = min 128 len
@@ -600,13 +669,29 @@ upperInclusive (IPv6Range (IPv6 w1 w2) len) =
         | otherwise =  IPv6 (w1) (w2 .|. theInvertedMask2)
   in upper
 
--- | This exists mostly for testing purposes.
+-- | Print an 'IPv6Range' using the textual encoding.
 printRange :: IPv6Range -> IO ()
 printRange = TIO.putStrLn . encodeRange
 
+-- | Smart constructor for 'IPv6Range'. Ensures the mask is appropriately
+--   sized and sets masked bits in the 'IPv6' to zero.
+--
+--   >>> let addr = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
+--   >>> printRange $ range addr 25
+--   dead:be80::/25
 range :: IPv6 -> Word8 -> IPv6Range
 range addr len = normalize (IPv6Range addr len)
 
+-- | Given an inclusive lower and upper ip address, create the smallest 'IPv6Range'
+--   that contains the two. This is helpful in situations where input is given as a
+--   range, like @ @.
+--   
+--   This makes the range broader if it cannot be represented in <https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing CIDR> notation.
+--
+--   >>> addrLower = ipv6 0xDEAD 0xBE80 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
+--   >>> addrUpper = ipv6 0xDEAD 0xBEFF 0xFFFF 0xFFFF 0xFFFF 0xFFFF 0xFFFF 0xFFFF
+--   >>> printRange $ fromBounds addrLower addrUpper
+--   dead:be80::/25
 fromBounds :: IPv6 -> IPv6 -> IPv6Range
 fromBounds (IPv6 a1 a2) (IPv6 b1 b2) =
   normalize (IPv6Range (IPv6 a1 a2) (maskFromBounds a1 b1 a2 b2))

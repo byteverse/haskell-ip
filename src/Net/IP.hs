@@ -60,6 +60,15 @@ import qualified Net.IPv6 as IPv6
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.IO as TIO
 
+-- | Run a function over an 'IP' depending on its status
+--   as an 'IPv4' or 'IPv6'.
+--
+--   >>> case_ IPv4.encode IPv6.encode (ipv4 192 168 2 47)
+--   "192.168.2.47"
+--
+--   >>> addr = ipv6 0x2001 0x0db8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001
+--   >>> case_ IPv4.encode IPv6.encode addr
+--   "2001:db8::1"
 case_ :: (IPv4 -> a) -> (IPv6 -> a) -> IP -> a
 case_ f g (IP addr@(IPv6 w1 w2)) = if w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
   then f (IPv4 (fromIntegral w2))
@@ -77,15 +86,19 @@ ipv6 :: Word16 -> Word16 -> Word16 -> Word16
      -> IP
 ipv6 a b c d e f g h = fromIPv6 (IPv6.fromWord16s a b c d e f g h)
 
+-- | Turn an 'IPv4' into an 'IP'.
 fromIPv4 :: IPv4 -> IP
 fromIPv4 (IPv4 w) = IP (IPv6 0 (0x0000FFFF00000000 .|. fromIntegral w))
 
+-- | Turn an 'IPv6' into an 'IP'.
 fromIPv6 :: IPv6 -> IP
 fromIPv6 = IP
 
+-- | Encode an 'IP' as 'Text'.
 encode :: IP -> Text
 encode = case_ IPv4.encode IPv6.encode
 
+-- | Decode an 'IP' from 'Text'.
 decode :: Text -> Maybe IP
 decode t = case IPv4.decode t of
   Nothing -> case IPv6.decode t of
@@ -93,6 +106,7 @@ decode t = case IPv4.decode t of
     Just v6 -> Just (fromIPv6 v6)
   Just v4 -> Just (fromIPv4 v4)
 
+-- | Print an 'IP' using the textual encoding.
 print :: IP -> IO ()
 print = TIO.putStrLn . encode
 

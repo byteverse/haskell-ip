@@ -7,19 +7,8 @@
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS_GHC -Wall #-}
-{-| An IPv4 data type
-
-    This module provides the IPv4 data type and functions for working
-    with it. There are also encoding and decoding functions provided
-    in this module, but they should be imported from
-    @Net.IPv4.Text@ and @Net.ByteString.Char8@ instead. They are
-    defined here so that the 'FromJSON' and 'ToJSON' instances can
-    use them.
-
-    At some point, a highly efficient IPv4-to-ByteString function needs
-    to be added to this module to take advantage of @aeson@'s new
-    @toEncoding@ method.
+{-| This module provides the IPv4 data type and functions for working
+    with it.
 -}
 
 module Net.IPv4
@@ -31,6 +20,7 @@ module Net.IPv4
     -- * Special IP Addresses
   , any
   , loopback
+  , localhost
   , broadcast
     -- * Range Predicates
   , private
@@ -174,15 +164,31 @@ toOctets (IPv4 w) =
   , fromIntegral w
   )
 
--- | The IP address representing any host: @0.0.0.0@
+-- | The IP address representing any host.
+--
+--   >>> any
+--   ipv4 0 0 0 0
 any :: IPv4
 any = IPv4 0
 
--- | The local loopback IP address: @127.0.0.1@
+-- | The local loopback IP address.
+--
+--   >>> loopback
+--   ipv4 127 0 0 1
 loopback :: IPv4
 loopback = fromOctets 127 0 0 1
 
--- | The broadcast IP address: @255.255.255.255@
+-- | A useful and common alias for 'loopback'.
+--
+--   >>> localhost
+--   ipv4 127 0 0 1
+localhost :: IPv4
+localhost = loopback
+
+-- | The broadcast IP address.
+--
+--   >>> broadcast
+--   ipv4 255 255 255 255
 broadcast :: IPv4
 broadcast = fromOctets 255 255 255 255
 
@@ -255,20 +261,46 @@ encode :: IPv4 -> Text
 encode = toDotDecimalText
 
 -- | Decode an 'IPv4' address.
+--
+--   >>> decode (Text.pack "192.168.2.47")
+--   Just (ipv4 192 168 2 47)
+--
+--   >>> decode (Text.pack "10.100.256.256")
+--   Nothing
 decode :: Text -> Maybe IPv4
 decode = decodeIPv4TextMaybe
 
 -- | Encode an 'IPv4' address to a text 'TBuilder.Builder'.
+--
+--   >>> builder (ipv4 192 168 2 47)
+--   "192.168.2.47"
 builder :: IPv4 -> TBuilder.Builder
 builder = toDotDecimalBuilder
 
+-- | Parse an 'IPv4' address using a 'TextRead.Reader'.
+--
+--   >>> reader (Text.pack "192.168.2.47")
+--   Right (ipv4 192 168 2 47,"")
+--
+--   >>> reader (Text.pack "192.168.2.470")
+--   Left "All octets in an IPv4 address must be between 0 and 255"
 reader :: TextRead.Reader IPv4
 reader = decodeIPv4TextReader
 
+-- | Parse an 'IPv4' address using a 'AT.Parser'.
+--
+--   >>> AT.parseOnly parser (Text.pack "192.168.2.47")
+--   Right (ipv4 192 168 2 47)
+--
+--   >>> AT.parseOnly parser (Text.pack "192.168.2.470")
+--   Left "Failed reading: All octets in an IPv4 address must be between 0 and 255"
 parser :: AT.Parser IPv4
 parser = dotDecimalParser
 
 -- | Encode an 'IPv4' address to a UTF-8 encoded 'ByteString'.
+--
+--   >>> encodeUtf8 (ipv4 192 168 2 47)
+--   "192.168.2.47"
 encodeUtf8 :: IPv4 -> ByteString
 encodeUtf8 = toBSPreAllocated
 
@@ -311,14 +343,26 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
               poke ptr (word + 48)
               return 1
 
--- This should be rewritten to not go through text
--- as an intermediary.
+-- | Decode a UTF8-encoded 'ByteString' into an 'IPv4'.
+--
+--   >>> decodeUtf8 (BC8.pack "192.168.2.47")
+--   Just (ipv4 192 168 2 47)
 decodeUtf8 :: ByteString -> Maybe IPv4
 decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
+-- This (decodeUtf8) should be rewritten to not go through text
+-- as an intermediary.
 
+-- | Encode an 'IPv4' as a 'Builder.Builder'
 builderUtf8 :: IPv4 -> Builder.Builder
 builderUtf8 = Builder.byteString . encodeUtf8
 
+-- | Parse an 'IPv4' using a 'AB.Parser'.
+--
+--   >>> AB.parseOnly parserUtf8 (BC8.pack "192.168.2.47")
+--   Right (ipv4 192 168 2 47)
+--
+--   >>> AB.parseOnly parserUtf8 (BC8.pack "192.168.2.470")
+--   Left "Failed reading: All octets in an ipv4 address must be between 0 and 255"
 parserUtf8 :: AB.Parser IPv4
 parserUtf8 = fromOctets'
   <$> (AB.decimal >>= limitSize)
@@ -344,9 +388,11 @@ parserUtf8 = fromOctets'
 
 -}
 
+-- | Encode an 'IPv4' as a 'String'.
 encodeString :: IPv4 -> String
 encodeString = Text.unpack . encode
 
+-- | Decode an 'IPv4' from a 'String'.
 decodeString :: String -> Maybe IPv4
 decodeString = decode . Text.pack
 
@@ -382,6 +428,7 @@ instance Read IPv4 where
     d <- step readPrec
     return (fromOctets a b c d)
 
+-- | Print an 'IPv4' using the textual encoding.
 print :: IPv4 -> IO ()
 print = TIO.putStrLn . encode
 
@@ -745,6 +792,10 @@ lowerInclusive :: IPv4Range -> IPv4
 lowerInclusive (IPv4Range (IPv4 w) len) =
   IPv4 (w .&. mask len)
 
+-- | The inclusive upper bound of an 'IPv4Range'.
+--
+--   >>> T.putStrLn $ encode $ upperInclusive $ IPv4Range (ipv4 10 10 1 160) 25
+--   10.10.1.255
 upperInclusive :: IPv4Range -> IPv4
 upperInclusive (IPv4Range (IPv4 w) len) =
   let theInvertedMask = shiftR 0xffffffff (fromIntegral len)
@@ -786,6 +837,8 @@ toList (IPv4Range ip len) =
   let totalAddrs = countAddrs len
    in wordSuccessors totalAddrs ip
 
+-- | A stream-polymorphic generator over an 'IPv4Range'.
+--   For more information, see <http://www.haskellforall.com/2014/11/how-to-build-library-agnostic-streaming.html How to build library-agnostic streaming sources>.
 toGenerator :: MonadPlus m => IPv4Range -> m IPv4
 toGenerator (IPv4Range ip len) =
   let totalAddrs = countAddrs len
@@ -827,15 +880,19 @@ normalize (IPv4Range (IPv4 w) len) =
       w' = w .&. mask len'
    in IPv4Range (IPv4 w') len'
 
+-- | Encode an 'IPv4Range' as 'Text'.
 encodeRange :: IPv4Range -> Text
 encodeRange = rangeToDotDecimalText
 
+-- | Decode an 'IPv4Range' from 'Text'.
 decodeRange :: Text -> Maybe IPv4Range
 decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
 
+-- | Encode an 'IPv4Range' to a 'TBuilder.Builder'.
 builderRange :: IPv4Range -> TBuilder.Builder
 builderRange = rangeToDotDecimalBuilder
 
+-- | Parse an 'IPv4Range' using a 'AT.Parser.'
 parserRange :: AT.Parser IPv4Range
 parserRange = do
   ip <- parser

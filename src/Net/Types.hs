@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wall -Werror #-}
-
+{-| This module re-exports all of the thematic types that this library defines.
+-}
 module Net.Types
   ( IPv4(..)
   , IPv6(..)
