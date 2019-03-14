@@ -372,7 +372,7 @@ encodeUtf8 :: Mac -> ByteString
 encodeUtf8 = encodeWithUtf8 defCodec
 
 -- | Lenient decoding of MAC address that accepts lowercase, uppercase,
---   and any kind separator.
+--   and any kind of separator.
 --
 --   >>> decodeUtf8 "A2:DE:AD:BE:EF:67"
 --   Just (mac 0xa2deadbeef67)
