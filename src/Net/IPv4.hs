@@ -825,6 +825,7 @@ wordSuccessorsM = go where
 
 -- | Convert an 'IPv4Range' into a list of the 'IPv4' addresses that
 --   are in it.
+--
 -- >>> let r = IPv4Range (fromOctets 192 168 1 8) 30
 -- >>> mapM_ (T.putStrLn . encode) (toList r)
 -- 192.168.1.8

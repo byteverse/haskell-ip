@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## [1.4.2.1] - 2019-03-18
+- Docfix for `Net.IPv4.toList`
+
 ## [1.4.2] - 2019-03-14
 - Fix existing `spec` test suite.
 - 100% haddock coverage, along with significantly more doctest coverage.
