@@ -81,7 +81,7 @@ import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.Builder as TBuilder
-import qualified Data.Text as Text
+import qualified Data.Text as Text ()
 
 -- $setup
 --
