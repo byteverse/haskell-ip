@@ -89,6 +89,7 @@ import qualified Data.Text as Text ()
 --
 -- >>> :set -XOverloadedStrings
 -- >>> import Test.QuickCheck (Arbitrary(..))
+-- >>> import qualified Data.Text as Text (pack)
 -- >>> import qualified Data.Text.IO as T
 -- >>> import qualified Data.ByteString.Char8 as BC
 -- >>> instance Arbitrary Mac where { arbitrary = fmap (Mac . (0xFFFFFFFFFFFF .&.)) arbitrary }
