@@ -7,27 +7,26 @@ package to learn how to use it.
 
 # Contributing
 
-Most contributions are welcome. Improvements are needed the most
-in the encoding/decoding of Text/ByteString. There is a 
-process for this so that old implementations can continue to be compared
-against. For improved implementations create a new module 
-in the `tests` directory. The name should be the concatenation of three things:
+Most contributions are welcome, especially performance improvements in encoding and decoding of Text/ByteString.
+Please make sure to follow naming conventions followed in the modules.
 
-1. A data type
-2. Either the word Text or ByteString
-3. A number
+## Cached dependencies
+Nix users can have all dependencies of `ip` cached when hacking on this project by using `cachix`:
 
-Some examples for names are `IPv4Text6` or `MacByteString2`. This module
-should export either a function named `encode` or a function named `decode`.
-Then, in `test/Bench.hs`, add the new implementation. Run `stack bench`
-to see how it compares with the others.
+```sh
+# install nix
+$ bash <(curl https://nixos.org/nix/install)
 
-After doing this, PR those changes and mention that a better
-implementation than what is currently being used has been added.
-The new implementation will be added to the actual library
-if it is better.
+# install cachix client
+$ nix-env -iA cachix -f https://cachix.org/api/v1/install
 
-# Other
+# start using the binary cache
+$ cachix use layer-3-cachix
+```
 
-If this readme is confusing in any way, please open up an issue.
+Nix commands will use the cache:
 
+```sh
+$ nix-build
+copying path '/nix/store/n1gwpmvmcgsbnr0a8ncflhvc59db775h-myproject-1.0.0' from 'https://layer-3-cachix.cachix.org'
+```

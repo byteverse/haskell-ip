@@ -1,11 +1,7 @@
 { package ? "ip", compiler ? "ghc844" }:
 
 let
-  fetchNixpkgs = import ./nix/fetchNixpkgs.nix;
-  nixpkgs = fetchNixpkgs {
-    rev = "45456fecc74f70476c583d4144019a1a9f48267e";
-    sha256 = "1pp22lxh70qg9l5ylhc8bc89pvccg3xwiyi6q5qkqpnwbb2jcjmr";
-  };
+  nixpkgs = import ./nix/nixpkgs.nix {};
   pkgs = import nixpkgs { config = {}; };
   inherit (pkgs) haskell;
 
@@ -27,15 +23,10 @@ let
            build = name: path: self.callCabal2nix name (builtins.filterSource filterPredicate path) {};
          };
     {
-      mkDerivation = args: super.mkDerivation (args // {
-        doCheck = pkgs.lib.elem args.pname [ "ip" ];
-        doHaddock = false;
-      });
-
       ip = build "ip" ./.;
+      semirings = super.semirings_0_3_1_1;
     };
   };
 in rec {
-  drv = overrides.${package};
-  ip  = if pkgs.lib.inNixShell then drv.env else drv;
+  ip = overrides.${package};
 }
