@@ -1,10 +1,10 @@
-{ package ? "ip", compiler ? "ghc822" }:
+{ package ? "ip", compiler ? "ghc844" }:
 
 let
   fetchNixpkgs = import ./nix/fetchNixpkgs.nix;
   nixpkgs = fetchNixpkgs {
-    rev = "e5629dc51a313c3b99725616718d2deff49cd891";
-    sha256 = "0s3a65mswqds5395cqy9d4mj8d75vii2479y4dvyagamv1zh0zp6";
+    rev = "45456fecc74f70476c583d4144019a1a9f48267e";
+    sha256 = "1pp22lxh70qg9l5ylhc8bc89pvccg3xwiyi6q5qkqpnwbb2jcjmr";
   };
   pkgs = import nixpkgs { config = {}; };
   inherit (pkgs) haskell;
