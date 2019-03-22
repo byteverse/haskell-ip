@@ -20,7 +20,7 @@ let
     overrides = self: super:
     with haskell.lib;
     with { cp = file: (self.callPackage (./nix/haskell + "/${file}.nix") {});
-           build = name: path: self.callCabal2nix name (builtins.filterSource filterPredicate path) {};
+           build = name: path: self.callCabal2nixWithOptions name (builtins.filterSource filterPredicate path) "--benchmark" {};
          };
     {
       ip = build "ip" ./.;
