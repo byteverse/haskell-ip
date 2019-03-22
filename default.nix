@@ -20,10 +20,10 @@ let
     overrides = self: super:
     with haskell.lib;
     with { cp = file: (self.callPackage (./nix/haskell + "/${file}.nix") {});
-           build = name: path: self.callCabal2nixWithOptions name (builtins.filterSource filterPredicate path) "--benchmark" {};
+           build = name: path: self.callCabal2nix name (builtins.filterSource filterPredicate path) {};
          };
     {
-      ip = build "ip" ./.;
+      ip = doBenchmark (build "ip" ./.);
       semirings = super.semirings_0_3_1_1;
     };
   };
