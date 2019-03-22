@@ -2,6 +2,7 @@ module Main (main) where
 
 import Criterion.Main
 import Net.Types (IPv4(..),MacGrouping(..),MacCodec(..))
+import Data.Maybe (fromJust)
 import qualified Data.Text as Text
 import qualified Net.Mac as Mac
 import qualified Net.IPv4 as IPv4
@@ -21,9 +22,13 @@ main = do
       ipText = Text.pack "192.168.5.99"
       mac = Mac.fromOctets 0xFA 0xBB 0x43 0xA1 0x22 0x09
       ip6Text = Text.pack "::"
+      ip6 = fromJust $ IPv6.decode ip6Text
       ip6TextBigger = Text.pack "1:2:3:4:5:6:7:8"
+      ip6Bigger = fromJust $ IPv6.decode ip6TextBigger
       ip6TextSkip = Text.pack "1:2::7:8"
+      ip6Skip = fromJust $ IPv6.decode ip6TextSkip
       ip6TextHex = Text.pack "a:b::c:d"
+      ip6Hex = fromJust $ IPv6.decode ip6TextHex
   defaultMain
     [ bgroup "Mac to Text"
       [ bench "Current Implementation, pairs" $ whnf Mac.encode mac
@@ -55,10 +60,16 @@ main = do
       , bench "Preallocated: No Lookup Tables" $ whnf IPv4ByteString1.encode ipAddr
       , bench "Preallocated" $ whnf IPv4.encodeUtf8 ipAddr
       ]
-    , bgroup "IPv6 from Text"
+    , bgroup "IPv6 to Text"
       [ bench "New '::'" $ whnf IPv6.decode ip6Text
       , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.decode ip6TextBigger
       , bench "New '1:2::7:8'" $ whnf IPv6.decode ip6TextSkip
       , bench "New 'a:b::c:d'" $ whnf IPv6.decode ip6TextHex
+      ]
+    , bgroup "IPv6 from Text"
+      [ bench "New '::'" $ whnf IPv6.encode ip6
+      , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.encode ip6Bigger
+      , bench "New '1:2::7:8'" $ whnf IPv6.encode ip6Skip
+      , bench "New 'a:b::c:d'" $ whnf IPv6.encode ip6Hex
       ]
     ]

@@ -23,7 +23,7 @@ let
            build = name: path: self.callCabal2nix name (builtins.filterSource filterPredicate path) {};
          };
     {
-      ip = build "ip" ./.;
+      ip = doBenchmark (build "ip" ./.);
       semirings = super.semirings_0_3_1_1;
     };
   };
