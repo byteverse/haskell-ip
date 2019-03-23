@@ -54,6 +54,7 @@ import Text.Read (Read(..))
 import Text.ParserCombinators.ReadPrec ((+++))
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Text (Text)
+import Data.WideWord (Word128(..))
 import Data.Word (Word8,Word16)
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
@@ -70,7 +71,10 @@ import qualified Data.Text.IO as TIO
 --   >>> case_ IPv4.encode IPv6.encode addr
 --   "2001:db8::1"
 case_ :: (IPv4 -> a) -> (IPv6 -> a) -> IP -> a
-case_ f g (IP addr@(IPv6 w1 w2)) = if w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
+-- Note: rather than performing the masking operations on the 'Word128',
+-- we unwrap the 'Word64's, as that's probably a bit more efficient, and
+-- we might need the lower word anyway.
+case_ f g (IP addr@(IPv6 (Word128 w1 w2))) = if w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
   then f (IPv4 (fromIntegral w2))
   else g addr
 
@@ -88,7 +92,7 @@ ipv6 a b c d e f g h = fromIPv6 (IPv6.fromWord16s a b c d e f g h)
 
 -- | Turn an 'IPv4' into an 'IP'.
 fromIPv4 :: IPv4 -> IP
-fromIPv4 (IPv4 w) = IP (IPv6 0 (0x0000FFFF00000000 .|. fromIntegral w))
+fromIPv4 (IPv4 w) = IP (IPv6 (Word128 0 (0x0000FFFF00000000 .|. fromIntegral w)))
 
 -- | Turn an 'IPv6' into an 'IP'.
 fromIPv6 :: IPv6 -> IP

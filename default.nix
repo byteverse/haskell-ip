@@ -25,6 +25,7 @@ let
     {
       ip = doBenchmark (build "ip" ./.);
       semirings = super.semirings_0_3_1_1;
+      wide-word = doJailbreak super.wide-word;
     };
   };
 in rec {
