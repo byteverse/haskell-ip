@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## [1.5.0] - 2019-03-23
+- Implement `IPv6` using `wide-word`'s `Word128`. (This is a breaking change.)
+
 ## [1.4.2.1] - 2019-03-18
 - Docfix for `Net.IPv4.toList`
 
