@@ -19,6 +19,7 @@ import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws
 import qualified Test.Framework.Providers.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
+import Data.WideWord (Word128(..))
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
@@ -395,13 +396,15 @@ instance Show HexIPv6 where
 
 deriving instance Arbitrary IPv4
 
-instance Arbitrary IPv6 where
-  arbitrary = IPv6 <$> arbitrary <*> arbitrary
-  shrink (IPv6 a b) = filter (/= IPv6 a b)
-    [ IPv6 0 0
-    , IPv6 (div a 2) b
-    , IPv6 a (div b 2)
+instance Arbitrary Word128 where
+  arbitrary = Word128 <$> arbitrary <*> arbitrary
+  shrink (Word128 a b) = filter (/= Word128 a b)
+    [ Word128 0 0
+    , Word128 (div a 2) b
+    , Word128 a (div b 2)
     ]
+
+deriving instance Arbitrary IPv6
 
 -- Half of the test cases generated are IPv6 mapped
 -- IPv4 addresses.

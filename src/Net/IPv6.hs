@@ -1,12 +1,11 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE InstanceSigs        #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE UnboxedTuples       #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs               #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeInType                 #-}
+{-# LANGUAGE UnboxedTuples              #-}
 
 {-| This module provides the IPv6 data type and functions for working
     with it.
@@ -57,31 +56,28 @@ import qualified Net.IPv4 as IPv4
 
 import Control.Applicative
 import Control.DeepSeq (NFData)
-import Control.Monad.Primitive
-import Control.Monad.ST
 import Data.Bits
 import Data.Char (chr)
 import Data.List (intercalate, group)
-import Data.Primitive.Addr
-import Data.Primitive.ByteArray
-import Data.Primitive.Types (Prim(..))
+import Data.Primitive.Types (Prim)
 #if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup ((<>))
 #endif
+import qualified Data.Aeson as Aeson
+import qualified Data.Attoparsec.Text as AT
+import qualified Data.Attoparsec.Text as Atto
 import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.IO as TIO
+import Data.WideWord.Word128 (Word128(..), zeroWord128)
 import Data.Word
-import GHC.Enum (predError, succError)
+import Foreign.Storable (Storable)
 import GHC.Exts
 import GHC.Generics (Generic)
 import Numeric (showHex)
 import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
-import qualified Data.Aeson as Aeson
-import qualified Data.Attoparsec.Text as AT
-import qualified Data.Attoparsec.Text as Atto
-import qualified Data.Text as Text
-import qualified Data.Text.IO as TIO
 
 -- $setup
 --
@@ -90,69 +86,14 @@ import qualified Data.Text.IO as TIO
 -- >>> import qualified Prelude as P
 -- >>> import qualified Data.Text.IO as T
 -- >>> import Test.QuickCheck (Arbitrary(..))
--- >>> instance Arbitrary IPv6 where { arbitrary = IPv6 <$> arbitrary <*> arbitrary }
+-- >>> instance Arbitrary Word128 where { arbitrary = Word128 <$> arbitrary <*> arbitrary }
+-- >>> instance Arbitrary IPv6 where { arbitrary = IPv6 <$> arbitrary }
 -- >>> instance Arbitrary IPv6Range where { arbitrary = IPv6Range <$> arbitrary <*> arbitrary }
 --
 
 -- | A 128-bit Internet Protocol version 6 address.
-data IPv6 = IPv6
-  { ipv6A :: {-# UNPACK #-} !Word64
-  , ipv6B :: {-# UNPACK #-} !Word64
-  } deriving (Eq,Ord,Generic)
-
-instance NFData IPv6
-
--- | Since 'IPv6' has more inhabitants than 'Int', the
--- implementation of 'fromEnum' discards information.
--- Currently, 'enumFromThen' and 'enumFromThenTo' emit
--- an error, but this could be remedied if someone
--- wants to provide an implementation of them.
-instance Enum IPv6 where
-  succ (IPv6 a b) 
-    | a == maxBound && b == maxBound = succError "IPv6"
-    | otherwise =
-        case b + 1 of
-          0 -> IPv6 (a + 1) 0
-          s -> IPv6 a s
-
-  pred (IPv6 a b)
-    | a == 0 && b == 0 = predError "IPv6"
-    | otherwise =
-        case b of
-          0 -> IPv6 (a - 1) maxBound
-          _ -> IPv6 a (b - 1)
-
-  toEnum :: Int -> IPv6
-  toEnum i = IPv6 0 (toEnum i)
-
-  fromEnum :: IPv6 -> Int
-  fromEnum (IPv6 _ b) = fromEnum b
-
-  {-# INLINE enumFrom #-}
-  enumFrom x = unfoldrLast (Just maxBound) (\b -> if b < maxBound then Just (b,succ b) else Nothing) x
-  {-# INLINE enumFromTo #-}
-  enumFromTo x y = unfoldrLast (if x <= y then Just y else Nothing) (\b -> if b < y then Just (b,succ b) else Nothing) x
-
-  enumFromThen = error "IPv6 currently lacks an implementation of enumFromThen"
-  enumFromThenTo = error "IPv6 currently lacks an implementation of enumFromThenTo"
-
--- This is like unfoldr except that it adds an additional element
--- at the end.
-unfoldrLast :: Maybe a -> (b -> Maybe (a, b)) -> b -> [a]
-{-# INLINE unfoldrLast #-}
-unfoldrLast a0 f b0 = build
-  (\c n ->
-    let go b = case f b of
-          Just (a, new_b) -> a `c` go new_b
-          Nothing -> case a0 of
-            Nothing -> n
-            Just x -> x `c` n
-     in go b0
-  )
-
-instance Bounded IPv6 where
-  minBound = IPv6 0 0
-  maxBound = IPv6 maxBound maxBound
+newtype IPv6 = IPv6 { getIPv6 :: Word128 }
+  deriving (Bounded,Enum,Eq,Integral,Num,Ord,Real,Storable,Bits,FiniteBits,NFData,Prim)
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
@@ -174,61 +115,6 @@ instance Show IPv6 where
     . showHexWord16 h
     where
     (a,b,c,d,e,f,g,h) = toWord16s addr
-
-instance Prim IPv6 where
-  sizeOf# _ = 2# *# sizeOf# (undefined :: Word64)
-  alignment# _ = alignment# (undefined :: Word64)
-  indexByteArray# arr# i# =
-    let i = I# i#
-        arr = ByteArray arr#
-    in IPv6 (indexByteArray arr (2 * i + 0)) (indexByteArray arr (2 * i + 1))
-  readByteArray# :: forall s. () => MutableByteArray# s -> Int# -> State# s -> (# State# s, IPv6 #)
-  readByteArray# arr# i# = internal $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    a <- readByteArray arr (2 * i + 0) :: ST s Word64
-    b <- readByteArray arr (2 * i + 1)
-    return (IPv6 a b)
-  writeByteArray# :: forall s. () => MutableByteArray# s -> Int# -> IPv6 -> State# s -> State# s
-  writeByteArray# arr# i# (IPv6 a b) = internal_ $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    writeByteArray arr (2 * i + 0) a
-    writeByteArray arr (2 * i + 1) b :: ST s ()
-  setByteArray# arr# i# len# ident = go 0#
-    where
-      go ix# s0 = if isTrue# (ix# <# len#)
-        then case writeByteArray# arr# (i# +# ix#) ident s0 of
-          s1 -> go (ix# +# 1#) s1
-        else s0
-  indexOffAddr# :: Addr# -> Int# -> IPv6
-  indexOffAddr# addr# i# =
-    let i = I# i#
-        addr = Addr addr#
-    in IPv6 (indexOffAddr addr (2 * i + 0)) (indexOffAddr addr (2 * i + 1))
-  readOffAddr# :: forall s. () => Addr# -> Int# -> State# s -> (# State# s, IPv6 #)
-  readOffAddr# addr# i# = internal $ do
-    let i = I# i#
-        addr = Addr addr#
-    a <- readOffAddr addr (2 * i + 0) :: ST s Word64
-    b <- readOffAddr addr (2 * i + 1)
-    return (IPv6 a b)
-  writeOffAddr# :: forall s. () => Addr# -> Int# -> IPv6 -> State# s -> State# s
-  writeOffAddr# addr# i# (IPv6 a b) = internal_ $ do
-    let i = I# i#
-        addr = Addr addr#
-    writeOffAddr addr (2 * i + 0) a
-    writeOffAddr addr (2 * i + 1) b :: ST s ()
-  setOffAddr# addr# i# len# ident = go 0#
-    where
-      go ix# s0 = if isTrue# (ix# <# len#)
-        then case writeOffAddr# addr# (i# +# ix#) ident s0 of
-          s1 -> go (ix# +# 1#) s1
-        else s0
-
-internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
-internal_ m s = case internal m s of
-  (# s', _ #) -> s'
 
 -- | Print an 'IPv6' using the textual encoding.
 print :: IPv6 -> IO ()
@@ -267,8 +153,8 @@ instance Aeson.ToJSON IPv6 where
 instance Aeson.FromJSON IPv6 where
   parseJSON = Aeson.withText "IPv6" $ \t -> case decode t of
     Nothing -> fail "invalid IPv6 address"
-    Just i -> return i
-        
+    Just i  -> return i
+
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
 
@@ -287,12 +173,36 @@ fromOctets ::
   -> Word8 -> Word8 -> Word8 -> Word8
   -> IPv6
 fromOctets a b c d e f g h i j k l m n o p =
-  let !(w1,w2) = fromOctetsV6
-        (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
-        (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
-        (fromIntegral i) (fromIntegral j) (fromIntegral k) (fromIntegral l)
-        (fromIntegral m) (fromIntegral n) (fromIntegral o) (fromIntegral p)
-   in IPv6 w1 w2
+  IPv6 $ fromOctetsWord128
+    (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
+    (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
+    (fromIntegral i) (fromIntegral j) (fromIntegral k) (fromIntegral l)
+    (fromIntegral m) (fromIntegral n) (fromIntegral o) (fromIntegral p)
+
+fromOctetsWord128 ::
+     Word128 -> Word128 -> Word128 -> Word128
+  -> Word128 -> Word128 -> Word128 -> Word128
+  -> Word128 -> Word128 -> Word128 -> Word128
+  -> Word128 -> Word128 -> Word128 -> Word128
+  -> Word128
+fromOctetsWord128 a b c d e f g h i j k l m n o p = fromIntegral
+    ( shiftL a 120
+  .|. shiftL b 112
+  .|. shiftL c 104
+  .|. shiftL d 96
+  .|. shiftL e 88
+  .|. shiftL f 80
+  .|. shiftL g 72
+  .|. shiftL h 64
+  .|. shiftL i 56
+  .|. shiftL j 48
+  .|. shiftL k 40
+  .|. shiftL l 32
+  .|. shiftL m 24
+  .|. shiftL n 16
+  .|. shiftL o 8
+  .|. p
+    )
 
 -- | Create an 'IPv6' address from the eight 16-bit fragments that make
 --   it up. This closely resembles the standard IPv6 notation, so
@@ -305,7 +215,7 @@ fromOctets a b c d e f g h i j k l m n o p =
 --   ipv6 0x3124 0x0000 0x0000 0xdead 0xcafe 0x00ff 0xfe00 0x0001
 --   >>> T.putStrLn (encode addr)
 --   3124::dead:cafe:ff:fe00:1
-ipv6 :: 
+ipv6 ::
      Word16 -> Word16 -> Word16 -> Word16
   -> Word16 -> Word16 -> Word16 -> Word16
   -> IPv6
@@ -317,14 +227,30 @@ fromWord16s ::
   -> Word16 -> Word16 -> Word16 -> Word16
   -> IPv6
 fromWord16s a b c d e f g h =
-  let !(w1,w2) = fromWord16sV6
-        (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
-        (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
-   in IPv6 w1 w2
+  IPv6 $ fromWord16sWord128
+    (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
+    (fromIntegral e) (fromIntegral f) (fromIntegral g) (fromIntegral h)
+
+fromWord16sWord128 ::
+     Word128 -> Word128 -> Word128 -> Word128
+  -> Word128 -> Word128 -> Word128 -> Word128
+  -> Word128
+fromWord16sWord128 a b c d e f g h = fromIntegral
+    ( shiftL a 112
+  .|. shiftL b 96
+  .|. shiftL c 80
+  .|. shiftL d 64
+  .|. shiftL e 48
+  .|. shiftL f 32
+  .|. shiftL g 16
+  .|. h
+    )
 
 -- | Convert an 'IPv6' to eight 16-bit words.
 toWord16s :: IPv6 -> (Word16,Word16,Word16,Word16,Word16,Word16,Word16,Word16)
-toWord16s (IPv6 a b) =
+toWord16s (IPv6 (Word128 a b)) =
+  -- Note: implementing this as 2 Word64 shifts with 'unsafeShiftR'
+  -- is up to 40% faster than using 128-bit shifts on a Word128 value.
   ( fromIntegral (unsafeShiftR a 48)
   , fromIntegral (unsafeShiftR a 32)
   , fromIntegral (unsafeShiftR a 16)
@@ -343,9 +269,18 @@ fromTupleWord16s (a,b,c,d,e,f,g,h) = fromWord16s a b c d e f g h
 --   is the high word and the rightword is the low word.
 fromWord32s :: Word32 -> Word32 -> Word32 -> Word32 -> IPv6
 fromWord32s a b c d =
-  let !(w1,w2) = fromWord32sV6
-        (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
-   in IPv6 w1 w2
+  IPv6 $ fromWord32sWord128
+    (fromIntegral a) (fromIntegral b) (fromIntegral c) (fromIntegral d)
+
+fromWord32sWord128 ::
+     Word128 -> Word128 -> Word128 -> Word128
+  -> Word128
+fromWord32sWord128 a b c d = fromIntegral
+    ( shiftL a 96
+  .|. shiftL b 64
+  .|. shiftL c 32
+  .|. d
+    )
 
 -- | Uncurried variant of 'fromWord32s'.
 fromTupleWord32s :: (Word32,Word32,Word32,Word32) -> IPv6
@@ -353,7 +288,9 @@ fromTupleWord32s (a,b,c,d) = fromWord32s a b c d
 
 -- | Convert an 'IPv6' to four 32-bit words.
 toWord32s :: IPv6 -> (Word32,Word32,Word32,Word32)
-toWord32s (IPv6 a b) =
+toWord32s (IPv6 (Word128 a b)) =
+  -- Note: implementing this as 2 Word64 shifts with 'unsafeShiftR'
+  -- is about 10% faster than using 128-bit shifts on a Word128 value.
   ( fromIntegral (unsafeShiftR a 32)
   , fromIntegral a
   , fromIntegral (unsafeShiftR b 32)
@@ -365,7 +302,7 @@ toWord32s (IPv6 a b) =
 --   >>> loopback
 --   ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0001
 loopback :: IPv6
-loopback = IPv6 0 1
+loopback = IPv6 (Word128 0 1)
 
 -- | A useful alias for 'loopback'.
 --
@@ -375,11 +312,11 @@ localhost :: IPv6
 localhost = loopback
 
 -- | The IP address representing any host.
---   
---   >>> any 
+--
+--   >>> any
 --   ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
 any :: IPv6
-any = IPv6 0 0
+any = IPv6 zeroWord128
 
 -- | Encodes the IP, using zero-compression on the leftmost-longest string of
 -- zeroes in the address.
@@ -475,58 +412,6 @@ parser = makeIP <$> ip
   ipv4ToWord16s :: IPv4 -> [Word16]
   ipv4ToWord16s (IPv4 word) = [fromIntegral (word `unsafeShiftR` 16), fromIntegral (word .&. 0xFFFF)]
 
-fromOctetsV6 ::
-     Word64 -> Word64 -> Word64 -> Word64
-  -> Word64 -> Word64 -> Word64 -> Word64
-  -> Word64 -> Word64 -> Word64 -> Word64
-  -> Word64 -> Word64 -> Word64 -> Word64
-  -> (Word64,Word64)
-fromOctetsV6 a b c d e f g h i j k l m n o p =
-  ( fromOctetsWord64 a b c d e f g h
-  , fromOctetsWord64 i j k l m n o p
-  )
-
-fromWord16sV6 ::
-     Word64 -> Word64 -> Word64 -> Word64
-  -> Word64 -> Word64 -> Word64 -> Word64
-  -> (Word64,Word64)
-fromWord16sV6 a b c d e f g h =
-  ( fromWord16Word64 a b c d
-  , fromWord16Word64 e f g h
-  )
-
-fromWord32sV6 :: Word64 -> Word64 -> Word64 -> Word64 -> (Word64,Word64)
-fromWord32sV6 a b c d =
-  ( fromWord32Word64 a b
-  , fromWord32Word64 c d
-  )
-
-fromOctetsWord64 ::
-     Word64 -> Word64 -> Word64 -> Word64
-  -> Word64 -> Word64 -> Word64 -> Word64
-  -> Word64
-fromOctetsWord64 a b c d e f g h = fromIntegral
-    ( shiftL a 56
-  .|. shiftL b 48
-  .|. shiftL c 40
-  .|. shiftL d 32
-  .|. shiftL e 24
-  .|. shiftL f 16
-  .|. shiftL g 8
-  .|. h
-    )
-
-fromWord16Word64 :: Word64 -> Word64 -> Word64 -> Word64 -> Word64
-fromWord16Word64 a b c d = fromIntegral
-    ( unsafeShiftL a 48
-  .|. unsafeShiftL b 32
-  .|. unsafeShiftL c 16
-  .|. d
-    )
-
-fromWord32Word64 :: Word64 -> Word64 -> Word64
-fromWord32Word64 a b = fromIntegral (unsafeShiftL a 32 .|. b)
-
 -- | An 'IPv6Range'. It is made up of the first 'IPv6' in the range
 --   and its length.
 data IPv6Range = IPv6Range
@@ -536,10 +421,11 @@ data IPv6Range = IPv6Range
 
 instance NFData IPv6Range
 
-mask :: Word8 -> Word64
-mask w = if w > 63
-  then 0xffffffffffffffff 
-  else complement (shiftR 0xffffffffffffffff (fromIntegral w))
+mask128 :: IPv6
+mask128 = maxBound
+
+mask :: Word8 -> IPv6
+mask = complement . shiftR mask128 . fromIntegral
 
 -- | Normalize an 'IPv6Range'. The first result of this is that the
 --   'IPv6' inside the 'IPv6Range' is changed so that the insignificant
@@ -548,7 +434,7 @@ mask w = if w > 63
 --   >>> addr1 = ipv6 0x0192 0x0168 0x0001 0x0019 0x0000 0x0000 0x0000 0x0000
 --   >>> addr2 = ipv6 0x0192 0x0168 0x0001 0x0163 0x0000 0x0000 0x0000 0x0000
 --   >>> printRange $ normalize $ IPv6Range addr1 24
---   192:100::/24 
+--   192:100::/24
 --   >>> printRange $ normalize $ IPv6Range addr2 28
 --   192:160::/28
 --
@@ -561,12 +447,10 @@ mask w = if w > 63
 --
 --   prop> normalize r == (normalize . normalize) r
 normalize :: IPv6Range -> IPv6Range
-normalize (IPv6Range (IPv6 w1 w2) len) =
+normalize (IPv6Range ip len) =
   let len' = min len 128
-      norm
-        | len' < 64 =  (IPv6Range (IPv6 (w1 .&. mask len') (w2 .&. mask 0)) len')
-        | otherwise =  (IPv6Range (IPv6 (w1 .&. mask 64) (w2 .&. mask (len' - 64))) len')
-  in norm
+      ip' = ip .&. mask len'
+  in IPv6Range ip' len'
 
 -- | Encode an 'IPv6Range' as 'Text'.
 --
@@ -619,17 +503,10 @@ parserRange = do
 -- creation and range normalization only occur once in the above example.
 -- They are reused as the list is iterated.
 contains :: IPv6Range -> IPv6 -> Bool
-contains (IPv6Range (IPv6 wsubnetA wsubnetB) len) = 
-  let lenA = if len > 64 then 64 else len
-      lenB = if len > 64 then len - 64 else 0
-      theMaskA = mask lenA
-      theMaskB = mask lenB
-      wsubnetNormalizedA = wsubnetA .&. theMaskA
-      wsubnetNormalizedB = wsubnetB .&. theMaskB
-   in \(IPv6 wA wB) ->
-        (wA .&. theMaskA) == wsubnetNormalizedA
-        &&
-        (wB .&. theMaskB) == wsubnetNormalizedB
+contains (IPv6Range subnet len) =
+  let theMask = mask len
+      subnetNormalized = subnet .&. theMask
+   in \ip -> (ip .&. theMask) == subnetNormalized
 
 -- | This is provided to mirror the interface provided by @Data.Set@. It
 -- behaves just like 'contains' but with flipped arguments.
@@ -649,8 +526,7 @@ member = flip contains
 --
 -- prop> lowerInclusive r == ipv6RangeBase (normalize r)
 lowerInclusive :: IPv6Range -> IPv6
-lowerInclusive (IPv6Range (IPv6 w1 w2) len) =
-  ipv6RangeBase (normalize (IPv6Range (IPv6 w1 w2) len))
+lowerInclusive = ipv6RangeBase . normalize
 
 -- | The inclusive upper bound of an 'IPv6Range'.
 --
@@ -659,15 +535,11 @@ lowerInclusive (IPv6Range (IPv6 w1 w2) len) =
 --   dead:beff:ffff:ffff:ffff:ffff:ffff:ffff
 --
 upperInclusive :: IPv6Range -> IPv6
-upperInclusive (IPv6Range (IPv6 w1 w2) len) =
+upperInclusive (IPv6Range ip len) =
   let len' = min 128 len
-      theInvertedMask :: Word64
-      theInvertedMask = shiftR 0xffffffffffffffff (fromIntegral len')
-      theInvertedMask2 = shiftR 0xffffffffffffffff ((fromIntegral len')-64)
-      upper
-        | len' < 64 =  IPv6 ((w1 .|. theInvertedMask)) ((w2 .|. shiftR 0xffffffffffffffff 0))
-        | otherwise =  IPv6 (w1) (w2 .|. theInvertedMask2)
-  in upper
+      theInvertedMask :: IPv6
+      theInvertedMask = shiftR mask128 (fromIntegral len')
+  in ip .|. theInvertedMask
 
 -- | Print an 'IPv6Range' using the textual encoding.
 printRange :: IPv6Range -> IO ()
@@ -685,7 +557,7 @@ range addr len = normalize (IPv6Range addr len)
 -- | Given an inclusive lower and upper ip address, create the smallest 'IPv6Range'
 --   that contains the two. This is helpful in situations where input is given as a
 --   range, like @ @.
---   
+--
 --   This makes the range broader if it cannot be represented in <https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing CIDR> notation.
 --
 --   >>> addrLower = ipv6 0xDEAD 0xBE80 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000
@@ -693,14 +565,8 @@ range addr len = normalize (IPv6Range addr len)
 --   >>> printRange $ fromBounds addrLower addrUpper
 --   dead:be80::/25
 fromBounds :: IPv6 -> IPv6 -> IPv6Range
-fromBounds (IPv6 a1 a2) (IPv6 b1 b2) =
-  normalize (IPv6Range (IPv6 a1 a2) (maskFromBounds a1 b1 a2 b2))
+fromBounds lo hi =
+  normalize (IPv6Range lo (maskFromBounds lo hi))
 
-maskFromBounds :: Word64 -> Word64 -> Word64 -> Word64 -> Word8
-maskFromBounds lo1 hi1 lo2 hi2 =
-  let x = countLeadingZeros (xor lo1 hi1)
-      check
-        | x < 64    = fromIntegral x
-        | otherwise = fromIntegral $ x + (countLeadingZeros (xor lo2 hi2))
-  in check
-
+maskFromBounds :: IPv6 -> IPv6 -> Word8
+maskFromBounds lo hi = fromIntegral (countLeadingZeros $ xor lo hi)
