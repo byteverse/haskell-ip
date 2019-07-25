@@ -1,6 +1,0 @@
-packages: .
-source-repository-package
-  type: git
-  location: https://github.com/bos/aeson
-  tag: c1907c9013a5a54dbc50838cb93be97ded5c8c01
-allow-newer: primitive
