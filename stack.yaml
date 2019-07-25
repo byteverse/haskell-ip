@@ -1,8 +1,0 @@
-resolver: lts-10.6
-packages:
-- '.'
-extra-deps:
-- 'quickcheck-classes-0.3.3'
-- 'prim-array-0.2.1'
-flags: {}
-extra-package-dbs: []
