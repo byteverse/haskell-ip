@@ -122,6 +122,7 @@ import qualified Data.Vector.Unboxed.Mutable as MUVector
 --
 -- These are here to get doctest's property checking to work
 --
+-- >>> :set -XOverloadedStrings
 -- >>> import Test.QuickCheck (Arbitrary(..))
 -- >>> import qualified Prelude as P
 -- >>> import qualified Data.Text.IO as T
@@ -262,10 +263,10 @@ encode = toDotDecimalText
 
 -- | Decode an 'IPv4' address.
 --
---   >>> decode (Text.pack "192.168.2.47")
+--   >>> decode "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
 --
---   >>> decode (Text.pack "10.100.256.256")
+--   >>> decode "10.100.256.256"
 --   Nothing
 decode :: Text -> Maybe IPv4
 decode = decodeIPv4TextMaybe
@@ -279,20 +280,20 @@ builder = toDotDecimalBuilder
 
 -- | Parse an 'IPv4' address using a 'TextRead.Reader'.
 --
---   >>> reader (Text.pack "192.168.2.47")
+--   >>> reader "192.168.2.47"
 --   Right (ipv4 192 168 2 47,"")
 --
---   >>> reader (Text.pack "192.168.2.470")
+--   >>> reader "192.168.2.470"
 --   Left "All octets in an IPv4 address must be between 0 and 255"
 reader :: TextRead.Reader IPv4
 reader = decodeIPv4TextReader
 
 -- | Parse an 'IPv4' address using a 'AT.Parser'.
 --
---   >>> AT.parseOnly parser (Text.pack "192.168.2.47")
+--   >>> AT.parseOnly parser "192.168.2.47"
 --   Right (ipv4 192 168 2 47)
 --
---   >>> AT.parseOnly parser (Text.pack "192.168.2.470")
+--   >>> AT.parseOnly parser "192.168.2.470"
 --   Left "Failed reading: All octets in an IPv4 address must be between 0 and 255"
 parser :: AT.Parser IPv4
 parser = dotDecimalParser
@@ -345,7 +346,7 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
 
 -- | Decode a UTF8-encoded 'ByteString' into an 'IPv4'.
 --
---   >>> decodeUtf8 (BC8.pack "192.168.2.47")
+--   >>> decodeUtf8 "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
 decodeUtf8 :: ByteString -> Maybe IPv4
 decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
@@ -358,10 +359,10 @@ builderUtf8 = Builder.byteString . encodeUtf8
 
 -- | Parse an 'IPv4' using a 'AB.Parser'.
 --
---   >>> AB.parseOnly parserUtf8 (BC8.pack "192.168.2.47")
+--   >>> AB.parseOnly parserUtf8 "192.168.2.47"
 --   Right (ipv4 192 168 2 47)
 --
---   >>> AB.parseOnly parserUtf8 (BC8.pack "192.168.2.470")
+--   >>> AB.parseOnly parserUtf8 "192.168.2.470"
 --   Left "Failed reading: All octets in an ipv4 address must be between 0 and 255"
 parserUtf8 :: AB.Parser IPv4
 parserUtf8 = fromOctets'
@@ -882,18 +883,32 @@ normalize (IPv4Range (IPv4 w) len) =
    in IPv4Range (IPv4 w') len'
 
 -- | Encode an 'IPv4Range' as 'Text'.
+--
+--   >>> encodeRange (IPv4Range (ipv4 172 16 0 0) 12)
+--   "172.16.0.0/12"
 encodeRange :: IPv4Range -> Text
 encodeRange = rangeToDotDecimalText
 
 -- | Decode an 'IPv4Range' from 'Text'.
+--
+--   >>> decodeRange "172.16.0.0/12"
+--   Just (IPv4Range {ipv4RangeBase = ipv4 172 16 0 0, ipv4RangeLength = 12})
+--   >>> decodeRange "192.168.25.254/16"
+--   Just (IPv4Range {ipv4RangeBase = ipv4 192 168 0 0, ipv4RangeLength = 16})
 decodeRange :: Text -> Maybe IPv4Range
 decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
 
 -- | Encode an 'IPv4Range' to a 'TBuilder.Builder'.
+--
+--   >>> builderRange (IPv4Range (ipv4 172 16 0 0) 12)
+--   "172.16.0.0/12"
 builderRange :: IPv4Range -> TBuilder.Builder
 builderRange = rangeToDotDecimalBuilder
 
--- | Parse an 'IPv4Range' using a 'AT.Parser.'
+-- | Parse an 'IPv4Range' using a 'AT.Parser'.
+--
+--   >>> AT.parseOnly parserRange "192.168.25.254/16"
+--   Right (IPv4Range {ipv4RangeBase = ipv4 192 168 0 0, ipv4RangeLength = 16})
 parserRange :: AT.Parser IPv4Range
 parserRange = do
   ip <- parser
@@ -906,7 +921,8 @@ parserRange = do
       then fail "An IP range length must be between 0 and 32"
       else return i
 
--- | This exists mostly for testing purposes.
+-- | Print an 'IPv4Range'. Helper function that
+--   exists mostly for testing purposes.
 printRange :: IPv4Range -> IO ()
 printRange = TIO.putStrLn . encodeRange
 
