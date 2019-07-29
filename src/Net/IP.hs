@@ -17,9 +17,9 @@
     All functions and instance methods that deal with textual conversion
     will encode an 'IP' using either dot-decimal notation (for IPv4) or
     RFC 5952 (for IPv6). They will decode an 'IP' from either format
-    as well. The 'Show' instance presents an address in as valid haskell code 
+    as well. The 'Show' instance presents an address in as valid haskell code
     that resembles the formatted address:
-    
+
     >>> decode "192.168.3.100"
     Just (ipv4 192 168 3 100)
     >>> decode "A3F5:12:F26::1466:8B91"
@@ -29,6 +29,8 @@
 module Net.IP
   ( -- * Pattern Matching
     case_
+  , isIPv4
+  , isIPv6
     -- * Construction
   , ipv4
   , ipv6
@@ -44,22 +46,25 @@ module Net.IP
   , IP(..)
   ) where
 
-import Prelude hiding (print)
 import Control.DeepSeq (NFData)
-import Data.Bits
-import GHC.Generics (Generic)
-import Net.IPv6 (IPv6(..))
-import Net.IPv4 (IPv4(..))
-import Text.Read (Read(..))
-import Text.ParserCombinators.ReadPrec ((+++))
 import Data.Aeson (FromJSON(..),ToJSON(..))
+import Data.Bits
 import Data.Text (Text)
 import Data.WideWord (Word128(..))
 import Data.Word (Word8,Word16)
-import qualified Net.IPv4 as IPv4
-import qualified Net.IPv6 as IPv6
+import GHC.Generics (Generic)
+import Net.IPv4 (IPv4(..))
+import Net.IPv6 (IPv6(..))
+import Prelude hiding (print)
+import Text.ParserCombinators.ReadPrec ((+++))
+import Text.Read (Read(..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.IO as TIO
+import qualified Net.IPv4 as IPv4
+import qualified Net.IPv6 as IPv6
+
+-- $setup
+-- >>> :set -XOverloadedStrings
 
 -- | Run a function over an 'IP' depending on its status
 --   as an 'IPv4' or 'IPv6'.
@@ -99,10 +104,28 @@ fromIPv6 :: IPv6 -> IP
 fromIPv6 = IP
 
 -- | Encode an 'IP' as 'Text'.
+--
+--   >>> encode (ipv4 10 0 0 25)
+--   "10.0.0.25"
+--
+--   >>> encode (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1)
+--   "3124::dead:cafe:ff:fe00:1"
 encode :: IP -> Text
 encode = case_ IPv4.encode IPv6.encode
 
 -- | Decode an 'IP' from 'Text'.
+--
+--   >>> decode "10.0.0.25"
+--   Just (ipv4 10 0 0 25)
+--
+--   >>> fmap isIPv4 (decode "10.0.0.25")
+--   Just True
+--
+--   >>> decode "3124::dead:cafe:ff:fe00:1"
+--   Just (ipv6 0x3124 0x0000 0x0000 0xdead 0xcafe 0x00ff 0xfe00 0x0001)
+--
+--   >>> fmap isIPv6 (decode "3124::dead:cafe:ff:fe00:1")
+--   Just True
 decode :: Text -> Maybe IP
 decode t = case IPv4.decode t of
   Nothing -> case IPv6.decode t of
@@ -110,7 +133,36 @@ decode t = case IPv4.decode t of
     Just v6 -> Just (fromIPv6 v6)
   Just v4 -> Just (fromIPv4 v4)
 
--- | Print an 'IP' using the textual encoding.
+-- | Is the 'IP' an IPv4 address?
+--
+--   >>> isIPv4 (ipv4 10 0 0 25)
+--   True
+--
+--   >>> isIPv4 (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1)
+--   False
+isIPv4 :: IP -> Bool
+isIPv4 = case_ (const True) (const False)
+{-# inline isIPv4 #-}
+
+-- | Is the 'IP' an IPv6 address?
+--
+--   >>> isIPv6 (ipv4 10 0 0 25)
+--   False
+--
+--   >>> isIPv6 (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1)
+--   True
+isIPv6 :: IP -> Bool
+isIPv6 = case_ (const False) (const True)
+{-# inline isIPv6 #-}
+
+-- | Print an 'IP' using the textual encoding. This exists mostly for
+--   debugging purposes.
+--
+--   >>> print (ipv4 10 0 0 25)
+--   10.0.0.25
+--
+--   >>> print (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE00 0x1)
+--   3124::dead:cafe:ff:fe00:1
 print :: IP -> IO ()
 print = TIO.putStrLn . encode
 
