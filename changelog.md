@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## [1.5.1] - 2019-07-29
+- Allow building with primitive-0.7.
+- Add more doctests to Net.IP.
+- Add to Net.IP: `isIPv4` and `isIPv6`.
+- Bump lower bound on primitive from 0.6 to 0.6.4.
+- Bump upper bound on hashable from < 1.3. to < 1.4.
+
 ## [1.5.0] - 2019-03-23
 - Implement `IPv6` using `wide-word`'s `Word128`. (This is a breaking change.)
 
