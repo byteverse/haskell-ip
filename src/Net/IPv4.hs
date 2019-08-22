@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
@@ -38,6 +39,9 @@ module Net.IPv4
   , decodeUtf8
   , builderUtf8
   , parserUtf8
+    -- ** UTF-8 Bytes
+  , decodeUtf8Bytes
+  , parserUtf8Bytes
     -- ** String
     -- $string
   , encodeString
@@ -81,6 +85,8 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
 import Data.ByteString (ByteString)
+import Data.Bytes.Types (Bytes)
+import Data.Coerce (coerce)
 import Data.Hashable
 import Data.Monoid ((<>))
 import Data.Primitive.Types (Prim)
@@ -91,6 +97,7 @@ import Data.Vector.Generic.Mutable (MVector(..))
 import Data.Word
 import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
+import GHC.Exts (Word#)
 import GHC.Generics (Generic)
 import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
@@ -105,6 +112,7 @@ import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as ByteString
+import qualified Data.Bytes.Parser as Smith
 import qualified Data.Text as Text
 import qualified Data.Text.Array as TArray
 import qualified Data.Text.IO as TIO
@@ -348,10 +356,39 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
 --
 --   >>> decodeUtf8 "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
+--
+--   Currently not terribly efficient since the implementation
+--   re-encodes the argument as UTF-16 text before decoding that
+--   IPv4 address from that. PRs to fix this are welcome.
 decodeUtf8 :: ByteString -> Maybe IPv4
 decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
 -- This (decodeUtf8) should be rewritten to not go through text
 -- as an intermediary.
+
+-- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
+decodeUtf8Bytes :: Bytes -> Maybe IPv4
+decodeUtf8Bytes !b = case Smith.parseBytes (parserUtf8Bytes ()) b of
+  Smith.Success addr _ len -> case len of
+    0 -> Just addr
+    _ -> Nothing
+  Smith.Failure _ -> Nothing
+
+-- | Parse UTF-8-encoded 'Bytes' as an 'IPv4' address.
+parserUtf8Bytes :: e -> Smith.Parser e s IPv4
+{-# inline parserUtf8Bytes #-}
+parserUtf8Bytes e = coerce (Smith.boxWord32 (parserUtf8Bytes# e))
+
+parserUtf8Bytes# :: e -> Smith.Parser e s Word#
+{-# noinline parserUtf8Bytes# #-}
+parserUtf8Bytes# e = Smith.unboxWord32 $ do
+  !a <- Smith.decWord8 e
+  Smith.ascii e '.'
+  !b <- Smith.decWord8 e
+  Smith.ascii e '.'
+  !c <- Smith.decWord8 e
+  Smith.ascii e '.'
+  !d <- Smith.decWord8 e
+  pure (getIPv4 (fromOctets a b c d))
 
 -- | Encode an 'IPv4' as a 'Builder.Builder'
 builderUtf8 :: IPv4 -> Builder.Builder

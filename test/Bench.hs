@@ -3,6 +3,7 @@ module Main (main) where
 import Criterion.Main
 import Net.Types (IPv4(..),MacGrouping(..),MacCodec(..))
 import Data.Maybe (fromJust)
+import qualified Data.Bytes as Bytes
 import qualified Data.Text as Text
 import qualified Net.Mac as Mac
 import qualified Net.IPv4 as IPv4
@@ -20,6 +21,7 @@ main :: IO ()
 main = do
   let ipAddr = IPv4 1000000009
       ipText = Text.pack "192.168.5.99"
+      ipBytes = Bytes.fromAsciiString "192.168.5.99"
       mac = Mac.fromOctets 0xFA 0xBB 0x43 0xA1 0x22 0x09
       ip6Text = Text.pack "::"
       ip6 = fromJust $ IPv6.decode ip6Text
@@ -54,6 +56,9 @@ main = do
       [ bench "Naive" $ whnf Naive.decodeText ipText
       , bench "Attoparsec" $ whnf IPv4DecodeText2.decodeText ipText
       , bench "Text Reader" $ whnf IPv4DecodeText1.decodeText ipText
+      ]
+    , bgroup "IPv4 from Bytes"
+      [ bench "Current" $ whnf IPv4.decodeUtf8Bytes ipBytes
       ]
     , bgroup "IPv4 to ByteString"
       [ bench "Naive" $ whnf Naive.encodeByteString ipAddr

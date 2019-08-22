@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## [1.5.2] - 2019-??-??
+- Provide decode functions for decoding from `ShortText` and
+  from `Bytes`. These two are implemented internally using
+  the same function.
+- Dependency on `bytesmith` effectively restricts users to
+  GHC 8.6 and up. Since GHC 8.8 is about to be released,
+  this is deemed an acceptable cost.
+- Require cabal version 2.2 so that leading commas are accepted
+  in dependencies lists.
+
 ## [1.5.1] - 2019-07-29
 - Allow building with primitive-0.7.
 - Add more doctests to Net.IP.

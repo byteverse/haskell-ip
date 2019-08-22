@@ -7,6 +7,7 @@ module Main (main) where
 
 import Naive
 import Control.Applicative (liftA2)
+import Data.Bytes (Bytes)
 import Data.Proxy (Proxy(..))
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -20,6 +21,7 @@ import qualified Test.Framework.Providers.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
 import Data.WideWord (Word128(..))
+import qualified Data.Bytes as Bytes
 import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
@@ -46,6 +48,11 @@ tests =
           $ propEncodeDecodeIso IPv4.encode IPv4.decode
       , PH.testCase "Decode an IP" testIPv4Decode
       ] ++ testDecodeFailures
+    , testGroup "Currently used IPv4 UTF-8 Bytes decode"
+      [ testProperty "Isomorphism"
+          $ propEncodeDecodeIso (byteStringToBytes . IPv4.encodeUtf8) IPv4.decodeUtf8Bytes
+      , PH.testCase "Encode a MAC Address" testMacEncode
+      ]
     , testGroup "Currently used MAC Text encode/decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIsoSettings Mac.encodeWith Mac.decodeWith
@@ -151,8 +158,18 @@ tests =
 lawsToTest :: Laws -> Test
 lawsToTest (Laws name pairs) = testGroup name (map (uncurry testProperty) pairs)
 
-propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
-propEncodeDecodeIso f g a = g (f a) == Just a
+propEncodeDecodeIso :: (Eq a, Show a, Show b)
+  => (a -> b) -> (b -> Maybe a) -> a -> Result
+propEncodeDecodeIso f g a =
+  let fa = f a
+      gfa = g fa
+   in if gfa == Just a
+        then succeeded
+        else failure $ concat
+          [ "x:       ", show a, "\n"
+          , "f(x):    ", show fa, "\n"
+          , "g(f(x)): ", show gfa, "\n"
+          ]
 
 propEncodeDecodeIsoSettings :: (Eq a,Show a,Show b,Show e)
   => (e -> a -> b) -> (e -> b -> Maybe a) -> e -> a -> Result
@@ -449,3 +466,5 @@ instance Arbitrary MacGrouping where
 arbitraryMacSeparator :: Gen Char
 arbitraryMacSeparator = elements [':','-','.','_']
 
+byteStringToBytes :: BC8.ByteString -> Bytes
+byteStringToBytes = Bytes.fromAsciiString . BC8.unpack

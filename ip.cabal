@@ -1,9 +1,9 @@
-cabal-version: 2.0
+cabal-version: 2.2
 name: ip
-version: 1.5.1
+version: 1.5.2
 synopsis: Library for IP and MAC addresses
 homepage: https://github.com/andrewthad/haskell-ip#readme
-license: BSD3
+license: BSD-3-Clause
 license-file: LICENSE
 author: Andrew Martin
 maintainer: andrew.thaddeus@gmail.com
@@ -46,7 +46,9 @@ library
     Data.Text.Builder.Common.Internal
     Data.ByteString.Builder.Fixed
   build-depends:
-      base >= 4.9.1.0 && < 5
+    , base >= 4.9.1.0 && < 5
+    , byteslice >= 0.1 && < 0.2
+    , bytesmith >= 0.1 && < 0.2
     , aeson >= 1.0 && < 1.5
     , attoparsec >= 0.13 && < 0.14
     , bytestring >= 0.10 && < 0.11
@@ -76,6 +78,7 @@ test-suite test
     , HUnit
     , test-framework-hunit
     , attoparsec
+    , byteslice >= 0.1.2 && < 0.2
   other-modules:
     Naive
     IPv4Text1
@@ -121,6 +124,7 @@ benchmark criterion
     , text
     , bytestring
     , attoparsec
+    , byteslice
   other-modules:
     Naive
     IPv4Text1
