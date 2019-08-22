@@ -34,6 +34,7 @@ module Net.IPv4
   , builder
   , reader
   , parser
+  , decodeShort
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
@@ -93,6 +94,7 @@ import Data.Primitive.Types (Prim)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8')
 import Data.Text.Internal (Text(..))
+import Data.Text.Short (ShortText)
 import Data.Vector.Generic.Mutable (MVector(..))
 import Data.Word
 import Foreign.Ptr (Ptr,plusPtr)
@@ -112,7 +114,10 @@ import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as ByteString
+import qualified Data.ByteString.Short.Internal as BSS
 import qualified Data.Bytes.Parser as Smith
+import qualified Data.Bytes as Bytes
+import qualified Data.Primitive as PM
 import qualified Data.Text as Text
 import qualified Data.Text.Array as TArray
 import qualified Data.Text.IO as TIO
@@ -120,6 +125,7 @@ import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Lazy.Builder.Int as TBI
 import qualified Data.Text.Read as TextRead
+import qualified Data.Text.Short as TS
 import qualified Data.Vector.Generic as GVector
 import qualified Data.Vector.Generic.Mutable as MGVector
 import qualified Data.Vector.Primitive as PVector
@@ -364,6 +370,14 @@ decodeUtf8 :: ByteString -> Maybe IPv4
 decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
 -- This (decodeUtf8) should be rewritten to not go through text
 -- as an intermediary.
+
+-- | Decode 'ShortText' as an 'IPv4' address.
+decodeShort :: ShortText -> Maybe IPv4
+decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
+  where b = shortByteStringToByteArray (TS.toShortByteString t)
+
+shortByteStringToByteArray :: BSS.ShortByteString -> PM.ByteArray
+shortByteStringToByteArray (BSS.SBS x) = PM.ByteArray x
 
 -- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
 decodeUtf8Bytes :: Bytes -> Maybe IPv4
