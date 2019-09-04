@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -30,6 +31,8 @@ module Net.IPv6
   , encodeShort
   , decode
   , parser
+    -- * UTF-8 Bytes
+  , boundedBuilderUtf8
     -- ** Printing
   , print
     -- * IPv6 Ranges
@@ -52,8 +55,9 @@ module Net.IPv6
   , IPv6Range(..)
   ) where
 
+import Prelude hiding (any, print)
+
 import Net.IPv4 (IPv4(..))
-import qualified Net.IPv4 as IPv4
 
 import Control.Applicative
 import Control.DeepSeq (NFData)
@@ -61,26 +65,28 @@ import Data.Bits
 import Data.Char (chr)
 import Data.List (intercalate, group)
 import Data.Primitive.Types (Prim)
-#if !MIN_VERSION_base(4,11,0)
-import Data.Semigroup ((<>))
-#endif
-import qualified Data.Aeson as Aeson
-import qualified Data.Attoparsec.Text as AT
-import qualified Data.Attoparsec.Text as Atto
 import Data.Text (Text)
 import Data.Text.Short (ShortText)
-import qualified Data.Text as Text
-import qualified Data.Text.Short as TS
-import qualified Data.Text.IO as TIO
 import Data.WideWord.Word128 (Word128(..), zeroWord128)
 import Data.Word
 import Foreign.Storable (Storable)
-import GHC.Exts
 import GHC.Generics (Generic)
 import Numeric (showHex)
-import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+
+import qualified Arithmetic.Lte as Lte
+import qualified Arithmetic.Nat as Nat
+import qualified Data.Aeson as Aeson
+import qualified Data.Attoparsec.Text as AT
+import qualified Data.Attoparsec.Text as Atto
+import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.ByteString.Short.Internal as BSS
+import qualified Data.Primitive as PM
+import qualified Data.Text as Text
+import qualified Data.Text.IO as TIO
+import qualified Data.Text.Short.Unsafe as TS
+import qualified Net.IPv4 as IPv4
 
 -- $setup
 --
@@ -332,22 +338,29 @@ any = IPv6 zeroWord128
 -- ::ffff:100.55.165.180
 -- >>> T.putStrLn $ encode $ fromWord16s 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0
 -- ::
+--
+-- Per <https://tools.ietf.org/html/rfc5952#section-4.2.2 Section 4.2.2> of the
+-- same RFC, this does not use @::@ to shorten a single 16-bit 0 field. Only
+-- runs of multiple 0 fields are considered.
 encode :: IPv6 -> Text
-encode ip =
+encode !ip =
   -- TODO: This implementation, while correct, is not particularly efficient.
   -- It uses string all over the place.
-  if isIPv4MappedAddress
-  -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
-  then Text.pack "::ffff:" `mappend` IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
-  else toText [w1, w2, w3, w4, w5, w6, w7, w8]
+  if isIPv4Mapped ip
+    -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
+    then
+      Text.pack "::ffff:"
+      `mappend`
+      IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
+    else toText [w1, w2, w3, w4, w5, w6, w7, w8]
   where
-  isIPv4MappedAddress = w1 == 0 && w2 == 0 && w3 == 0 && w4 == 0 && w5 == 0 && w6 == 0xFFFF
   (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip
-  toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
+  toText ws = Text.pack $ intercalate ":"
+      $ expand 0 (if longestZ > 1 then longestZ else 0) grouped
     where
-    expand _ 8 _ = ["::"]
-    expand _ _ [] = []
-    expand i longest ((x, len):wsNext)
+    expand !_ 8 !_ = ["::"]
+    expand !_ !_ [] = []
+    expand !i !longest ((x, len):wsNext)
         -- zero-compressed group:
         | x == 0 && len == longest =
             -- first and last need an extra colon since there's nothing
@@ -359,14 +372,119 @@ encode ip =
     longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
     grouped = map (\x -> (head x, length x)) (group ws)
 
+isIPv4Mapped :: IPv6 -> Bool
+isIPv4Mapped (IPv6 (Word128 w1 w2)) =
+  w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
+
+boundedBuilderUtf8 :: IPv6 -> BB.Builder 39
+boundedBuilderUtf8 !ip@(IPv6 (Word128 hi lo))
+  | hi == 0 && lo == 0 = BB.weaken Lte.constant
+      (BB.ascii ':' `BB.append` BB.ascii ':')
+  | isIPv4Mapped ip = BB.weaken Lte.constant $
+      BB.ascii ':'
+      `BB.append`
+      BB.ascii ':'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii ':'
+      `BB.append`
+      IPv4.boundedBuilderUtf8 (IPv4.IPv4 (fromIntegral lo))
+  | otherwise =
+      let (w0,w1,w2,w3,w4,w5,w6,w7) = toWord16s ip
+          IntTriple startLongest longest _ = longestRun w0 w1 w2 w3 w4 w5 w6 w7
+          start = startLongest
+          end = start + longest
+          -- start is inclusive. end is exclusive
+       in firstPiece w0 start
+          `BB.append`
+          piece 1 w1 start end
+          `BB.append`
+          piece 2 w2 start end
+          `BB.append`
+          piece 3 w3 start end
+          `BB.append`
+          piece 4 w4 start end
+          `BB.append`
+          piece 5 w5 start end
+          `BB.append`
+          piece 6 w6 start end
+          `BB.append`
+          lastPiece w7 end
+
+firstPiece :: Word16 -> Int -> BB.Builder 4
+firstPiece !w !start = case start of
+  0 -> BB.weaken Lte.constant (BB.ascii ':')
+  _ -> BB.word16LowerHex w
+
+piece :: Int -> Word16 -> Int -> Int -> BB.Builder 5
+piece !ix !w !start !end = case compare ix start of
+  LT -> BB.ascii ':' `BB.append` BB.word16LowerHex w
+  EQ -> BB.weaken Lte.constant (BB.ascii ':')
+  GT -> if ix < end
+    then BB.weaken Lte.constant BB.empty
+    else BB.ascii ':' `BB.append` BB.word16LowerHex w
+
+lastPiece :: Word16 -> Int -> BB.Builder 5
+lastPiece !w !end = case end of
+  8 -> BB.weaken Lte.constant (BB.ascii ':')
+  _ -> BB.ascii ':' `BB.append` BB.word16LowerHex w
+
+data IntTriple = IntTriple !Int !Int !Int
+
+-- Choose the longest run. Prefer the leftmost run in the
+-- event of a tie.
+stepZeroRunLength :: Int -> Word16 -> IntTriple -> IntTriple
+stepZeroRunLength !ix !w (IntTriple startLongest longest current) = case w of
+  0 -> let !x = current + 1 in
+    if x > longest
+      then IntTriple (ix - current) x x
+      else IntTriple startLongest longest x
+  _ -> IntTriple startLongest longest 0
+
+-- We start out by setting the longest run to size 1. This
+-- means that we will only detect runs of length two or greater.
+longestRun ::
+     Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> IntTriple
+longestRun !w0 !w1 !w2 !w3 !w4 !w5 !w6 !w7 = id
+  $ stepZeroRunLength 7 w7
+  $ stepZeroRunLength 6 w6
+  $ stepZeroRunLength 5 w5
+  $ stepZeroRunLength 4 w4
+  $ stepZeroRunLength 3 w3
+  $ stepZeroRunLength 2 w2
+  $ stepZeroRunLength 1 w1
+  $ stepZeroRunLength 0 w0
+  $ IntTriple (-1) 1 0
+
 -- | Encodes the 'IPv6' address as 'ShortText' using zero-compression on
 -- the leftmost longest string of zeroes in the address.
 -- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
 -- this uses mixed notation when encoding an IPv4-mapped IPv6 address.
 encodeShort :: IPv6 -> ShortText
-encodeShort = TS.fromText . encode
--- This (encodeShort) should be rewritten to not go through
--- UTF-16-encoded text as an intermediary.
+encodeShort w = id
+  $ TS.fromShortByteStringUnsafe
+  $ byteArrayToShortByteString
+  $ BB.run Nat.constant
+  $ boundedBuilderUtf8
+  $ w
+
+byteArrayToShortByteString :: PM.ByteArray -> BSS.ShortByteString
+byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 
 -- | Decode an 'IPv6' address. This accepts both standard IPv6
 -- notation (with zero compression) and mixed notation for

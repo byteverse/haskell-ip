@@ -23,6 +23,7 @@ import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),Mac
 import Data.WideWord (Word128(..))
 import qualified Data.Bytes as Bytes
 import qualified Data.Text as Text
+import qualified Data.Text.Short as TS
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
@@ -96,7 +97,8 @@ tests =
       ]
     , testGroup "IPv6 encode/decode"
       [ PH.testCase "Parser Test Cases" testIPv6Parser
-      , PH.testCase "Encode test cases" testIPv6Encode
+      , PH.testCase "Encode test cases" (testIPv6Encode IPv6.encode)
+      , PH.testCase "Encode ShortText" (testIPv6Encode (TS.toText . IPv6.encodeShort))
       , PH.testCase "Parser Failure Test Cases" testIPv6ParserFailure
       ]
     ]
@@ -313,8 +315,8 @@ testIPv6ParserFailure = do
         (IPv6.parser <* AT.endOfInput)
         (Text.pack str))
 
-testIPv6Encode :: Assertion
-testIPv6Encode = do
+testIPv6Encode :: (IPv6 -> Text.Text) -> Assertion
+testIPv6Encode enc = do
 
   -- degenerate cases:
   "::" `roundTripsTo` "::"
@@ -325,7 +327,7 @@ testIPv6Encode = do
   "1234:1234:0000:0000:0000:0000:3456:3434" `roundTripsTo` "1234:1234::3456:3434"
 
   -- picks first case:
-  "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234::1234:0:1234:0:123:1234"
+  "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234:0:1234:0:1234:0:123:1234"
 
   -- picks longest case:
   "1234:0000:1234:0000:0:0000:0123:1234" `roundTripsTo` "1234:0:1234::123:1234"
@@ -340,8 +342,8 @@ testIPv6Encode = do
   "1:2:3:4:5:6:7:8" `roundTripsTo` "1:2:3:4:5:6:7:8"
 
   -- works with only first or last:
-  "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
-  "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
+  "::2:3:4:5:6:7:8" `roundTripsTo` "0:2:3:4:5:6:7:8"
+  "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7:0"
 
   -- decimal notation in IPv6 addresses:
   "1:2:3:4:5:6:0.7.0.8" `roundTripsTo` "1:2:3:4:5:6:7:8"
@@ -356,7 +358,7 @@ testIPv6Encode = do
  where
  roundTripsTo s sExpected =
    case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
-      Right result -> IPv6.encode result @?= Text.pack sExpected
+      Right result -> enc result @?= Text.pack sExpected
       Left failMsg -> fail ("failed to parse '" ++ s ++ "': " ++ failMsg)
 
 textBadIPv4 :: [String]

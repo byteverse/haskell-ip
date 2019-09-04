@@ -41,11 +41,11 @@ module Net.IPv4
   , decodeUtf8
   , builderUtf8
   , parserUtf8
-  , byteArrayBuilderUtf8
-  , boundedBuilderUtf8
     -- ** UTF-8 Bytes
   , decodeUtf8Bytes
   , parserUtf8Bytes
+  , byteArrayBuilderUtf8
+  , boundedBuilderUtf8
     -- ** String
     -- $string
   , encodeString

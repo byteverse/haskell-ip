@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 {-# OPTIONS_GHC -Wall #-}
@@ -41,6 +42,7 @@ module Net.IP
   , encode
   , encodeShort
   , decode
+  , boundedBuilderUtf8
     -- ** Printing
   , print
     -- * Types
@@ -60,7 +62,10 @@ import Prelude hiding (print)
 import Text.ParserCombinators.ReadPrec ((+++))
 import Text.Read (Read(..))
 import Data.Text.Short (ShortText)
+
+import qualified Arithmetic.Lte as Lte
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteArray.Builder.Bounded as BB
 import qualified Data.Text.IO as TIO
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
@@ -118,6 +123,12 @@ encode = case_ IPv4.encode IPv6.encode
 -- | Encode an 'IP' as 'ShortText'.
 encodeShort :: IP -> ShortText
 encodeShort = case_ IPv4.encodeShort IPv6.encodeShort
+
+-- | Encode an 'IP' as a bounded bytearray builder.
+boundedBuilderUtf8 :: IP -> BB.Builder 39
+boundedBuilderUtf8 = case_
+  (\y -> BB.weaken Lte.constant (IPv4.boundedBuilderUtf8 y))
+  IPv6.boundedBuilderUtf8
 
 -- | Decode an 'IP' from 'Text'.
 --

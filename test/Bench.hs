@@ -68,16 +68,21 @@ main = do
       , bench "Preallocated: No Lookup Tables" $ whnf IPv4ByteString1.encode ipAddr
       , bench "Preallocated" $ whnf IPv4.encodeUtf8 ipAddr
       ]
-    , bgroup "IPv6 to Text"
+    , bgroup "IPv6 from Text"
       [ bench "New '::'" $ whnf IPv6.decode ip6Text
       , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.decode ip6TextBigger
       , bench "New '1:2::7:8'" $ whnf IPv6.decode ip6TextSkip
       , bench "New 'a:b::c:d'" $ whnf IPv6.decode ip6TextHex
       ]
-    , bgroup "IPv6 from Text"
-      [ bench "New '::'" $ whnf IPv6.encode ip6
-      , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.encode ip6Bigger
-      , bench "New '1:2::7:8'" $ whnf IPv6.encode ip6Skip
-      , bench "New 'a:b::c:d'" $ whnf IPv6.encode ip6Hex
+    , bgroup "IPv6 to Text"
+      [ bench "::" $ whnf IPv6.encode ip6
+      , bench "1:2:3:4:5:6:7:8" $ whnf IPv6.encode ip6Bigger
+      , bench "1:2::7:8" $ whnf IPv6.encode ip6Skip
+      , bench "a:b::c:d" $ whnf IPv6.encode ip6Hex
+      ]
+    , bgroup "IPv6 to ShortText"
+      [ bench "1:2:3:4:5:6:7:8" $ whnf IPv6.encodeShort ip6Bigger
+      , bench "1:2::7:8" $ whnf IPv6.encodeShort ip6Skip
+      , bench "a:b::c:d" $ whnf IPv6.encodeShort ip6Hex
       ]
     ]
