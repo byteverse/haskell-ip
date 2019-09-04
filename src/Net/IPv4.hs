@@ -92,7 +92,6 @@ import Data.ByteString (ByteString)
 import Data.Bytes.Types (Bytes)
 import Data.Coerce (coerce)
 import Data.Hashable
-import Data.Monoid ((<>))
 import Data.Primitive.Types (Prim)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8')
