@@ -48,6 +48,10 @@ tests =
           $ propEncodeDecodeIso IPv4.encode IPv4.decode
       , PH.testCase "Decode an IP" testIPv4Decode
       ] ++ testDecodeFailures
+    , testGroup "Currently used IPv4 encodeShort/decodeShort" $
+      [ testProperty "Isomorphism"
+          $ propEncodeDecodeIso IPv4.encodeShort IPv4.decodeShort
+      ] ++ testDecodeFailures
     , testGroup "Currently used IPv4 UTF-8 Bytes decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIso (byteStringToBytes . IPv4.encodeUtf8) IPv4.decodeUtf8Bytes

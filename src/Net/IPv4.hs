@@ -35,11 +35,14 @@ module Net.IPv4
   , reader
   , parser
   , decodeShort
+  , encodeShort
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
   , builderUtf8
   , parserUtf8
+  , byteArrayBuilderUtf8
+  , boundedBuilderUtf8
     -- ** UTF-8 Bytes
   , decodeUtf8Bytes
   , parserUtf8Bytes
@@ -105,11 +108,14 @@ import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Bits as Bits
+import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.ByteArray.Builder as UB
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
@@ -126,6 +132,7 @@ import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Lazy.Builder.Int as TBI
 import qualified Data.Text.Read as TextRead
 import qualified Data.Text.Short as TS
+import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Vector.Generic as GVector
 import qualified Data.Vector.Generic.Mutable as MGVector
 import qualified Data.Vector.Primitive as PVector
@@ -376,8 +383,20 @@ decodeShort :: ShortText -> Maybe IPv4
 decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
   where b = shortByteStringToByteArray (TS.toShortByteString t)
 
+-- | Encode an 'IPv4' address as 'ShortText'.
+encodeShort :: IPv4 -> ShortText
+encodeShort !w = id
+  $ TS.fromShortByteStringUnsafe
+  $ byteArrayToShortByteString
+  $ BB.run Nat.constant
+  $ boundedBuilderUtf8
+  $ w
+
 shortByteStringToByteArray :: BSS.ShortByteString -> PM.ByteArray
 shortByteStringToByteArray (BSS.SBS x) = PM.ByteArray x
+
+byteArrayToShortByteString :: PM.ByteArray -> BSS.ShortByteString
+byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 
 -- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
 decodeUtf8Bytes :: Bytes -> Maybe IPv4
@@ -407,6 +426,32 @@ parserUtf8Bytes# e = Smith.unboxWord32 $ do
 -- | Encode an 'IPv4' as a 'Builder.Builder'
 builderUtf8 :: IPv4 -> Builder.Builder
 builderUtf8 = Builder.byteString . encodeUtf8
+
+-- | Encode an 'IPv4' address as a unbounded byte array builder.
+byteArrayBuilderUtf8 :: IPv4 -> UB.Builder
+byteArrayBuilderUtf8 = UB.fromBounded Nat.constant . boundedBuilderUtf8
+
+-- | Encode an 'IPv4' address as a bounded byte array builder.
+boundedBuilderUtf8 :: IPv4 -> BB.Builder 15
+boundedBuilderUtf8 (IPv4 !w) =
+  BB.word8Dec w1
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w2
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w3
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w4
+  where
+  w1 = fromIntegral (shiftR w 24) :: Word8
+  w2 = fromIntegral (shiftR w 16) :: Word8
+  w3 = fromIntegral (shiftR w 8) :: Word8
+  w4 = fromIntegral w :: Word8
 
 -- | Parse an 'IPv4' using a 'AB.Parser'.
 --
@@ -537,7 +582,6 @@ instance ToJSON IPv4 where
 instance FromJSON IPv4 where
   parseJSON = Aeson.withText "IPv4" aesonParser
 
-#if MIN_VERSION_aeson(1,0,0)
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     encode
@@ -545,7 +589,6 @@ instance ToJSONKey IPv4 where
 
 instance FromJSONKey IPv4 where
   fromJSONKey = FromJSONKeyTextParser aesonParser
-#endif
 
 aesonParser :: Text -> Aeson.Parser IPv4
 aesonParser t = case decode t of

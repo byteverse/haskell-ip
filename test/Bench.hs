@@ -46,6 +46,9 @@ main = do
       , bench "Current Implementation, no separator"
           $ whnf (Mac.encodeWithUtf8 (MacCodec MacGroupingNoSeparator True)) mac
       ]
+    , bgroup "IPv4 to ShortText"
+      [ bench "Implementation" $ whnf IPv4.encodeShort ipAddr
+      ]
     , bgroup "IPv4 to Text"
       [ bench "Naive" $ whnf Naive.encodeText ipAddr
       , bench "Text Builder" $ whnf IPv4Text2.encode ipAddr

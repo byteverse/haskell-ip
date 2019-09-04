@@ -27,6 +27,7 @@ module Net.IPv6
     -- * Textual Conversion
     -- ** Text
   , encode
+  , encodeShort
   , decode
   , parser
     -- ** Printing
@@ -67,7 +68,9 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.Text as Atto
 import Data.Text (Text)
+import Data.Text.Short (ShortText)
 import qualified Data.Text as Text
+import qualified Data.Text.Short as TS
 import qualified Data.Text.IO as TIO
 import Data.WideWord.Word128 (Word128(..), zeroWord128)
 import Data.Word
@@ -318,8 +321,8 @@ localhost = loopback
 any :: IPv6
 any = IPv6 zeroWord128
 
--- | Encodes the IP, using zero-compression on the leftmost-longest string of
--- zeroes in the address.
+-- | Encodes the 'IPv6' address using zero-compression on the leftmost longest
+-- string of zeroes in the address.
 -- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
 -- this uses mixed notation when encoding an IPv4-mapped IPv6 address:
 --
@@ -331,6 +334,8 @@ any = IPv6 zeroWord128
 -- ::
 encode :: IPv6 -> Text
 encode ip =
+  -- TODO: This implementation, while correct, is not particularly efficient.
+  -- It uses string all over the place.
   if isIPv4MappedAddress
   -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
   then Text.pack "::ffff:" `mappend` IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
@@ -354,9 +359,20 @@ encode ip =
     longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
     grouped = map (\x -> (head x, length x)) (group ws)
 
--- | Decode an IPv6 address. This accepts both standard IPv6
+-- | Encodes the 'IPv6' address as 'ShortText' using zero-compression on
+-- the leftmost longest string of zeroes in the address.
+-- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
+-- this uses mixed notation when encoding an IPv4-mapped IPv6 address.
+encodeShort :: IPv6 -> ShortText
+encodeShort = TS.fromText . encode
+-- This (encodeShort) should be rewritten to not go through
+-- UTF-16-encoded text as an intermediary.
+
+-- | Decode an 'IPv6' address. This accepts both standard IPv6
 -- notation (with zero compression) and mixed notation for
--- IPv4-mapped IPv6 addresses.
+-- IPv4-mapped IPv6 addresses. For a decoding function that
+-- additionally accepts dot-decimal-encoded IPv4 addresses,
+-- see @Net.IP.decode@.
 decode :: Text -> Maybe IPv6
 decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 

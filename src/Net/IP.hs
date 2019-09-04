@@ -39,6 +39,7 @@ module Net.IP
     -- * Textual Conversion
     -- ** Text
   , encode
+  , encodeShort
   , decode
     -- ** Printing
   , print
@@ -58,6 +59,7 @@ import Net.IPv6 (IPv6(..))
 import Prelude hiding (print)
 import Text.ParserCombinators.ReadPrec ((+++))
 import Text.Read (Read(..))
+import Data.Text.Short (ShortText)
 import qualified Data.Aeson as Aeson
 import qualified Data.Text.IO as TIO
 import qualified Net.IPv4 as IPv4
@@ -112,6 +114,10 @@ fromIPv6 = IP
 --   "3124::dead:cafe:ff:fe00:1"
 encode :: IP -> Text
 encode = case_ IPv4.encode IPv6.encode
+
+-- | Encode an 'IP' as 'ShortText'.
+encodeShort :: IP -> ShortText
+encodeShort = case_ IPv4.encodeShort IPv6.encodeShort
 
 -- | Decode an 'IP' from 'Text'.
 --
