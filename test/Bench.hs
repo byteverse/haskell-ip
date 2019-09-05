@@ -27,6 +27,7 @@ main = do
       ip6 = fromJust $ IPv6.decode ip6Text
       ip6TextBigger = Text.pack "1:2:3:4:5:6:7:8"
       ip6Bigger = fromJust $ IPv6.decode ip6TextBigger
+      ip6Complicated = fromJust $ IPv6.decode (Text.pack "2001:db8:ba1:0:aaaa:542c:bb:cc00")
       ip6TextSkip = Text.pack "1:2::7:8"
       ip6Skip = fromJust $ IPv6.decode ip6TextSkip
       ip6TextHex = Text.pack "a:b::c:d"
@@ -84,5 +85,6 @@ main = do
       [ bench "1:2:3:4:5:6:7:8" $ whnf IPv6.encodeShort ip6Bigger
       , bench "1:2::7:8" $ whnf IPv6.encodeShort ip6Skip
       , bench "a:b::c:d" $ whnf IPv6.encodeShort ip6Hex
+      , bench "2001:db8:ba1:0:aaaa:542c:bb:cc00" $ whnf IPv6.encodeShort ip6Complicated
       ]
     ]
