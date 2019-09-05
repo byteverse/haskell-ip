@@ -1,12 +1,13 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE InstanceSigs               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeInType                 #-}
-{-# LANGUAGE UnboxedTuples              #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-| This module provides the IPv6 data type and functions for working
     with it.
@@ -70,7 +71,9 @@ import Data.Text.Short (ShortText)
 import Data.WideWord.Word128 (Word128(..), zeroWord128)
 import Data.Word
 import Foreign.Storable (Storable)
+import GHC.Exts (Int#,Word#,Int(I#))
 import GHC.Generics (Generic)
+import GHC.Word (Word16(W16#))
 import Numeric (showHex)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
@@ -376,6 +379,8 @@ isIPv4Mapped :: IPv6 -> Bool
 isIPv4Mapped (IPv6 (Word128 w1 w2)) =
   w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
 
+-- | Encodes the 'IPv6' address using zero-compression on the
+-- leftmost longest string of zeroes in the address.
 boundedBuilderUtf8 :: IPv6 -> BB.Builder 39
 boundedBuilderUtf8 !ip@(IPv6 (Word128 hi lo))
   | hi == 0 && lo == 0 = BB.weaken Lte.constant
@@ -423,13 +428,32 @@ firstPiece !w !start = case start of
   0 -> BB.weaken Lte.constant (BB.ascii ':')
   _ -> BB.word16LowerHex w
 
+-- Note about the implementation of piece:
+-- It is important to manually perform worker-wrapper so that
+-- we can stop piece from inlining. If we do not do this, GHC
+-- inlines piece, leading to enormous blowup in the generated
+-- Core. The implementation of boundedBuilderUtf8 becomes
+-- thousands of lines of Core. Even in the microbenchmark that
+-- comes with this library, it can be observed that preventing
+-- this inlining improves performance of encodeShort by 50%.
 piece :: Int -> Word16 -> Int -> Int -> BB.Builder 5
-piece !ix !w !start !end = case compare ix start of
+{-# inline piece #-}
+piece (I# ix) (W16# w) (I# start) (I# end) =
+  piece# ix w start end
+
+piece# :: Int# -> Word# -> Int# -> Int# -> BB.Builder 5
+{-# noinline piece# #-}
+piece# !ix# !w# !start# !end# = case compare ix start of
   LT -> BB.ascii ':' `BB.append` BB.word16LowerHex w
   EQ -> BB.weaken Lte.constant (BB.ascii ':')
   GT -> if ix < end
     then BB.weaken Lte.constant BB.empty
     else BB.ascii ':' `BB.append` BB.word16LowerHex w
+  where
+  ix = I# ix#
+  start = I# start#
+  end = I# end#
+  w = W16# w#
 
 lastPiece :: Word16 -> Int -> BB.Builder 5
 lastPiece !w !end = case end of
