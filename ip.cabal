@@ -34,33 +34,33 @@ description:
 library
   hs-source-dirs: src
   exposed-modules:
-    Net.Mac
+    Net.IP
     Net.IPv4
     Net.IPv6
-    Net.IP
+    Net.Mac
     Net.Types
   other-modules:
-    Data.Word.Synthetic.Word12
+    Data.ByteString.Builder.Fixed
+    Data.Text.Builder.Common.Internal
     Data.Text.Builder.Fixed
     Data.Text.Builder.Variable
-    Data.Text.Builder.Common.Internal
-    Data.ByteString.Builder.Fixed
+    Data.Word.Synthetic.Word12
   build-depends:
+    , aeson >= 1.0 && < 1.5
+    , attoparsec >= 0.13 && < 0.14
     , base >= 4.9.1.0 && < 5
     , byteslice >= 0.1.2 && < 0.2
     , bytesmith >= 0.2 && < 0.3
-    , aeson >= 1.0 && < 1.5
-    , attoparsec >= 0.13 && < 0.14
     , bytestring >= 0.10.8 && < 0.11
     , deepseq >= 1.4 && < 1.5
     , hashable >= 1.2 && < 1.4
+    , natural-arithmetic >= 0.1 && <0.2
     , primitive >= 0.6.4 && < 0.8
+    , small-bytearray-builder >= 0.2.1 && <0.3
     , text >= 1.2  && < 1.3
+    , text-short >= 0.1.3 && < 0.2
     , vector >= 0.11 && < 0.13
     , wide-word >= 0.1.0.8 && < 0.2
-    , text-short >= 0.1.3 && < 0.2
-    , small-bytearray-builder >= 0.2.1 && <0.3
-    , natural-arithmetic >= 0.1 && <0.2
   ghc-options: -Wall -O2
   default-language: Haskell2010
 
@@ -69,25 +69,25 @@ test-suite test
   hs-source-dirs:      test
   main-is:             Test.hs
   build-depends:
-      base
-    , ip
-    , wide-word
-    , tasty
-    , tasty-quickcheck
-    , tasty-hunit
+    , HUnit
     , QuickCheck
+    , attoparsec
+    , base
+    , byteslice >= 0.1.2 && < 0.2
+    , bytestring
+    , ip
     , quickcheck-classes >= 0.4.13 && < 0.7.0.0
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
     , text
     , text-short
-    , bytestring
-    , HUnit
-    , attoparsec
-    , byteslice >= 0.1.2 && < 0.2
+    , wide-word
   other-modules:
-    Naive
+    IPv4ByteString1
     IPv4Text1
     IPv4Text2
-    IPv4ByteString1
+    Naive
   ghc-options: -Wall -O2
   default-language: Haskell2010
 
@@ -96,13 +96,13 @@ test-suite spec
   hs-source-dirs: test
   main-is: Spec.hs
   build-depends:
-      base
+    , base
+    , hspec >= 2.5.5
     , ip
     , wide-word
-    , hspec >= 2.5.5
   other-modules:
-    Net.IPv4Spec
     Net.IPv4.RangeSpec
+    Net.IPv4Spec
   ghc-options: -Wall -O2
   default-language: Haskell2010
   build-tool-depends: hspec-discover:hspec-discover >= 2.5.5
@@ -112,30 +112,30 @@ test-suite doctest
   hs-source-dirs: test
   main-is: Doctests.hs
   build-depends:
-      base
+    , QuickCheck
+    , base
+    , doctest >= 0.10
     , ip
     , wide-word
-    , doctest >= 0.10
-    , QuickCheck
   default-language:    Haskell2010
 
 benchmark criterion
   type: exitcode-stdio-1.0
   build-depends:
-      base
-    , ip
-    , criterion
-    , text
-    , bytestring
     , attoparsec
+    , base
     , byteslice
+    , bytestring
+    , criterion
+    , ip
+    , text
   other-modules:
-    Naive
-    IPv4Text1
-    IPv4Text2
+    IPv4ByteString1
     IPv4DecodeText1
     IPv4DecodeText2
-    IPv4ByteString1
+    IPv4Text1
+    IPv4Text2
+    Naive
   ghc-options: -Wall -O2
   default-language: Haskell2010
   hs-source-dirs: test
