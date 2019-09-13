@@ -388,6 +388,9 @@ decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
   where b = shortByteStringToByteArray (TS.toShortByteString t)
 
 -- | Encode an 'IPv4' address as 'ShortText'.
+--
+--   >>> encodeShort (ipv4 192 168 5 99)
+--   "192.168.5.99"
 encodeShort :: IPv4 -> ShortText
 encodeShort !w = id
   $ TS.fromShortByteStringUnsafe
