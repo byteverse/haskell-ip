@@ -60,7 +60,6 @@ import Data.Semigroup ((<>))
 #endif
 import Data.Text (Text)
 import Data.Word
-import Data.Word (Word8)
 import Data.Word.Synthetic.Word12 (Word12)
 import GHC.Enum (predError, succError)
 import GHC.Exts

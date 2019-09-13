@@ -120,7 +120,8 @@ import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.ByteString.Short.Internal as BSS
-import qualified Data.Bytes.Parser as Smith
+import qualified Data.Bytes.Parser as Parser
+import qualified Data.Bytes.Parser.Latin as Latin
 import qualified Data.Bytes as Bytes
 import qualified Data.Primitive as PM
 import qualified Data.Text as Text
@@ -399,27 +400,27 @@ byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 
 -- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
 decodeUtf8Bytes :: Bytes -> Maybe IPv4
-decodeUtf8Bytes !b = case Smith.parseBytes (parserUtf8Bytes ()) b of
-  Smith.Success addr _ len -> case len of
+decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
+  Parser.Success addr len -> case len of
     0 -> Just addr
     _ -> Nothing
-  Smith.Failure _ -> Nothing
+  Parser.Failure _ -> Nothing
 
 -- | Parse UTF-8-encoded 'Bytes' as an 'IPv4' address.
-parserUtf8Bytes :: e -> Smith.Parser e s IPv4
+parserUtf8Bytes :: e -> Parser.Parser e s IPv4
 {-# inline parserUtf8Bytes #-}
-parserUtf8Bytes e = coerce (Smith.boxWord32 (parserUtf8Bytes# e))
+parserUtf8Bytes e = coerce (Parser.boxWord32 (parserUtf8Bytes# e))
 
-parserUtf8Bytes# :: e -> Smith.Parser e s Word#
+parserUtf8Bytes# :: e -> Parser.Parser e s Word#
 {-# noinline parserUtf8Bytes# #-}
-parserUtf8Bytes# e = Smith.unboxWord32 $ do
-  !a <- Smith.decWord8 e
-  Smith.ascii e '.'
-  !b <- Smith.decWord8 e
-  Smith.ascii e '.'
-  !c <- Smith.decWord8 e
-  Smith.ascii e '.'
-  !d <- Smith.decWord8 e
+parserUtf8Bytes# e = Parser.unboxWord32 $ do
+  !a <- Latin.decWord8 e
+  Latin.char e '.'
+  !b <- Latin.decWord8 e
+  Latin.char e '.'
+  !c <- Latin.decWord8 e
+  Latin.char e '.'
+  !d <- Latin.decWord8 e
   pure (getIPv4 (fromOctets a b c d))
 
 -- | Encode an 'IPv4' as a 'Builder.Builder'

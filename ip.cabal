@@ -48,7 +48,7 @@ library
   build-depends:
     , base >= 4.9.1.0 && < 5
     , byteslice >= 0.1.2 && < 0.2
-    , bytesmith >= 0.1 && < 0.2
+    , bytesmith >= 0.2 && < 0.3
     , aeson >= 1.0 && < 1.5
     , attoparsec >= 0.13 && < 0.14
     , bytestring >= 0.10.8 && < 0.11
@@ -72,15 +72,15 @@ test-suite test
       base
     , ip
     , wide-word
-    , test-framework
-    , test-framework-quickcheck2
+    , tasty
+    , tasty-quickcheck
+    , tasty-hunit
     , QuickCheck
     , quickcheck-classes >= 0.4.13 && < 0.7.0.0
     , text
     , text-short
     , bytestring
     , HUnit
-    , test-framework-hunit
     , attoparsec
     , byteslice >= 0.1.2 && < 0.2
   other-modules:

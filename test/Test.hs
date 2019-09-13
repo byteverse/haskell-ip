@@ -9,15 +9,15 @@ import Naive
 import Control.Applicative (liftA2)
 import Data.Bytes (Bytes)
 import Data.Proxy (Proxy(..))
-import Test.Framework (defaultMain, testGroup, Test)
-import Test.Framework.Providers.QuickCheck2 (testProperty)
+import Test.Tasty (defaultMain, testGroup, TestTree)
+import Test.Tasty.QuickCheck (testProperty)
 import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose,(===))
 import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
 import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws,boundedEnumLaws)
-import qualified Test.Framework.Providers.HUnit as PH
+import qualified Test.Tasty.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
 import Data.WideWord (Word128(..))
@@ -41,8 +41,8 @@ import qualified IPv4ByteString1
 main :: IO ()
 main = defaultMain tests
 
-tests :: [Test]
-tests =
+tests :: TestTree
+tests = testGroup "tests"
   [ testGroup "Encoding and Decoding"
     [ testGroup "Currently used IPv4 encode/decode" $
       [ testProperty "Isomorphism"
@@ -161,7 +161,7 @@ tests =
     ]
   ]
 
-lawsToTest :: Laws -> Test
+lawsToTest :: Laws -> TestTree
 lawsToTest (Laws name pairs) = testGroup name (map (uncurry testProperty) pairs)
 
 propEncodeDecodeIso :: (Eq a, Show a, Show b)
@@ -373,7 +373,7 @@ textBadIPv4 =
   , "1.9"
   ]
 
-testDecodeFailures :: [Test]
+testDecodeFailures :: [TestTree]
 testDecodeFailures = flip map textBadIPv4 $ \str ->
   PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4.decode (Text.pack str) @?= Nothing
 
