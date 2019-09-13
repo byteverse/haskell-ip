@@ -120,6 +120,7 @@ import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as ByteString
 import qualified Data.ByteString.Short.Internal as BSS
+import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Parser as Parser
 import qualified Data.Bytes.Parser.Latin as Latin
 import qualified Data.Bytes as Bytes
@@ -379,6 +380,9 @@ decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
 -- as an intermediary.
 
 -- | Decode 'ShortText' as an 'IPv4' address.
+--
+--   >>> decodeShort "192.168.3.48"
+--   Just (ipv4 192 168 3 48)
 decodeShort :: ShortText -> Maybe IPv4
 decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
   where b = shortByteStringToByteArray (TS.toShortByteString t)
@@ -399,7 +403,10 @@ byteArrayToShortByteString :: PM.ByteArray -> BSS.ShortByteString
 byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 
 -- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
-decodeUtf8Bytes :: Bytes -> Maybe IPv4
+--
+--   >>> decodeUtf8Bytes (Bytes.fromAsciiString "127.0.0.1")
+--   Just (ipv4 127 0 0 1)
+decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv4
 decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
   Parser.Success addr len -> case len of
     0 -> Just addr

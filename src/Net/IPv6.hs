@@ -499,6 +499,9 @@ longestRun !w0 !w1 !w2 !w3 !w4 !w5 !w6 !w7 = id
 -- the leftmost longest string of zeroes in the address.
 -- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
 -- this uses mixed notation when encoding an IPv4-mapped IPv6 address.
+-- 
+-- >>> encodeShort $ fromWord16s 0xDEAD 0xBEEF 0x0 0x0 0x0 0x0ABC 0x0 0x1234
+-- "dead:beef::abc:0:1234"
 encodeShort :: IPv6 -> ShortText
 encodeShort w = id
   $ TS.fromShortByteStringUnsafe

@@ -121,6 +121,12 @@ encode :: IP -> Text
 encode = case_ IPv4.encode IPv6.encode
 
 -- | Encode an 'IP' as 'ShortText'.
+--
+--   >>> encodeShort (ipv4 10 0 1 26)
+--   "10.0.1.26"
+--
+--   >>> encodeShort (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE01 0x0000)
+--   "3124::dead:cafe:ff:fe01:0"
 encodeShort :: IP -> ShortText
 encodeShort = case_ IPv4.encodeShort IPv6.encodeShort
 
