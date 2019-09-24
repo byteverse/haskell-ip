@@ -89,7 +89,6 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
 import Data.ByteString (ByteString)
-import Data.Bytes.Types (Bytes)
 import Data.Coerce (coerce)
 import Data.Hashable
 import Data.Primitive.Types (Prim)
@@ -123,7 +122,6 @@ import qualified Data.ByteString.Short.Internal as BSS
 import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Parser as Parser
 import qualified Data.Bytes.Parser.Latin as Latin
-import qualified Data.Bytes as Bytes
 import qualified Data.Primitive as PM
 import qualified Data.Text as Text
 import qualified Data.Text.Array as TArray
