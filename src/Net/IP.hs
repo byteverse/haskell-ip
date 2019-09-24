@@ -72,6 +72,7 @@ import qualified Net.IPv6 as IPv6
 
 -- $setup
 -- >>> :set -XOverloadedStrings
+-- >>> import qualified Arithmetic.Nat as Nat
 
 -- | Run a function over an 'IP' depending on its status
 --   as an 'IPv4' or 'IPv6'.
@@ -131,6 +132,9 @@ encodeShort :: IP -> ShortText
 encodeShort = case_ IPv4.encodeShort IPv6.encodeShort
 
 -- | Encode an 'IP' as a bounded bytearray builder.
+--
+-- >>> BB.run Nat.constant (boundedBuilderUtf8 (ipv4 192 168 2 14))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x34]
 boundedBuilderUtf8 :: IP -> BB.Builder 39
 boundedBuilderUtf8 = case_
   (\y -> BB.weaken Lte.constant (IPv4.boundedBuilderUtf8 y))

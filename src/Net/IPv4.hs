@@ -434,15 +434,28 @@ parserUtf8Bytes# e = Parser.unboxWord32 $ do
   !d <- Latin.decWord8 e
   pure (getIPv4 (fromOctets a b c d))
 
--- | Encode an 'IPv4' as a 'Builder.Builder'
+-- | Encode an 'IPv4' as a bytestring 'Builder.Builder'
+--
+-- >>> Builder.toLazyByteString (builderUtf8 (fromOctets 192 168 2 12))
+-- "192.168.2.12"
 builderUtf8 :: IPv4 -> Builder.Builder
 builderUtf8 = Builder.byteString . encodeUtf8
 
 -- | Encode an 'IPv4' address as a unbounded byte array builder.
+--
+-- >>> UB.run 1 (byteArrayBuilderUtf8 (fromOctets 192 168 2 13))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x33]
+--
+-- Note that period is encoded by UTF-8 as @0x2e@.
 byteArrayBuilderUtf8 :: IPv4 -> UB.Builder
 byteArrayBuilderUtf8 = UB.fromBounded Nat.constant . boundedBuilderUtf8
 
 -- | Encode an 'IPv4' address as a bounded byte array builder.
+--
+-- >>> BB.run Nat.constant (boundedBuilderUtf8 (fromOctets 192 168 2 14))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x34]
+--
+-- Note that period is encoded by UTF-8 as @0x2e@.
 boundedBuilderUtf8 :: IPv4 -> BB.Builder 15
 boundedBuilderUtf8 (IPv4 !w) =
   BB.word8Dec w1

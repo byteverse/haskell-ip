@@ -381,6 +381,9 @@ isIPv4Mapped (IPv6 (Word128 w1 w2)) =
 
 -- | Encodes the 'IPv6' address using zero-compression on the
 -- leftmost longest string of zeroes in the address.
+--
+-- >>> BB.run Nat.constant $ boundedBuilderUtf8 $ fromWord16s 0xDEAD 0xBEEF 0x0 0x0 0x0 0x0 0x0 0x1234
+-- [0x64, 0x65, 0x61, 0x64, 0x3a, 0x62, 0x65, 0x65, 0x66, 0x3a, 0x3a, 0x31, 0x32, 0x33, 0x34]
 boundedBuilderUtf8 :: IPv6 -> BB.Builder 39
 boundedBuilderUtf8 !ip@(IPv6 (Word128 hi lo))
   | hi == 0 && lo == 0 = BB.weaken Lte.constant
