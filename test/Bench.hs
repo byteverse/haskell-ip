@@ -25,9 +25,13 @@ main = do
       mac = Mac.fromOctets 0xFA 0xBB 0x43 0xA1 0x22 0x09
       ip6Text = Text.pack "::"
       ip6 = fromJust $ IPv6.decode ip6Text
-      ip6TextBigger = Text.pack "1:2:3:4:5:6:7:8"
+      ip6StrBigger = "1:2:3:4:5:6:7:8"
+      ip6TextBigger = Text.pack ip6StrBigger
+      ip6BytesBigger = Bytes.fromAsciiString "1:2:3:4:5:6:7:8"
       ip6Bigger = fromJust $ IPv6.decode ip6TextBigger
-      ip6Complicated = fromJust $ IPv6.decode (Text.pack "2001:db8:ba1:0:aaaa:542c:bb:cc00")
+      ip6ComplicatedStr = "2001:db8:ba1:0:aaaa:542c:bb:cc00"
+      ip6ComplicatedBytes = Bytes.fromAsciiString ip6ComplicatedStr
+      ip6Complicated = fromJust $ IPv6.decode (Text.pack ip6ComplicatedStr)
       ip6TextSkip = Text.pack "1:2::7:8"
       ip6Skip = fromJust $ IPv6.decode ip6TextSkip
       ip6TextHex = Text.pack "a:b::c:d"
@@ -70,10 +74,14 @@ main = do
       , bench "Preallocated" $ whnf IPv4.encodeUtf8 ipAddr
       ]
     , bgroup "IPv6 from Text"
-      [ bench "New '::'" $ whnf IPv6.decode ip6Text
-      , bench "New '1:2:3:4:5:6:7:8'" $ whnf IPv6.decode ip6TextBigger
-      , bench "New '1:2::7:8'" $ whnf IPv6.decode ip6TextSkip
-      , bench "New 'a:b::c:d'" $ whnf IPv6.decode ip6TextHex
+      [ bench "::" $ whnf IPv6.decode ip6Text
+      , bench "1:2:3:4:5:6:7:8" $ whnf IPv6.decode ip6TextBigger
+      , bench "1:2::7:8" $ whnf IPv6.decode ip6TextSkip
+      , bench "a:b::c:d" $ whnf IPv6.decode ip6TextHex
+      ]
+    , bgroup "IPv6 bytesmith"
+      [ bench "1:2:3:4:5:6:7:8" $ whnf IPv6.decodeUtf8Bytes ip6BytesBigger
+      , bench "2001:db8:ba1:0:aaaa:542c:bb:cc00" $ whnf IPv6.decodeUtf8Bytes ip6ComplicatedBytes
       ]
     , bgroup "IPv6 to Text"
       [ bench "::" $ whnf IPv6.encode ip6

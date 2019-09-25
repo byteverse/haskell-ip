@@ -96,10 +96,20 @@ tests = testGroup "tests"
       [ PH.testCase "Parser Test Cases" testIPv4Parser
       ]
     , testGroup "IPv6 encode/decode"
-      [ PH.testCase "Parser Test Cases" testIPv6Parser
+      [ PH.testCase "Parser Test Cases" $ testIPv6Parser $ \str -> 
+          either (\_ -> Nothing) (Just . HexIPv6)
+            (AT.parseOnly
+              (IPv6.parser <* AT.endOfInput)
+              (Text.pack str)
+            )
+      , PH.testCase "Bytes Parser Test Cases" $ testIPv6Parser $ \str ->
+          fmap HexIPv6 (IPv6.decodeUtf8Bytes (Bytes.fromAsciiString str))
       , PH.testCase "Encode test cases" (testIPv6Encode IPv6.encode)
       , PH.testCase "Encode ShortText" (testIPv6Encode (TS.toText . IPv6.encodeShort))
-      , PH.testCase "Parser Failure Test Cases" testIPv6ParserFailure
+      , PH.testCase "Parser Failure Test Cases"
+          (testIPv6ParserFailure expectIPv6ParserFailure)
+      , PH.testCase "Bytes Parser Failure Test Cases"
+          (testIPv6ParserFailure expectIPv6BytesParserFailure)
       ]
     ]
   , testGroup "IPv4 Range Operations"
@@ -234,8 +244,8 @@ testIPv4Parser = do
           (BC8.pack str)
         )
 
-testIPv6Parser :: Assertion
-testIPv6Parser = do
+testIPv6Parser :: (String -> Maybe HexIPv6) -> Assertion
+testIPv6Parser decode = do
   -- Basic test
   go 0xABCD 0x1234 0xABCD 0x1234 0xDCBA 0x4321 0xFFFF 0xE0E0
      "ABCD:1234:ABCD:1234:DCBA:4321:FFFF:E0E0"
@@ -257,22 +267,19 @@ testIPv6Parser = do
      "AAAA:0000:0000:0000:BBBB::ABCD:1234"
   where
   go a b c d e f g h str =
-    Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
-    @=? fmap HexIPv6
-      (AT.parseOnly
-        (IPv6.parser <* AT.endOfInput)
-        (Text.pack str)
-      )
+    Just (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
+    @=?
+    decode str
 
-testIPv6ParserFailure :: Assertion
-testIPv6ParserFailure = do
+testIPv6ParserFailure :: (String -> Assertion) -> Assertion
+testIPv6ParserFailure go = do
   -- must not start or end in colon:
   go ":::"
   go "1::2:"
-  go ":1::2"
-  go "1:::"
-  go ":1::"
-  go "::1:"
+  go ":1::3"
+  go "a:::"
+  go ":b::"
+  go "::c:"
   go "1:2:3:4:5:6:777:8:"
   go ":1:2:3:4:5:6:7777:8"
 
@@ -307,13 +314,22 @@ testIPv6ParserFailure = do
   -- IPv4 decimal embedded, with too many parts:
   go "1:2:3:4:5:6:7:127.0.0.1"
   go "1:2:3:4:5:6:7:8:127.0.0.1"
-  where
-  go str =
-    Left ()
-    @=? bimap (\_ -> ()) HexIPv6
-      (AT.parseOnly
-        (IPv6.parser <* AT.endOfInput)
-        (Text.pack str))
+
+expectIPv6ParserFailure :: String -> Assertion
+expectIPv6ParserFailure str =
+  Left ()
+  @=?
+  bimap (\_ -> ()) HexIPv6
+    (AT.parseOnly
+      (IPv6.parser <* AT.endOfInput)
+      (Text.pack str)
+    )
+
+expectIPv6BytesParserFailure :: String -> Assertion
+expectIPv6BytesParserFailure s =
+  Nothing
+  @=?
+  IPv6.decodeUtf8Bytes (Bytes.fromAsciiString s)
 
 testIPv6Encode :: (IPv6 -> Text.Text) -> Assertion
 testIPv6Encode enc = do
