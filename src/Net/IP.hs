@@ -42,7 +42,10 @@ module Net.IP
   , encode
   , encodeShort
   , decode
+  , decodeShort
   , boundedBuilderUtf8
+    -- ** Bytes
+  , parserUtf8Bytes
     -- ** Printing
   , print
     -- * Types
@@ -52,6 +55,7 @@ module Net.IP
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Bits
+import Data.Coerce (coerce)
 import Data.Text (Text)
 import Data.WideWord (Word128(..))
 import Data.Word (Word8,Word16)
@@ -67,6 +71,7 @@ import qualified Arithmetic.Lte as Lte
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteArray.Builder.Bounded as BB
 import qualified Data.Text.IO as TIO
+import qualified Data.Bytes.Parser as Parser
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 
@@ -159,6 +164,24 @@ decode t = case IPv4.decode t of
     Nothing -> Nothing
     Just v6 -> Just (fromIPv6 v6)
   Just v4 -> Just (fromIPv4 v4)
+
+-- | Decode an 'IP' from 'ShortText'.
+--
+--   >>> decodeShort "10.0.0.25"
+--   Just (ipv4 10 0 0 25)
+--   >>> decodeShort "::dead:cafe"
+--   Just (ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0xdead 0xcafe)
+decodeShort :: ShortText -> Maybe IP
+decodeShort t
+  | Just x <- IPv4.decodeShort t = Just (fromIPv4 x)
+  | otherwise = coerce (IPv6.decodeShort t)
+
+-- | Parse UTF-8-encoded 'Bytes' as an 'IP' address.
+parserUtf8Bytes :: e -> Parser.Parser e s IP
+parserUtf8Bytes e =
+  fmap fromIPv4 (IPv4.parserUtf8Bytes ())
+  `Parser.orElse`
+  coerce (IPv6.parserUtf8Bytes e)
 
 -- | Is the 'IP' an IPv4 address?
 --
