@@ -77,7 +77,14 @@ module Net.IPv4
   , printRange
     -- * Types
   , IPv4(..)
+  , IPv4#
   , IPv4Range(..)
+    -- * Unboxing
+    -- | These functions are useful for micro-optimizing
+    --   when GHC does a poor job with worker-wrapper.
+  , box
+  , unbox
+  , parserUtf8Bytes#
     -- * Interoperability
     -- $interoperability
   ) where
@@ -102,6 +109,7 @@ import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
 import GHC.Exts (Word#)
 import GHC.Generics (Generic)
+import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
@@ -422,7 +430,7 @@ parserUtf8Bytes :: e -> Parser.Parser e s IPv4
 {-# inline parserUtf8Bytes #-}
 parserUtf8Bytes e = coerce (Parser.boxWord32 (parserUtf8Bytes# e))
 
-parserUtf8Bytes# :: e -> Parser.Parser e s Word#
+parserUtf8Bytes# :: e -> Parser.Parser e s IPv4#
 {-# noinline parserUtf8Bytes# #-}
 parserUtf8Bytes# e = Parser.unboxWord32 $ do
   !a <- Latin.decWord8 e
@@ -517,6 +525,20 @@ encodeString = Text.unpack . encode
 decodeString :: String -> Maybe IPv4
 decodeString = decode . Text.pack
 
+
+-- | Unboxed variant of 'IPv4'. Before GHC 8.10, this is
+-- implemented as a type synonym. Portable use of this type requires
+-- treating it as though it were opaque. Use 'box' and 'unbox' to
+-- convert between this and the lifted 'IPv4'.
+type IPv4# = Word#
+
+-- | Convert an unboxed IPv4 address to a boxed one. 
+box :: IPv4# -> IPv4
+box w = IPv4 (W32# w)
+
+-- | Convert a boxed IPv4 address to an unboxed one. 
+unbox :: IPv4 -> IPv4#
+unbox (IPv4 (W32# w)) = w
 
 -- | A 32-bit Internet Protocol version 4 address. To use this with the
 --   @network@ library, it is necessary to use @Network.Socket.htonl@ to
