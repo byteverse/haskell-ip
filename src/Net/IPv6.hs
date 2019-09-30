@@ -561,7 +561,7 @@ decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 --
 -- >>> let str = "dead:beef:3240:a426:ba68:1cd0:4263:109b -> alive"
 -- >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString str)
--- Success (ipv6 0xdead 0xbeef 0x3240 0xa426 0xba68 0x1cd0 0x4263 0x109b) 9
+-- Success (Slice {offset = 39, length = 9, value = ipv6 0xdead 0xbeef 0x3240 0xa426 0xba68 0x1cd0 0x4263 0x109b})
 --
 -- This does not currently support parsing embedded IPv4 address
 -- (e.g. @ff00:8000:abc::224.1.2.3@).

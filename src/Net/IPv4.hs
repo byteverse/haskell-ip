@@ -425,7 +425,7 @@ decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
 -- | Parse UTF-8-encoded 'Bytes' as an 'IPv4' address.
 --
 --   >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString "10.0.1.254")
---   Success (ipv4 10 0 1 254) 0
+--   Success (Slice {offset = 10, length = 0, value = ipv4 10 0 1 254})
 parserUtf8Bytes :: e -> Parser.Parser e s IPv4
 {-# inline parserUtf8Bytes #-}
 parserUtf8Bytes e = coerce (Parser.boxWord32 (parserUtf8Bytes# e))
