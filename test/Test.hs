@@ -7,20 +7,23 @@ module Main (main) where
 
 import Naive
 import Control.Applicative (liftA2)
+import Data.Bytes (Bytes)
 import Data.Proxy (Proxy(..))
-import Test.Framework (defaultMain, testGroup, Test)
-import Test.Framework.Providers.QuickCheck2 (testProperty)
-import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose,(===))
+import Test.Tasty (defaultMain, testGroup, TestTree)
+import Test.Tasty.QuickCheck (testProperty)
+import Test.QuickCheck (Arbitrary(..),oneof,Gen,elements,choose,(===))
 import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
-import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws,boundedEnumLaws)
-import qualified Test.Framework.Providers.HUnit as PH
+import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,primLaws,boundedEnumLaws)
+import qualified Test.Tasty.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
 import Data.WideWord (Word128(..))
+import qualified Data.Bytes as Bytes
 import qualified Data.Text as Text
+import qualified Data.Text.Short as TS
 import qualified Data.ByteString.Char8 as BC8
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
@@ -38,14 +41,23 @@ import qualified IPv4ByteString1
 main :: IO ()
 main = defaultMain tests
 
-tests :: [Test]
-tests =
+tests :: TestTree
+tests = testGroup "tests"
   [ testGroup "Encoding and Decoding"
     [ testGroup "Currently used IPv4 encode/decode" $
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIso IPv4.encode IPv4.decode
       , PH.testCase "Decode an IP" testIPv4Decode
       ] ++ testDecodeFailures
+    , testGroup "Currently used IPv4 encodeShort/decodeShort" $
+      [ testProperty "Isomorphism"
+          $ propEncodeDecodeIso IPv4.encodeShort IPv4.decodeShort
+      ] ++ testDecodeFailures
+    , testGroup "Currently used IPv4 UTF-8 Bytes decode"
+      [ testProperty "Isomorphism"
+          $ propEncodeDecodeIso (byteStringToBytes . IPv4.encodeUtf8) IPv4.decodeUtf8Bytes
+      , PH.testCase "Encode a MAC Address" testMacEncode
+      ]
     , testGroup "Currently used MAC Text encode/decode"
       [ testProperty "Isomorphism"
           $ propEncodeDecodeIsoSettings Mac.encodeWith Mac.decodeWith
@@ -84,9 +96,20 @@ tests =
       [ PH.testCase "Parser Test Cases" testIPv4Parser
       ]
     , testGroup "IPv6 encode/decode"
-      [ PH.testCase "Parser Test Cases" testIPv6Parser
-      , PH.testCase "Encode test cases" testIPv6Encode
-      , PH.testCase "Parser Failure Test Cases" testIPv6ParserFailure
+      [ PH.testCase "Parser Test Cases" $ testIPv6Parser $ \str -> 
+          either (\_ -> Nothing) (Just . HexIPv6)
+            (AT.parseOnly
+              (IPv6.parser <* AT.endOfInput)
+              (Text.pack str)
+            )
+      , PH.testCase "Bytes Parser Test Cases" $ testIPv6Parser $ \str ->
+          fmap HexIPv6 (IPv6.decodeUtf8Bytes (Bytes.fromAsciiString str))
+      , PH.testCase "Encode test cases" (testIPv6Encode IPv6.encode)
+      , PH.testCase "Encode ShortText" (testIPv6Encode (TS.toText . IPv6.encodeShort))
+      , PH.testCase "Parser Failure Test Cases"
+          (testIPv6ParserFailure expectIPv6ParserFailure)
+      , PH.testCase "Bytes Parser Failure Test Cases"
+          (testIPv6ParserFailure expectIPv6BytesParserFailure)
       ]
     ]
   , testGroup "IPv4 Range Operations"
@@ -148,11 +171,21 @@ tests =
     ]
   ]
 
-lawsToTest :: Laws -> Test
+lawsToTest :: Laws -> TestTree
 lawsToTest (Laws name pairs) = testGroup name (map (uncurry testProperty) pairs)
 
-propEncodeDecodeIso :: Eq a => (a -> b) -> (b -> Maybe a) -> a -> Bool
-propEncodeDecodeIso f g a = g (f a) == Just a
+propEncodeDecodeIso :: (Eq a, Show a, Show b)
+  => (a -> b) -> (b -> Maybe a) -> a -> Result
+propEncodeDecodeIso f g a =
+  let fa = f a
+      gfa = g fa
+   in if gfa == Just a
+        then succeeded
+        else failure $ concat
+          [ "x:       ", show a, "\n"
+          , "f(x):    ", show fa, "\n"
+          , "g(f(x)): ", show gfa, "\n"
+          ]
 
 propEncodeDecodeIsoSettings :: (Eq a,Show a,Show b,Show e)
   => (e -> a -> b) -> (e -> b -> Maybe a) -> e -> a -> Result
@@ -211,8 +244,8 @@ testIPv4Parser = do
           (BC8.pack str)
         )
 
-testIPv6Parser :: Assertion
-testIPv6Parser = do
+testIPv6Parser :: (String -> Maybe HexIPv6) -> Assertion
+testIPv6Parser decode = do
   -- Basic test
   go 0xABCD 0x1234 0xABCD 0x1234 0xDCBA 0x4321 0xFFFF 0xE0E0
      "ABCD:1234:ABCD:1234:DCBA:4321:FFFF:E0E0"
@@ -234,22 +267,19 @@ testIPv6Parser = do
      "AAAA:0000:0000:0000:BBBB::ABCD:1234"
   where
   go a b c d e f g h str =
-    Right (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
-    @=? fmap HexIPv6
-      (AT.parseOnly
-        (IPv6.parser <* AT.endOfInput)
-        (Text.pack str)
-      )
+    Just (HexIPv6 (IPv6.fromWord16s a b c d e f g h))
+    @=?
+    decode str
 
-testIPv6ParserFailure :: Assertion
-testIPv6ParserFailure = do
+testIPv6ParserFailure :: (String -> Assertion) -> Assertion
+testIPv6ParserFailure go = do
   -- must not start or end in colon:
   go ":::"
   go "1::2:"
-  go ":1::2"
-  go "1:::"
-  go ":1::"
-  go "::1:"
+  go ":1::3"
+  go "a:::"
+  go ":b::"
+  go "::c:"
   go "1:2:3:4:5:6:777:8:"
   go ":1:2:3:4:5:6:7777:8"
 
@@ -284,16 +314,25 @@ testIPv6ParserFailure = do
   -- IPv4 decimal embedded, with too many parts:
   go "1:2:3:4:5:6:7:127.0.0.1"
   go "1:2:3:4:5:6:7:8:127.0.0.1"
-  where
-  go str =
-    Left ()
-    @=? bimap (\_ -> ()) HexIPv6
-      (AT.parseOnly
-        (IPv6.parser <* AT.endOfInput)
-        (Text.pack str))
 
-testIPv6Encode :: Assertion
-testIPv6Encode = do
+expectIPv6ParserFailure :: String -> Assertion
+expectIPv6ParserFailure str =
+  Left ()
+  @=?
+  bimap (\_ -> ()) HexIPv6
+    (AT.parseOnly
+      (IPv6.parser <* AT.endOfInput)
+      (Text.pack str)
+    )
+
+expectIPv6BytesParserFailure :: String -> Assertion
+expectIPv6BytesParserFailure s =
+  Nothing
+  @=?
+  IPv6.decodeUtf8Bytes (Bytes.fromAsciiString s)
+
+testIPv6Encode :: (IPv6 -> Text.Text) -> Assertion
+testIPv6Encode enc = do
 
   -- degenerate cases:
   "::" `roundTripsTo` "::"
@@ -304,7 +343,7 @@ testIPv6Encode = do
   "1234:1234:0000:0000:0000:0000:3456:3434" `roundTripsTo` "1234:1234::3456:3434"
 
   -- picks first case:
-  "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234::1234:0:1234:0:123:1234"
+  "1234:0000:1234:0000:1234:0000:0123:1234" `roundTripsTo` "1234:0:1234:0:1234:0:123:1234"
 
   -- picks longest case:
   "1234:0000:1234:0000:0:0000:0123:1234" `roundTripsTo` "1234:0:1234::123:1234"
@@ -319,8 +358,8 @@ testIPv6Encode = do
   "1:2:3:4:5:6:7:8" `roundTripsTo` "1:2:3:4:5:6:7:8"
 
   -- works with only first or last:
-  "::2:3:4:5:6:7:8" `roundTripsTo` "::2:3:4:5:6:7:8"
-  "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7::"
+  "::2:3:4:5:6:7:8" `roundTripsTo` "0:2:3:4:5:6:7:8"
+  "1:2:3:4:5:6:7::" `roundTripsTo` "1:2:3:4:5:6:7:0"
 
   -- decimal notation in IPv6 addresses:
   "1:2:3:4:5:6:0.7.0.8" `roundTripsTo` "1:2:3:4:5:6:7:8"
@@ -335,7 +374,7 @@ testIPv6Encode = do
  where
  roundTripsTo s sExpected =
    case AT.parseOnly (IPv6.parser <* AT.endOfInput) (Text.pack s) of
-      Right result -> IPv6.encode result @?= Text.pack sExpected
+      Right result -> enc result @?= Text.pack sExpected
       Left failMsg -> fail ("failed to parse '" ++ s ++ "': " ++ failMsg)
 
 textBadIPv4 :: [String]
@@ -350,7 +389,7 @@ textBadIPv4 =
   , "1.9"
   ]
 
-testDecodeFailures :: [Test]
+testDecodeFailures :: [TestTree]
 testDecodeFailures = flip map textBadIPv4 $ \str ->
   PH.testCase ("Should fail to decode [" ++ str ++ "]") $ IPv4.decode (Text.pack str) @?= Nothing
 
@@ -449,3 +488,5 @@ instance Arbitrary MacGrouping where
 arbitraryMacSeparator :: Gen Char
 arbitraryMacSeparator = elements [':','-','.','_']
 
+byteStringToBytes :: BC8.ByteString -> Bytes
+byteStringToBytes = Bytes.fromAsciiString . BC8.unpack

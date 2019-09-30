@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 {-# OPTIONS_GHC -Wall #-}
@@ -39,7 +40,12 @@ module Net.IP
     -- * Textual Conversion
     -- ** Text
   , encode
+  , encodeShort
   , decode
+  , decodeShort
+  , boundedBuilderUtf8
+    -- ** Bytes
+  , parserUtf8Bytes
     -- ** Printing
   , print
     -- * Types
@@ -49,6 +55,7 @@ module Net.IP
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Bits
+import Data.Coerce (coerce)
 import Data.Text (Text)
 import Data.WideWord (Word128(..))
 import Data.Word (Word8,Word16)
@@ -58,13 +65,19 @@ import Net.IPv6 (IPv6(..))
 import Prelude hiding (print)
 import Text.ParserCombinators.ReadPrec ((+++))
 import Text.Read (Read(..))
+import Data.Text.Short (ShortText)
+
+import qualified Arithmetic.Lte as Lte
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteArray.Builder.Bounded as BB
 import qualified Data.Text.IO as TIO
+import qualified Data.Bytes.Parser as Parser
 import qualified Net.IPv4 as IPv4
 import qualified Net.IPv6 as IPv6
 
 -- $setup
 -- >>> :set -XOverloadedStrings
+-- >>> import qualified Arithmetic.Nat as Nat
 
 -- | Run a function over an 'IP' depending on its status
 --   as an 'IPv4' or 'IPv6'.
@@ -113,6 +126,25 @@ fromIPv6 = IP
 encode :: IP -> Text
 encode = case_ IPv4.encode IPv6.encode
 
+-- | Encode an 'IP' as 'ShortText'.
+--
+--   >>> encodeShort (ipv4 10 0 1 26)
+--   "10.0.1.26"
+--
+--   >>> encodeShort (ipv6 0x3124 0x0 0x0 0xDEAD 0xCAFE 0xFF 0xFE01 0x0000)
+--   "3124::dead:cafe:ff:fe01:0"
+encodeShort :: IP -> ShortText
+encodeShort = case_ IPv4.encodeShort IPv6.encodeShort
+
+-- | Encode an 'IP' as a bounded bytearray builder.
+--
+-- >>> BB.run Nat.constant (boundedBuilderUtf8 (ipv4 192 168 2 14))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x34]
+boundedBuilderUtf8 :: IP -> BB.Builder 39
+boundedBuilderUtf8 = case_
+  (\y -> BB.weaken Lte.constant (IPv4.boundedBuilderUtf8 y))
+  IPv6.boundedBuilderUtf8
+
 -- | Decode an 'IP' from 'Text'.
 --
 --   >>> decode "10.0.0.25"
@@ -132,6 +164,24 @@ decode t = case IPv4.decode t of
     Nothing -> Nothing
     Just v6 -> Just (fromIPv6 v6)
   Just v4 -> Just (fromIPv4 v4)
+
+-- | Decode an 'IP' from 'ShortText'.
+--
+--   >>> decodeShort "10.0.0.25"
+--   Just (ipv4 10 0 0 25)
+--   >>> decodeShort "::dead:cafe"
+--   Just (ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0xdead 0xcafe)
+decodeShort :: ShortText -> Maybe IP
+decodeShort t
+  | Just x <- IPv4.decodeShort t = Just (fromIPv4 x)
+  | otherwise = coerce (IPv6.decodeShort t)
+
+-- | Parse UTF-8-encoded 'Bytes' as an 'IP' address.
+parserUtf8Bytes :: e -> Parser.Parser e s IP
+parserUtf8Bytes e =
+  fmap fromIPv4 (IPv4.parserUtf8Bytes ())
+  `Parser.orElse`
+  coerce (IPv6.parserUtf8Bytes e)
 
 -- | Is the 'IP' an IPv4 address?
 --

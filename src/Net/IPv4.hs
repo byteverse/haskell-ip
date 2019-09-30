@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
@@ -33,11 +34,18 @@ module Net.IPv4
   , builder
   , reader
   , parser
+  , decodeShort
+  , encodeShort
     -- ** UTF-8 ByteString
   , encodeUtf8
   , decodeUtf8
   , builderUtf8
   , parserUtf8
+    -- ** UTF-8 Bytes
+  , decodeUtf8Bytes
+  , parserUtf8Bytes
+  , byteArrayBuilderUtf8
+  , boundedBuilderUtf8
     -- ** String
     -- $string
   , encodeString
@@ -69,7 +77,14 @@ module Net.IPv4
   , printRange
     -- * Types
   , IPv4(..)
+  , IPv4#
   , IPv4Range(..)
+    -- * Unboxing
+    -- | These functions are useful for micro-optimizing
+    --   when GHC does a poor job with worker-wrapper.
+  , box
+  , unbox
+  , parserUtf8Bytes#
     -- * Interoperability
     -- $interoperability
   ) where
@@ -81,30 +96,41 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
 import Data.ByteString (ByteString)
+import Data.Coerce (coerce)
 import Data.Hashable
-import Data.Monoid ((<>))
 import Data.Primitive.Types (Prim)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8')
 import Data.Text.Internal (Text(..))
+import Data.Text.Short (ShortText)
 import Data.Vector.Generic.Mutable (MVector(..))
 import Data.Word
 import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
+import GHC.Exts (Word#)
 import GHC.Generics (Generic)
+import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Bits as Bits
+import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.ByteArray.Builder as UB
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
 import qualified Data.ByteString.Unsafe as ByteString
+import qualified Data.ByteString.Short.Internal as BSS
+import qualified Data.Bytes as Bytes
+import qualified Data.Bytes.Parser as Parser
+import qualified Data.Bytes.Parser.Latin as Latin
+import qualified Data.Primitive as PM
 import qualified Data.Text as Text
 import qualified Data.Text.Array as TArray
 import qualified Data.Text.IO as TIO
@@ -112,6 +138,8 @@ import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Lazy.Builder.Int as TBI
 import qualified Data.Text.Read as TextRead
+import qualified Data.Text.Short as TS
+import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Vector.Generic as GVector
 import qualified Data.Vector.Generic.Mutable as MGVector
 import qualified Data.Vector.Primitive as PVector
@@ -348,14 +376,115 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
 --
 --   >>> decodeUtf8 "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
+--
+--   Currently not terribly efficient since the implementation
+--   re-encodes the argument as UTF-16 text before decoding that
+--   IPv4 address from that. PRs to fix this are welcome.
 decodeUtf8 :: ByteString -> Maybe IPv4
 decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
 -- This (decodeUtf8) should be rewritten to not go through text
 -- as an intermediary.
 
--- | Encode an 'IPv4' as a 'Builder.Builder'
+-- | Decode 'ShortText' as an 'IPv4' address.
+--
+--   >>> decodeShort "192.168.3.48"
+--   Just (ipv4 192 168 3 48)
+decodeShort :: ShortText -> Maybe IPv4
+decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
+  where b = shortByteStringToByteArray (TS.toShortByteString t)
+
+-- | Encode an 'IPv4' address as 'ShortText'.
+--
+--   >>> encodeShort (ipv4 192 168 5 99)
+--   "192.168.5.99"
+encodeShort :: IPv4 -> ShortText
+encodeShort !w = id
+  $ TS.fromShortByteStringUnsafe
+  $ byteArrayToShortByteString
+  $ BB.run Nat.constant
+  $ boundedBuilderUtf8
+  $ w
+
+shortByteStringToByteArray :: BSS.ShortByteString -> PM.ByteArray
+shortByteStringToByteArray (BSS.SBS x) = PM.ByteArray x
+
+byteArrayToShortByteString :: PM.ByteArray -> BSS.ShortByteString
+byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
+
+-- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
+--
+--   >>> decodeUtf8Bytes (Bytes.fromAsciiString "127.0.0.1")
+--   Just (ipv4 127 0 0 1)
+decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv4
+decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
+  Parser.Success (Parser.Slice _ len addr) -> case len of
+    0 -> Just addr
+    _ -> Nothing
+  Parser.Failure _ -> Nothing
+
+-- | Parse UTF-8-encoded 'Bytes' as an 'IPv4' address.
+--
+--   >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString "10.0.1.254")
+--   Success (Slice {offset = 10, length = 0, value = ipv4 10 0 1 254})
+parserUtf8Bytes :: e -> Parser.Parser e s IPv4
+{-# inline parserUtf8Bytes #-}
+parserUtf8Bytes e = coerce (Parser.boxWord32 (parserUtf8Bytes# e))
+
+-- | Variant of 'parserUtf8Bytes' with unboxed result type.
+parserUtf8Bytes# :: e -> Parser.Parser e s IPv4#
+{-# noinline parserUtf8Bytes# #-}
+parserUtf8Bytes# e = Parser.unboxWord32 $ do
+  !a <- Latin.decWord8 e
+  Latin.char e '.'
+  !b <- Latin.decWord8 e
+  Latin.char e '.'
+  !c <- Latin.decWord8 e
+  Latin.char e '.'
+  !d <- Latin.decWord8 e
+  pure (getIPv4 (fromOctets a b c d))
+
+-- | Encode an 'IPv4' as a bytestring 'Builder.Builder'
+--
+-- >>> Builder.toLazyByteString (builderUtf8 (fromOctets 192 168 2 12))
+-- "192.168.2.12"
 builderUtf8 :: IPv4 -> Builder.Builder
 builderUtf8 = Builder.byteString . encodeUtf8
+
+-- | Encode an 'IPv4' address as a unbounded byte array builder.
+--
+-- >>> UB.run 1 (byteArrayBuilderUtf8 (fromOctets 192 168 2 13))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x33]
+--
+-- Note that period is encoded by UTF-8 as @0x2e@.
+byteArrayBuilderUtf8 :: IPv4 -> UB.Builder
+byteArrayBuilderUtf8 = UB.fromBounded Nat.constant . boundedBuilderUtf8
+
+-- | Encode an 'IPv4' address as a bounded byte array builder.
+--
+-- >>> BB.run Nat.constant (boundedBuilderUtf8 (fromOctets 192 168 2 14))
+-- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x34]
+--
+-- Note that period is encoded by UTF-8 as @0x2e@.
+boundedBuilderUtf8 :: IPv4 -> BB.Builder 15
+boundedBuilderUtf8 (IPv4 !w) =
+  BB.word8Dec w1
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w2
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w3
+  `BB.append`
+  BB.ascii '.'
+  `BB.append`
+  BB.word8Dec w4
+  where
+  w1 = fromIntegral (shiftR w 24) :: Word8
+  w2 = fromIntegral (shiftR w 16) :: Word8
+  w3 = fromIntegral (shiftR w 8) :: Word8
+  w4 = fromIntegral w :: Word8
 
 -- | Parse an 'IPv4' using a 'AB.Parser'.
 --
@@ -397,6 +526,20 @@ encodeString = Text.unpack . encode
 decodeString :: String -> Maybe IPv4
 decodeString = decode . Text.pack
 
+
+-- | Unboxed variant of 'IPv4'. Before GHC 8.10, this is
+-- implemented as a type synonym. Portable use of this type requires
+-- treating it as though it were opaque. Use 'box' and 'unbox' to
+-- convert between this and the lifted 'IPv4'.
+type IPv4# = Word#
+
+-- | Convert an unboxed IPv4 address to a boxed one. 
+box :: IPv4# -> IPv4
+box w = IPv4 (W32# w)
+
+-- | Convert a boxed IPv4 address to an unboxed one. 
+unbox :: IPv4 -> IPv4#
+unbox (IPv4 (W32# w)) = w
 
 -- | A 32-bit Internet Protocol version 4 address. To use this with the
 --   @network@ library, it is necessary to use @Network.Socket.htonl@ to
@@ -486,7 +629,6 @@ instance ToJSON IPv4 where
 instance FromJSON IPv4 where
   parseJSON = Aeson.withText "IPv4" aesonParser
 
-#if MIN_VERSION_aeson(1,0,0)
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
     encode
@@ -494,7 +636,6 @@ instance ToJSONKey IPv4 where
 
 instance FromJSONKey IPv4 where
   fromJSONKey = FromJSONKeyTextParser aesonParser
-#endif
 
 aesonParser :: Text -> Aeson.Parser IPv4
 aesonParser t = case decode t of

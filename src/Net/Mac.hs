@@ -60,7 +60,6 @@ import Data.Semigroup ((<>))
 #endif
 import Data.Text (Text)
 import Data.Word
-import Data.Word (Word8)
 import Data.Word.Synthetic.Word12 (Word12)
 import GHC.Enum (predError, succError)
 import GHC.Exts
@@ -756,7 +755,6 @@ instance Hashable Mac
 instance ToJSON Mac where
   toJSON = Aeson.String . encode
 
-#if MIN_VERSION_aeson(1,0,0) 
 instance ToJSONKey Mac where
   toJSONKey = ToJSONKeyText
     encode
@@ -766,7 +764,6 @@ instance FromJSONKey Mac where
   fromJSONKey = FromJSONKeyTextParser $ \t -> case decode t of
     Nothing -> fail "invalid mac address"
     Just addr -> return addr
-#endif
 
 instance FromJSON Mac where
   parseJSON = attoparsecParseJSON parser

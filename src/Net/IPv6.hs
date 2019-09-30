@@ -1,11 +1,14 @@
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE InstanceSigs               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeInType                 #-}
-{-# LANGUAGE UnboxedTuples              #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-| This module provides the IPv6 data type and functions for working
     with it.
@@ -27,8 +30,14 @@ module Net.IPv6
     -- * Textual Conversion
     -- ** Text
   , encode
+  , encodeShort
   , decode
+  , decodeShort
   , parser
+    -- * UTF-8 Bytes
+  , parserUtf8Bytes
+  , decodeUtf8Bytes
+  , boundedBuilderUtf8
     -- ** Printing
   , print
     -- * IPv6 Ranges
@@ -51,33 +60,46 @@ module Net.IPv6
   , IPv6Range(..)
   ) where
 
+import Prelude hiding (any, print)
+
 import Net.IPv4 (IPv4(..))
-import qualified Net.IPv4 as IPv4
 
 import Control.Applicative
 import Control.DeepSeq (NFData)
+import Control.Monad.ST (ST)
 import Data.Bits
 import Data.Char (chr)
 import Data.List (intercalate, group)
+import Data.Primitive (MutablePrimArray)
 import Data.Primitive.Types (Prim)
-#if !MIN_VERSION_base(4,11,0)
-import Data.Semigroup ((<>))
-#endif
-import qualified Data.Aeson as Aeson
-import qualified Data.Attoparsec.Text as AT
-import qualified Data.Attoparsec.Text as Atto
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as TIO
+import Data.Text.Short (ShortText)
 import Data.WideWord.Word128 (Word128(..), zeroWord128)
 import Data.Word
 import Foreign.Storable (Storable)
-import GHC.Exts
+import GHC.Exts (Int#,Word#,Int(I#))
 import GHC.Generics (Generic)
+import GHC.Word (Word16(W16#))
 import Numeric (showHex)
-import Prelude hiding (any, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+
+import qualified Arithmetic.Lte as Lte
+import qualified Arithmetic.Nat as Nat
+import qualified Data.Aeson as Aeson
+import qualified Data.Attoparsec.Text as AT
+import qualified Data.Attoparsec.Text as Atto
+import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.Bytes as Bytes
+import qualified Data.Bytes.Parser as Parser
+import qualified Data.Bytes.Parser.Latin as Latin
+import qualified Data.ByteString.Short.Internal as BSS
+import qualified Data.Primitive as PM
+import qualified Data.Text as Text
+import qualified Data.Text.IO as TIO
+import qualified Data.Text.Short.Unsafe as TS
+import qualified Data.Text.Short as TS
+import qualified Net.IPv4 as IPv4
 
 -- $setup
 --
@@ -119,6 +141,17 @@ instance Show IPv6 where
 -- | Print an 'IPv6' using the textual encoding.
 print :: IPv6 -> IO ()
 print = TIO.putStrLn . encode
+
+-- | Decode 'ShortText' as an 'IPv6' address.
+--
+--   >>> decodeShort "ffff::2:b"
+--   Just (ipv6 0xffff 0x0000 0x0000 0x0000 0x0000 0x0000 0x0002 0x000b)
+decodeShort :: ShortText -> Maybe IPv6
+decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
+  where b = shortByteStringToByteArray (TS.toShortByteString t)
+
+shortByteStringToByteArray :: BSS.ShortByteString -> PM.ByteArray
+shortByteStringToByteArray (BSS.SBS x) = PM.ByteArray x
 
 showHexWord16 :: Word16 -> ShowS
 showHexWord16 w =
@@ -318,8 +351,8 @@ localhost = loopback
 any :: IPv6
 any = IPv6 zeroWord128
 
--- | Encodes the IP, using zero-compression on the leftmost-longest string of
--- zeroes in the address.
+-- | Encodes the 'IPv6' address using zero-compression on the leftmost longest
+-- string of zeroes in the address.
 -- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
 -- this uses mixed notation when encoding an IPv4-mapped IPv6 address:
 --
@@ -329,20 +362,29 @@ any = IPv6 zeroWord128
 -- ::ffff:100.55.165.180
 -- >>> T.putStrLn $ encode $ fromWord16s 0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0
 -- ::
+--
+-- Per <https://tools.ietf.org/html/rfc5952#section-4.2.2 Section 4.2.2> of the
+-- same RFC, this does not use @::@ to shorten a single 16-bit 0 field. Only
+-- runs of multiple 0 fields are considered.
 encode :: IPv6 -> Text
-encode ip =
-  if isIPv4MappedAddress
-  -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
-  then Text.pack "::ffff:" `mappend` IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
-  else toText [w1, w2, w3, w4, w5, w6, w7, w8]
+encode !ip =
+  -- TODO: This implementation, while correct, is not particularly efficient.
+  -- It uses string all over the place.
+  if isIPv4Mapped ip
+    -- This representation is RECOMMENDED by https://tools.ietf.org/html/rfc5952#section-5
+    then
+      Text.pack "::ffff:"
+      `mappend`
+      IPv4.encode (IPv4.IPv4 (fromIntegral w7 `unsafeShiftL` 16 .|. fromIntegral w8))
+    else toText [w1, w2, w3, w4, w5, w6, w7, w8]
   where
-  isIPv4MappedAddress = w1 == 0 && w2 == 0 && w3 == 0 && w4 == 0 && w5 == 0 && w6 == 0xFFFF
   (w1, w2, w3, w4, w5, w6, w7, w8) = toWord16s ip
-  toText ws = Text.pack $ intercalate ":" $ expand 0 longestZ grouped
+  toText ws = Text.pack $ intercalate ":"
+      $ expand 0 (if longestZ > 1 then longestZ else 0) grouped
     where
-    expand _ 8 _ = ["::"]
-    expand _ _ [] = []
-    expand i longest ((x, len):wsNext)
+    expand !_ 8 !_ = ["::"]
+    expand !_ !_ [] = []
+    expand !i !longest ((x, len):wsNext)
         -- zero-compressed group:
         | x == 0 && len == longest =
             -- first and last need an extra colon since there's nothing
@@ -354,15 +396,305 @@ encode ip =
     longestZ = maximum . (0:) . map snd . filter ((==0) . fst) $ grouped
     grouped = map (\x -> (head x, length x)) (group ws)
 
--- | Decode an IPv6 address. This accepts both standard IPv6
+isIPv4Mapped :: IPv6 -> Bool
+isIPv4Mapped (IPv6 (Word128 w1 w2)) =
+  w1 == 0 && (0xFFFFFFFF00000000 .&. w2 == 0x0000FFFF00000000)
+
+-- | Decode UTF-8-encoded 'Bytes' into an 'IPv6' address.
+--
+--   >>> decodeUtf8Bytes (Bytes.fromAsciiString "::cab:1")
+--   Just (ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0cab 0x0001)
+decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv6
+decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
+  Parser.Success (Parser.Slice _ len addr) -> case len of
+    0 -> Just addr
+    _ -> Nothing
+  Parser.Failure _ -> Nothing
+
+-- | Encodes the 'IPv6' address using zero-compression on the
+-- leftmost longest string of zeroes in the address.
+--
+-- >>> BB.run Nat.constant $ boundedBuilderUtf8 $ fromWord16s 0xDEAD 0xBEEF 0x0 0x0 0x0 0x0 0x0 0x1234
+-- [0x64, 0x65, 0x61, 0x64, 0x3a, 0x62, 0x65, 0x65, 0x66, 0x3a, 0x3a, 0x31, 0x32, 0x33, 0x34]
+boundedBuilderUtf8 :: IPv6 -> BB.Builder 39
+boundedBuilderUtf8 !ip@(IPv6 (Word128 hi lo))
+  | hi == 0 && lo == 0 = BB.weaken Lte.constant
+      (BB.ascii ':' `BB.append` BB.ascii ':')
+  | isIPv4Mapped ip = BB.weaken Lte.constant $
+      BB.ascii ':'
+      `BB.append`
+      BB.ascii ':'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii 'f'
+      `BB.append`
+      BB.ascii ':'
+      `BB.append`
+      IPv4.boundedBuilderUtf8 (IPv4.IPv4 (fromIntegral lo))
+  | otherwise =
+      let (w0,w1,w2,w3,w4,w5,w6,w7) = toWord16s ip
+          IntTriple startLongest longest _ = longestRun w0 w1 w2 w3 w4 w5 w6 w7
+          start = startLongest
+          end = start + longest
+          -- start is inclusive. end is exclusive
+       in firstPiece w0 start
+          `BB.append`
+          piece 1 w1 start end
+          `BB.append`
+          piece 2 w2 start end
+          `BB.append`
+          piece 3 w3 start end
+          `BB.append`
+          piece 4 w4 start end
+          `BB.append`
+          piece 5 w5 start end
+          `BB.append`
+          piece 6 w6 start end
+          `BB.append`
+          lastPiece w7 end
+
+firstPiece :: Word16 -> Int -> BB.Builder 4
+firstPiece !w !start = case start of
+  0 -> BB.weaken Lte.constant (BB.ascii ':')
+  _ -> BB.word16LowerHex w
+
+-- Note about the implementation of piece:
+-- It is important to manually perform worker-wrapper so that
+-- we can stop piece from inlining. If we do not do this, GHC
+-- inlines piece, leading to enormous blowup in the generated
+-- Core. The implementation of boundedBuilderUtf8 becomes
+-- thousands of lines of Core. Even in the microbenchmark that
+-- comes with this library, it can be observed that preventing
+-- this inlining improves performance of encodeShort by 50%.
+piece :: Int -> Word16 -> Int -> Int -> BB.Builder 5
+{-# inline piece #-}
+piece (I# ix) (W16# w) (I# start) (I# end) =
+  piece# ix w start end
+
+piece# :: Int# -> Word# -> Int# -> Int# -> BB.Builder 5
+{-# noinline piece# #-}
+piece# !ix# !w# !start# !end# = case compare ix start of
+  LT -> BB.ascii ':' `BB.append` BB.word16LowerHex w
+  EQ -> BB.weaken Lte.constant (BB.ascii ':')
+  GT -> if ix < end
+    then BB.weaken Lte.constant BB.empty
+    else BB.ascii ':' `BB.append` BB.word16LowerHex w
+  where
+  ix = I# ix#
+  start = I# start#
+  end = I# end#
+  w = W16# w#
+
+lastPiece :: Word16 -> Int -> BB.Builder 5
+lastPiece !w !end = case end of
+  8 -> BB.weaken Lte.constant (BB.ascii ':')
+  _ -> BB.ascii ':' `BB.append` BB.word16LowerHex w
+
+data IntTriple = IntTriple !Int !Int !Int
+
+-- Choose the longest run. Prefer the leftmost run in the
+-- event of a tie.
+stepZeroRunLength :: Int -> Word16 -> IntTriple -> IntTriple
+stepZeroRunLength !ix !w (IntTriple startLongest longest current) = case w of
+  0 -> let !x = current + 1 in
+    if x > longest
+      then IntTriple (ix - current) x x
+      else IntTriple startLongest longest x
+  _ -> IntTriple startLongest longest 0
+
+-- We start out by setting the longest run to size 1. This
+-- means that we will only detect runs of length two or greater.
+longestRun ::
+     Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> Word16
+  -> IntTriple
+longestRun !w0 !w1 !w2 !w3 !w4 !w5 !w6 !w7 = id
+  $ stepZeroRunLength 7 w7
+  $ stepZeroRunLength 6 w6
+  $ stepZeroRunLength 5 w5
+  $ stepZeroRunLength 4 w4
+  $ stepZeroRunLength 3 w3
+  $ stepZeroRunLength 2 w2
+  $ stepZeroRunLength 1 w1
+  $ stepZeroRunLength 0 w0
+  $ IntTriple (-1) 1 0
+
+-- | Encodes the 'IPv6' address as 'ShortText' using zero-compression on
+-- the leftmost longest string of zeroes in the address.
+-- Per <https://tools.ietf.org/html/rfc5952#section-5 RFC 5952 Section 5>,
+-- this uses mixed notation when encoding an IPv4-mapped IPv6 address.
+-- 
+-- >>> encodeShort $ fromWord16s 0xDEAD 0xBEEF 0x0 0x0 0x0 0x0ABC 0x0 0x1234
+-- "dead:beef::abc:0:1234"
+encodeShort :: IPv6 -> ShortText
+encodeShort w = id
+  $ TS.fromShortByteStringUnsafe
+  $ byteArrayToShortByteString
+  $ BB.run Nat.constant
+  $ boundedBuilderUtf8
+  $ w
+
+byteArrayToShortByteString :: PM.ByteArray -> BSS.ShortByteString
+byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
+
+-- | Decode an 'IPv6' address. This accepts both standard IPv6
 -- notation (with zero compression) and mixed notation for
--- IPv4-mapped IPv6 addresses.
+-- IPv4-mapped IPv6 addresses. For a decoding function that
+-- additionally accepts dot-decimal-encoded IPv4 addresses,
+-- see @Net.IP.decode@.
 decode :: Text -> Maybe IPv6
 decode t = rightToMaybe (AT.parseOnly (parser <* AT.endOfInput) t)
 
+-- | Parse UTF-8-encoded 'Bytes' as an 'IPv6' address. This accepts
+-- both uppercase and lowercase characters in the hexadecimal components.
+--
+-- >>> let str = "dead:beef:3240:a426:ba68:1cd0:4263:109b -> alive"
+-- >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString str)
+-- Success (Slice {offset = 39, length = 9, value = ipv6 0xdead 0xbeef 0x3240 0xa426 0xba68 0x1cd0 0x4263 0x109b})
+--
+-- This does not currently support parsing embedded IPv4 address
+-- (e.g. @ff00:8000:abc::224.1.2.3@).
+parserUtf8Bytes :: e -> Parser.Parser e s IPv6
+parserUtf8Bytes e = do
+  marr <- Parser.effect (PM.newPrimArray 8)
+  -- We cannot immidiately call preZeroes since it wants a
+  -- leading colon present.
+  Latin.trySatisfy (== ':') >>= \case
+    True -> do
+      Latin.char e ':'
+      postZeroesBegin e marr 0 0
+    False -> do
+      w <- pieceParser e
+      Parser.effect (PM.writePrimArray marr 0 w)
+      preZeroes e marr 1
+
+-- This is called when we are positioned before a colon.
+-- We may encounter another colon immidiately after
+-- the one that we consume here. This indicates zero
+-- compression. Or we may encounter another hex-encoded
+-- number.
+preZeroes ::
+     e
+  -> MutablePrimArray s Word16 -- length must be 8
+  -> Int
+  -> Parser.Parser e s IPv6
+preZeroes e !marr !ix = case ix of
+  8 -> Parser.effect (combinePieces marr)
+  _ -> do
+    Latin.char e ':'
+    Latin.trySatisfy (== ':') >>= \case
+      True -> postZeroesBegin e marr ix ix
+      False -> do
+        w <- pieceParser e
+        Parser.effect (PM.writePrimArray marr ix w)
+        preZeroes e marr (ix + 1)
+
+-- The same as postZeroes except that there is no
+-- leading that gets consumed. This is called right
+-- after a double colon is consumed.
+-- Precondition: the index is less than 8. This parser
+-- is only called by preZeroes, which ensures that
+-- this holds.
+postZeroesBegin ::
+     e
+  -> MutablePrimArray s Word16 -- length must be 8
+  -> Int -- current index in array
+  -> Int -- index where compression happened
+  -> Parser.Parser e s IPv6
+postZeroesBegin e !marr !ix !compress = do
+  optionalPieceParser e >>= \case
+    Nothing -> do -- the end has come
+      Parser.effect (conclude marr ix compress)
+    Just w -> do
+      Parser.effect (PM.writePrimArray marr ix w)
+      postZeroes e marr (ix + 1) compress
+
+-- Should be run right before a colon.
+postZeroes :: 
+     e
+  -> MutablePrimArray s Word16 -- length must be 8
+  -> Int -- current index in array
+  -> Int -- index where compression happened
+  -> Parser.Parser e s IPv6
+postZeroes e !marr !ix !compress = case ix of
+  8 -> Parser.fail e
+  _ -> do
+    Latin.trySatisfy (== ':') >>= \case
+      False -> -- The end has come
+        Parser.effect (conclude marr ix compress)
+      True -> do
+        w <- pieceParser e
+        Parser.effect (PM.writePrimArray marr ix w)
+        postZeroes e marr (ix + 1) compress
+
+conclude :: MutablePrimArray s Word16 -> Int -> Int -> ST s IPv6
+conclude !marr !ix !compress = do
+  -- This will overlap, but GHC's copy primop is fine with that.
+  let postCompressionLen = ix - compress
+  PM.copyMutablePrimArray marr (8 - postCompressionLen) marr compress postCompressionLen
+  let compressedArea = 8 - ix
+  PM.setPrimArray marr compress compressedArea (0 :: Word16)
+  combinePieces marr
+
+-- Example memmove that may need to happen:
+-- A B C H  ==> A B C 0 0 0 0 H
+--       *
+-- ix = 4, compress = 3, postCompressionLen = 1, compressedArea = 4
+-- copyPrimArray marr 7 marr 3 1
+-- setPrimArray marr 3 4 (0 :: Word16)
+
+combinePieces ::
+     MutablePrimArray s Word16
+  -> ST s IPv6
+combinePieces !marr = fromWord16s
+  <$> PM.readPrimArray marr 0
+  <*> PM.readPrimArray marr 1
+  <*> PM.readPrimArray marr 2
+  <*> PM.readPrimArray marr 3
+  <*> PM.readPrimArray marr 4
+  <*> PM.readPrimArray marr 5
+  <*> PM.readPrimArray marr 6
+  <*> PM.readPrimArray marr 7
+
+optionalPieceParser :: e -> Parser.Parser e s (Maybe Word16)
+optionalPieceParser e = Latin.tryHexNibble >>= \case
+  Nothing -> pure Nothing
+  Just w0 -> do
+    r <- pieceParserStep e w0
+    pure (Just r)
+
+pieceParser :: e -> Parser.Parser e s Word16
+pieceParser e = Latin.hexNibble e >>= pieceParserStep e
+
+-- Parses the remainder of a lowercase hexadecimal number.
+-- Leaves trailing colons alone. This fails if there are
+-- more than four hex digits unless there are leading zeroes.
+-- I cannot find a spec that is clear about what to do
+-- if someone puts 00000 in a piece of an encoded IPv6
+-- address, so I veer on the side of leniency.
+pieceParserStep ::
+     e
+  -> Word
+  -> Parser.Parser e s Word16
+pieceParserStep e !acc = if acc > 0xFFFF
+  then Parser.fail e
+  else Latin.tryHexNibble >>= \case
+    Nothing -> pure (fromIntegral acc)
+    Just w -> pieceParserStep e (16 * acc + w)
+
 -- | Parse an 'IPv6' using 'Atto.Parser'.
 --
---   >>> ip = ipv6 0xDEAD 0xBEEF 0x3240 0xA426 0xBA68 0x1CD0 0x4263 0x109B
 --   >>> Atto.parseOnly parser (Text.pack "dead:beef:3240:a426:ba68:1cd0:4263:109b")
 --   Right (ipv6 0xdead 0xbeef 0x3240 0xa426 0xba68 0x1cd0 0x4263 0x109b)
 parser :: Atto.Parser IPv6

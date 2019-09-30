@@ -3,7 +3,6 @@ module IPv4Text2 where
 import Net.Types (IPv4(..))
 import Data.Text (Text)
 import Data.Bits ((.&.),shiftR)
-import Data.Monoid ((<>))
 import Data.Text.Lazy.Builder.Int (decimal)
 import qualified Data.Text.Lazy         as LText
 import qualified Data.Text.Lazy.Builder as TBuilder

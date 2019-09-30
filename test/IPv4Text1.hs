@@ -2,7 +2,6 @@ module IPv4Text1 where
 
 import Net.Types (IPv4(..))
 import Data.Text (Text)
-import Data.Monoid ((<>))
 import Data.Text.Internal (Text(..))
 import Data.Word
 import Data.ByteString (ByteString)
