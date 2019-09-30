@@ -430,6 +430,7 @@ parserUtf8Bytes :: e -> Parser.Parser e s IPv4
 {-# inline parserUtf8Bytes #-}
 parserUtf8Bytes e = coerce (Parser.boxWord32 (parserUtf8Bytes# e))
 
+-- | Variant of 'parserUtf8Bytes' with unboxed result type.
 parserUtf8Bytes# :: e -> Parser.Parser e s IPv4#
 {-# noinline parserUtf8Bytes# #-}
 parserUtf8Bytes# e = Parser.unboxWord32 $ do
