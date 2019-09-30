@@ -417,7 +417,7 @@ byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 --   Just (ipv4 127 0 0 1)
 decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv4
 decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
-  Parser.Success addr len -> case len of
+  Parser.Success (Parser.Slice _ len addr) -> case len of
     0 -> Just addr
     _ -> Nothing
   Parser.Failure _ -> Nothing

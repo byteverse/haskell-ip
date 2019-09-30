@@ -11,12 +11,12 @@ import Data.Bytes (Bytes)
 import Data.Proxy (Proxy(..))
 import Test.Tasty (defaultMain, testGroup, TestTree)
 import Test.Tasty.QuickCheck (testProperty)
-import Test.QuickCheck (Arbitrary(..),Property,oneof,Gen,elements,choose,(===))
+import Test.QuickCheck (Arbitrary(..),oneof,Gen,elements,choose,(===))
 import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
-import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,bitsLaws,primLaws,boundedEnumLaws)
+import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,primLaws,boundedEnumLaws)
 import qualified Test.Tasty.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))

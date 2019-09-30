@@ -406,7 +406,7 @@ isIPv4Mapped (IPv6 (Word128 w1 w2)) =
 --   Just (ipv6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0cab 0x0001)
 decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv6
 decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
-  Parser.Success addr len -> case len of
+  Parser.Success (Parser.Slice _ len addr) -> case len of
     0 -> Just addr
     _ -> Nothing
   Parser.Failure _ -> Nothing
