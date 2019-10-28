@@ -119,7 +119,7 @@ import qualified Net.IPv4 as IPv4
 
 -- | A 128-bit Internet Protocol version 6 address.
 newtype IPv6 = IPv6 { getIPv6 :: Word128 }
-  deriving (Bounded,Enum,Eq,Integral,Num,Ord,Real,Storable,Bits,FiniteBits,NFData,Prim,Ix,Data)
+  deriving (Bounded,Enum,Eq,Ord,Storable,Bits,FiniteBits,NFData,Prim,Ix,Data)
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
