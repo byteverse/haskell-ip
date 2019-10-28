@@ -67,6 +67,7 @@ import Net.IPv4 (IPv4(..))
 
 import Control.Applicative
 import Control.DeepSeq (NFData)
+import Control.Monad (mzero)
 import Control.Monad.ST (ST)
 import Data.Bits
 import Data.Char (chr)
@@ -755,6 +756,15 @@ data IPv6Range = IPv6Range
   } deriving (Eq,Ord,Show,Read,Generic,Data)
 
 instance NFData IPv6Range
+
+instance Aeson.ToJSON IPv6Range where
+  toJSON = Aeson.String . encodeRange
+
+instance Aeson.FromJSON IPv6Range where
+  parseJSON (Aeson.String t) = case decodeRange t of
+    Nothing -> fail "Could not decodeRange IPv6 range"
+    Just res -> return res
+  parseJSON _ = mzero
 
 mask128 :: IPv6
 mask128 = maxBound

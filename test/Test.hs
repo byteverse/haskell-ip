@@ -159,6 +159,10 @@ tests = testGroup "tests"
       , lawsToTest (primLaws (Proxy :: Proxy IPv6))
       , lawsToTest (boundedEnumLaws (Proxy :: Proxy IPv6))
       ]
+    , testGroup "IPv6Range"
+      [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6Range))
+      , lawsToTest (showReadLaws (Proxy :: Proxy IPv6Range))
+      ]
     , testGroup "IP"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IP))
       , lawsToTest (showReadLaws (Proxy :: Proxy IP))
