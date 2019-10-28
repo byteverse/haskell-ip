@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -69,6 +70,8 @@ import Control.DeepSeq (NFData)
 import Control.Monad.ST (ST)
 import Data.Bits
 import Data.Char (chr)
+import Data.Data (Data)
+import Data.Ix (Ix)
 import Data.List (intercalate, group)
 import Data.Primitive (MutablePrimArray)
 import Data.Primitive.Types (Prim)
@@ -115,7 +118,7 @@ import qualified Net.IPv4 as IPv4
 
 -- | A 128-bit Internet Protocol version 6 address.
 newtype IPv6 = IPv6 { getIPv6 :: Word128 }
-  deriving (Bounded,Enum,Eq,Integral,Num,Ord,Real,Storable,Bits,FiniteBits,NFData,Prim)
+  deriving (Bounded,Enum,Eq,Integral,Num,Ord,Real,Storable,Bits,FiniteBits,NFData,Prim,Ix,Data)
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)
@@ -749,7 +752,7 @@ parser = makeIP <$> ip
 data IPv6Range = IPv6Range
   { ipv6RangeBase   :: {-# UNPACK #-} !IPv6
   , ipv6RangeLength :: {-# UNPACK #-} !Word8
-  } deriving (Eq,Ord,Show,Read,Generic)
+  } deriving (Eq,Ord,Show,Read,Generic,Data)
 
 instance NFData IPv6Range
 

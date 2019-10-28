@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -56,6 +57,8 @@ import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Bits
 import Data.Coerce (coerce)
+import Data.Data (Data)
+import Data.Ix (Ix)
 import Data.Text (Text)
 import Data.WideWord (Word128(..))
 import Data.Word (Word8,Word16)
@@ -222,7 +225,7 @@ print = TIO.putStrLn . encode
 --   of this type. All functions and typeclass methods that convert
 --   'IP' values to text will display it as an 'IPv4' address if possible.
 newtype IP = IP { getIP :: IPv6 }
-  deriving (Eq,Ord,Generic)
+  deriving (Eq,Ord,Generic,Ix,Data)
 
 instance NFData IP
 
