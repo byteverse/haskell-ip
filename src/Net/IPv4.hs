@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
@@ -97,7 +98,9 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONK
 import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
+import Data.Data (Data)
 import Data.Hashable
+import Data.Ix (Ix)
 import Data.Primitive.Types (Prim)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8')
@@ -546,7 +549,7 @@ unbox (IPv4 (W32# w)) = w
 --   convert the underlying 'Word32' from host byte order to network byte
 --   order.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
-  deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable)
+  deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable,Ix,Data)
 
 instance NFData IPv4
 
@@ -1074,7 +1077,7 @@ printRange = TIO.putStrLn . encodeRange
 data IPv4Range = IPv4Range
   { ipv4RangeBase   :: {-# UNPACK #-} !IPv4
   , ipv4RangeLength :: {-# UNPACK #-} !Word8
-  } deriving (Eq,Ord,Show,Read,Generic)
+  } deriving (Eq,Ord,Show,Read,Generic,Data)
 
 instance NFData IPv4Range
 instance Hashable IPv4Range

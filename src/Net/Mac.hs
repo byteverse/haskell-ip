@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -53,7 +54,9 @@ import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
 import Data.ByteString (ByteString)
 import Data.Char (ord,chr)
+import Data.Data (Data)
 import Data.Hashable (Hashable)
+import Data.Ix (Ix)
 import Data.Primitive.Types (Prim(..))
 #if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup ((<>))
@@ -607,7 +610,7 @@ word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 --   type. It is not considered part of the stable API, and it
 --   allows you to construct invalid MAC addresses.
 newtype Mac = Mac Word64
-  deriving (Eq,Ord,Generic)
+  deriving (Eq,Ord,Generic,Ix,Data)
 
 instance NFData Mac
 
@@ -737,7 +740,7 @@ nibbleToHex w
 data MacCodec = MacCodec
   { macCodecGrouping :: !MacGrouping
   , macCodecUpperCase :: !Bool
-  } deriving (Eq,Ord,Show,Read,Generic)
+  } deriving (Eq,Ord,Show,Read,Generic,Data)
 
 -- | The format expected by the mac address parser. The 'Word8' taken
 --   by some of these constructors is the ascii value of the character
@@ -748,7 +751,7 @@ data MacGrouping
   | MacGroupingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
   | MacGroupingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
   | MacGroupingNoSeparator -- ^ No separator, @24AF4B5B0780@
-  deriving (Eq,Ord,Show,Read,Generic)
+  deriving (Eq,Ord,Show,Read,Generic,Data)
 
 instance Hashable Mac
 
