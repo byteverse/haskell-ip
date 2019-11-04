@@ -95,7 +95,7 @@ import Control.Monad
 import Control.Monad.ST (ST,runST)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
-import Data.Bits ((.&.),(.|.),shiftR,shiftL,unsafeShiftR,complement,shift)
+import Data.Bits (Bits(..),FiniteBits(..))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Data (Data)
@@ -114,7 +114,6 @@ import GHC.Exts (Word#)
 import GHC.Generics (Generic)
 import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
-import System.ByteOrder.Class
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
@@ -550,7 +549,7 @@ unbox (IPv4 (W32# w)) = w
 --   convert the underlying 'Word32' from host byte order to network byte
 --   order.
 newtype IPv4 = IPv4 { getIPv4 :: Word32 }
-  deriving (Eq,Ord,Enum,Bounded,Hashable,Generic,Prim,Storable,Ix,Data)
+  deriving (Bits.Bits,Bounded,Data,Enum,Eq,Bits.FiniteBits,Generic,Hashable,Ix,Ord,Prim,Storable)
 
 instance NFData IPv4
 
@@ -645,28 +644,6 @@ aesonParser :: Text -> Aeson.Parser IPv4
 aesonParser t = case decode t of
   Nothing -> fail "Could not parse IPv4 address"
   Just addr -> return addr
-
-ipv4Bitwise :: (Word32 -> Word32 -> Word32) -> IPv4 -> IPv4 -> IPv4
-ipv4Bitwise fun l r = IPv4 $ (toBigEndian (getIPv4 l)) `fun` (toBigEndian (getIPv4 r))
-
--- | Note: we use network order (big endian) as opposed to host order (little
---   endian) which differs from the underlying IPv4 type representation.
-instance Bits.Bits IPv4 where
-    (.&.) = ipv4Bitwise (.&.)
-    (.|.) = ipv4Bitwise (.|.)
-    xor = ipv4Bitwise Bits.xor
-    complement = IPv4 . Bits.complement . toBigEndian . getIPv4
-    shift ip i = IPv4 $ Bits.shift (toBigEndian (getIPv4 ip)) i
-    rotate ip i = IPv4 $ Bits.rotate (toBigEndian (getIPv4 ip)) i
-    bitSize = Bits.finiteBitSize
-    bitSizeMaybe = Bits.bitSizeMaybe . getIPv4
-    isSigned = Bits.isSigned . toBigEndian . getIPv4
-    testBit ip i = Bits.testBit (toBigEndian (getIPv4 ip)) $ Bits.finiteBitSize ip - 1 - i
-    bit i = IPv4 $ Bits.bit $ Bits.finiteBitSize any - 1 - i
-    popCount = Bits.popCount . toBigEndian . getIPv4
-
-instance Bits.FiniteBits IPv4 where
-    finiteBitSize = Bits.finiteBitSize . getIPv4
 
 ------------------------------------
 -- Internal functions, not exported

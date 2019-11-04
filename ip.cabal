@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: ip
-version: 1.6.0
+version: 1.7.0
 synopsis: Library for IP and MAC addresses
 homepage: https://github.com/andrewthad/haskell-ip#readme
 license: BSD-3-Clause
@@ -48,8 +48,7 @@ library
   build-depends:
     , aeson >= 1.0 && < 1.5
     , attoparsec >= 0.13 && < 0.14
-    , base >= 4.11.1.0 && < 5
-    , byte-order >= 0.1 && < 0.2
+    , base >= 4.9 && < 5
     , byteslice >= 0.1.2 && < 0.2
     , bytesmith >= 0.3 && < 0.4
     , bytestring >= 0.10.8 && < 0.11
