@@ -114,6 +114,7 @@ import GHC.Exts (Word#)
 import GHC.Generics (Generic)
 import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
+import System.ByteOrder.Class
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
@@ -536,11 +537,11 @@ decodeString = decode . Text.pack
 -- convert between this and the lifted 'IPv4'.
 type IPv4# = Word#
 
--- | Convert an unboxed IPv4 address to a boxed one. 
+-- | Convert an unboxed IPv4 address to a boxed one.
 box :: IPv4# -> IPv4
 box w = IPv4 (W32# w)
 
--- | Convert a boxed IPv4 address to an unboxed one. 
+-- | Convert a boxed IPv4 address to an unboxed one.
 unbox :: IPv4 -> IPv4#
 unbox (IPv4 (W32# w)) = w
 
@@ -646,7 +647,7 @@ aesonParser t = case decode t of
   Just addr -> return addr
 
 ipv4Bitwise :: (Word32 -> Word32 -> Word32) -> IPv4 -> IPv4 -> IPv4
-ipv4Bitwise fun l r = IPv4 $ (getIPv4 l) `fun` (getIPv4 r)
+ipv4Bitwise fun l r = IPv4 $ (toBigEndian (getIPv4 l)) `fun` (toBigEndian (getIPv4 r))
 
 -- | Note: we use network order (big endian) as opposed to host order (little
 --   endian) which differs from the underlying IPv4 type representation.
@@ -654,15 +655,15 @@ instance Bits.Bits IPv4 where
     (.&.) = ipv4Bitwise (.&.)
     (.|.) = ipv4Bitwise (.|.)
     xor = ipv4Bitwise Bits.xor
-    complement = IPv4 . Bits.complement . getIPv4
-    shift ip i = IPv4 $ Bits.shift (getIPv4 ip) i
-    rotate ip i = IPv4 $ Bits.rotate (getIPv4 ip) i
+    complement = IPv4 . Bits.complement . toBigEndian . getIPv4
+    shift ip i = IPv4 $ Bits.shift (toBigEndian (getIPv4 ip)) i
+    rotate ip i = IPv4 $ Bits.rotate (toBigEndian (getIPv4 ip)) i
     bitSize = Bits.finiteBitSize
     bitSizeMaybe = Bits.bitSizeMaybe . getIPv4
-    isSigned = Bits.isSigned . getIPv4
-    testBit ip i = Bits.testBit (getIPv4 ip) $ Bits.finiteBitSize ip - 1 - i
+    isSigned = Bits.isSigned . toBigEndian . getIPv4
+    testBit ip i = Bits.testBit (toBigEndian (getIPv4 ip)) $ Bits.finiteBitSize ip - 1 - i
     bit i = IPv4 $ Bits.bit $ Bits.finiteBitSize any - 1 - i
-    popCount = Bits.popCount . getIPv4
+    popCount = Bits.popCount . toBigEndian . getIPv4
 
 instance Bits.FiniteBits IPv4 where
     finiteBitSize = Bits.finiteBitSize . getIPv4
