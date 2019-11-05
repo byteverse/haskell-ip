@@ -4,11 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## [1.7.0] - 2019-10-28
+## [1.7.0] - 2019-11-05
 - Add `Data` instances for all types.
 - Add `Ix` instances for all address types.
 - Add missing `ToJSON`/`FromJSON` instances for `IPv6Range`.
 - Remove `Num`, `Integral`, and `Real` instances from `IPv6`.
+- Remove `Bits` instance for `IPv4Range`.
+- Switch to derived `Bits` instance for `IPv4.
+- Remove old spec test for IPv4 Bits laws, instead use
+  quickcheck-classes.
+- Bump exclusive upper bound on small-bytearray-builder
 
 ## [1.6.0] - 2019-09-30
 - Provide decode functions for decoding from `ShortText` and
