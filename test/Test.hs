@@ -16,7 +16,7 @@ import Test.HUnit (Assertion,(@?=),(@=?))
 import Numeric (showHex)
 import Test.QuickCheck.Property (failed,succeeded,Result(..))
 import Data.Bifunctor
-import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,primLaws,boundedEnumLaws)
+import Test.QuickCheck.Classes (Laws(..),jsonLaws,showReadLaws,primLaws,boundedEnumLaws,bitsLaws)
 import qualified Test.Tasty.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
@@ -96,7 +96,7 @@ tests = testGroup "tests"
       [ PH.testCase "Parser Test Cases" testIPv4Parser
       ]
     , testGroup "IPv6 encode/decode"
-      [ PH.testCase "Parser Test Cases" $ testIPv6Parser $ \str -> 
+      [ PH.testCase "Parser Test Cases" $ testIPv6Parser $ \str ->
           either (\_ -> Nothing) (Just . HexIPv6)
             (AT.parseOnly
               (IPv6.parser <* AT.endOfInput)
@@ -146,18 +146,18 @@ tests = testGroup "tests"
     [ testGroup "IPv4"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv4))
-      -- , lawsToTest (bitsLaws (Proxy :: Proxy IPv4))
+       , lawsToTest (bitsLaws (Proxy :: Proxy IPv4))
       ]
     , testGroup "IPv4Range"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv4Range))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv4Range))
-      -- , lawsToTest (bitsLaws (Proxy :: Proxy IPv4Range))
       ]
     , testGroup "IPv6"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6))
       , lawsToTest (showReadLaws (Proxy :: Proxy IPv6))
       , lawsToTest (primLaws (Proxy :: Proxy IPv6))
       , lawsToTest (boundedEnumLaws (Proxy :: Proxy IPv6))
+      , lawsToTest (bitsLaws (Proxy :: Proxy IPv6))
       ]
     , testGroup "IPv6Range"
       [ lawsToTest (jsonLaws (Proxy :: Proxy IPv6Range))
@@ -476,7 +476,6 @@ instance Arbitrary IPv6Range where
   shrink (IPv6Range addr mask) = liftA2 IPv6.range
     (shrink addr)
     (filter (/= mask) [0,div mask 2,if mask > 0 then mask - 1 else 0])
-    
 
 instance Arbitrary MacCodec where
   arbitrary = MacCodec <$> arbitrary <*> arbitrary

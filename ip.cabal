@@ -101,7 +101,6 @@ test-suite spec
     , ip
     , wide-word
   other-modules:
-    Net.IPv4.RangeSpec
     Net.IPv4Spec
   ghc-options: -Wall -O2
   default-language: Haskell2010
@@ -117,6 +116,7 @@ test-suite doctest
     , doctest >= 0.10
     , ip
     , wide-word
+    , vector
   default-language:    Haskell2010
 
 benchmark criterion

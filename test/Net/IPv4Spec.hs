@@ -49,14 +49,14 @@ spec = do
             isSigned broadcast `shouldBe` False
         it "testBit" $ do
             testBit loopback <$> [0..31] `shouldBe`
-                [ False, True,  True,  True,  True,  True,  True,  True
-                , False, False, False, False, False, False, False, False
-                , False, False, False, False, False, False, False, False
-                , False, False, False, False, False, False, False, True]
+              [ True, False, False, False, False, False, False, False
+              , False, False, False, False, False, False, False, False
+              , False, False, False, False, False, False, False, False
+              , True, True, True, True, True, True, True, False ]
         it "bit" $ do
-            bit 0 `shouldBe` ipv4 128 0 0 0
-            bit 1 `shouldBe` ipv4 64 0 0 0
-            bit 31 `shouldBe` ipv4 0 0 0 1
+            bit 0 `shouldBe` ipv4 0 0 0 1
+            bit 1 `shouldBe` ipv4 0 0 0 2
+            bit 31 `shouldBe` ipv4 128 0 0 0
         it "popCount" $ do
             popCount any `shouldBe` 0
             popCount loopback `shouldBe` 8
