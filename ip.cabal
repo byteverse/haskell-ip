@@ -73,7 +73,7 @@ test-suite test
     , QuickCheck
     , attoparsec
     , base
-    , byteslice >= 0.1.2 && < 0.2
+    , byteslice
     , bytestring
     , ip
     , quickcheck-classes >= 0.4.13 && < 0.7.0.0
