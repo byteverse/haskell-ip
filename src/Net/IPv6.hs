@@ -678,6 +678,7 @@ optionalPieceParser e = Latin.tryHexNibble >>= \case
     r <- pieceParserStep e w0
     pure (Just r)
 
+-- This should probably be moved into bytesmith and renamed.
 pieceParser :: e -> Parser.Parser e s Word16
 pieceParser e = Latin.hexNibble e >>= pieceParserStep e
 
