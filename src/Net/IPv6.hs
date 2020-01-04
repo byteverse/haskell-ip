@@ -56,6 +56,9 @@ module Net.IPv6
   , decodeRange
   , parserRange
   , printRange
+    -- ** UTF-8 Bytes
+  , parserRangeUtf8Bytes
+  , parserRangeUtf8BytesLenient
     -- * Types
   , IPv6(..)
   , IPv6Range(..)
@@ -697,6 +700,43 @@ pieceParserStep e !acc = if acc > 0xFFFF
   else Latin.tryHexNibble >>= \case
     Nothing -> pure (fromIntegral acc)
     Just w -> pieceParserStep e (16 * acc + w)
+
+-- | Parse UTF-8-encoded 'Bytes' into an 'IPv4Range'.
+-- This requires the mask to be present.
+--
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "1b02:f001:5:200b::/80")
+-- 1b02:f001:5:200b::/80
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "abcd::")
+-- nope
+--
+-- See 'parserRangeUtf8BytesLenient' for a variant that treats
+-- a missing mask as a @/32@ mask.
+parserRangeUtf8Bytes :: e -> Parser.Parser e s IPv6Range
+parserRangeUtf8Bytes e = do
+  base <- parserUtf8Bytes e
+  Latin.char e '/'
+  theMask <- Latin.decWord8 e
+  if theMask > 128
+    then Parser.fail e
+    else pure $! normalize (IPv6Range base theMask)
+
+-- | Variant of 'parserRangeUtf8Bytes' that allows the mask
+-- to be omitted. An omitted mask is treated as a @/128@ mask.
+--
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "1b02:f001:5:200b::/80")
+-- 1b02:f001:5:200b::/80
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "abcd::")
+-- abcd::/128
+parserRangeUtf8BytesLenient :: e -> Parser.Parser e s IPv6Range
+parserRangeUtf8BytesLenient e = do
+  base <- parserUtf8Bytes e
+  Latin.trySatisfy (=='/') >>= \case
+    True -> do
+      theMask <- Latin.decWord8 e
+      if theMask > 128
+        then Parser.fail e
+        else pure $! normalize (IPv6Range base theMask)
+    False -> pure $! IPv6Range base 128
 
 -- | Parse an 'IPv6' using 'Atto.Parser'.
 --

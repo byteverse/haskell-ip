@@ -8,6 +8,8 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 - Deprecate 'decodeBytes' in favor of 'decodeOctets'.
 - Add `Bytes`-oriented encode and decode functions to `Net.Mac`:
   `boundedBuilderUtf8`, `decodeUtf8Bytes`, and `parserUtf8Bytes`.
+- Add `parserRangeUtf8Bytes` and `parserRangeUtf8BytesLenient` to
+  both `Net.IPv4` and `Net.IPv6` modules.
 
 ## [1.7.0] - 2019-11-05
 - Add `Data` instances for all types.
