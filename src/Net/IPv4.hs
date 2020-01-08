@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -95,7 +96,7 @@ import Control.Monad
 import Control.Monad.ST (ST,runST)
 import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Aeson (ToJSONKey(..),FromJSONKey(..),ToJSONKeyFunction(..),FromJSONKeyFunction(..))
-import Data.Bits (Bits(..))
+import Data.Bits (Bits(..),countTrailingZeros)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Data (Data)
@@ -112,7 +113,7 @@ import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
 import GHC.Exts (Word#)
 import GHC.Generics (Generic)
-import GHC.Word (Word32(W32#))
+import GHC.Word (Word32(W32#),Word(W#))
 import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
@@ -240,8 +241,18 @@ private (IPv4 w) =
 -- checks along with several other ranges that are not used
 -- on the public Internet.
 reserved :: IPv4 -> Bool
-reserved !(IPv4 w) =
-  let a = getIPv4 $ fromOctets' 0 0 0 0
+reserved !(IPv4 (W32# w)) = case reserved# w of
+  0## -> False
+  _ -> True
+
+-- On 32-bit platforms, returns 1 on success. On 64-bit platforms,
+-- returns 2 on success. On all platforms, returns 0 if the address
+-- is not reserved.
+reserved# :: Word# -> Word#
+{-# noinline reserved# #-}
+reserved# w# =
+  let w = W# w#
+      a = getIPv4 $ fromOctets' 0 0 0 0
       b = getIPv4 $ fromOctets' 100 64 0 0
       c = getIPv4 $ fromOctets' 127 0 0 0
       d = getIPv4 $ fromOctets' 169 254 0 0
@@ -253,23 +264,25 @@ reserved !(IPv4 w) =
       j = getIPv4 $ fromOctets' 203 0 113 0
       k = getIPv4 $ fromOctets' 224 0 0 0
       l = getIPv4 $ fromOctets' 240 0 0 0
-   in    mask4  .&. w == k
-      || mask4  .&. w == l
-      || mask8  .&. w == p24
-      || mask8  .&. w == a
-      || mask8  .&. w == c
-      || mask10 .&. w == b
-      || mask12 .&. w == p20
-      || mask15 .&. w == h
-      || mask16 .&. w == d
-      || mask16 .&. w == p16
-      || mask24 .&. w == e
-      || mask24 .&. w == f
-      || mask24 .&. w == g
-      || mask24 .&. w == i
-      || mask24 .&. w == j
+      !(W# r) = flip unsafeShiftR 5 $ fromIntegral @Int @Word $
+            countTrailingZeros ((fromIntegral @Word32 @Word mask4  .&. w) `xor` fromIntegral @Word32 @Word k)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask4  .&. w) `xor` fromIntegral @Word32 @Word l)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask8  .&. w) `xor` fromIntegral @Word32 @Word p24)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask8  .&. w) `xor` fromIntegral @Word32 @Word a)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask8  .&. w) `xor` fromIntegral @Word32 @Word c)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask10 .&. w) `xor` fromIntegral @Word32 @Word b)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask12 .&. w) `xor` fromIntegral @Word32 @Word p20)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask15 .&. w) `xor` fromIntegral @Word32 @Word h)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask16 .&. w) `xor` fromIntegral @Word32 @Word d)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask16 .&. w) `xor` fromIntegral @Word32 @Word p16)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask24 .&. w) `xor` fromIntegral @Word32 @Word e)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask24 .&. w) `xor` fromIntegral @Word32 @Word f)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask24 .&. w) `xor` fromIntegral @Word32 @Word g)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask24 .&. w) `xor` fromIntegral @Word32 @Word i)
+        .|. countTrailingZeros ((fromIntegral @Word32 @Word mask24 .&. w) `xor` fromIntegral @Word32 @Word j)
+   in r
 
-mask8,mask4,mask12,mask16,mask10,mask24,mask32,mask15 :: Word32
+mask8,mask4,mask12,mask16,mask10,mask24,mask15 :: Word32
 mask4  = 0xF0000000
 mask8  = 0xFF000000
 mask10 = 0xFFC00000
@@ -277,13 +290,14 @@ mask12 = 0xFFF00000
 mask15 = 0xFFFE0000
 mask16 = 0xFFFF0000
 mask24 = 0xFFFFFF00
-mask32 = 0xFFFFFFFF
 
 -- | Checks to see if the 'IPv4' address is publicly routable.
 --
 -- prop> public x == not (reserved x)
 public :: IPv4 -> Bool
-public = not . reserved
+public (IPv4 (W32# w)) = case reserved# w of
+  0## -> True
+  _ -> False
 
 -- | Encode an 'IPv4' address to 'Text' using dot-decimal notation:
 --
