@@ -240,7 +240,7 @@ private (IPv4 w) =
 -- checks along with several other ranges that are not used
 -- on the public Internet.
 reserved :: IPv4 -> Bool
-reserved =
+reserved !(IPv4 w) =
   let a = getIPv4 $ fromOctets' 0 0 0 0
       b = getIPv4 $ fromOctets' 100 64 0 0
       c = getIPv4 $ fromOctets' 127 0 0 0
@@ -253,23 +253,21 @@ reserved =
       j = getIPv4 $ fromOctets' 203 0 113 0
       k = getIPv4 $ fromOctets' 224 0 0 0
       l = getIPv4 $ fromOctets' 240 0 0 0
-      m = getIPv4 $ fromOctets' 255 255 255 255
-  in \(IPv4 w) -> mask8  .&. w == p24
-               || mask12 .&. w == p20
-               || mask16 .&. w == p16
-               || mask8  .&. w == a
-               || mask10 .&. w == b
-               || mask8  .&. w == c
-               || mask16 .&. w == d
-               || mask24 .&. w == e
-               || mask24 .&. w == f
-               || mask24 .&. w == g
-               || mask15 .&. w == h
-               || mask24 .&. w == i
-               || mask24 .&. w == j
-               || mask4  .&. w == k
-               || mask4  .&. w == l
-               || mask32 .&. w == m
+   in    mask4  .&. w == k
+      || mask4  .&. w == l
+      || mask8  .&. w == p24
+      || mask8  .&. w == a
+      || mask8  .&. w == c
+      || mask10 .&. w == b
+      || mask12 .&. w == p20
+      || mask15 .&. w == h
+      || mask16 .&. w == d
+      || mask16 .&. w == p16
+      || mask24 .&. w == e
+      || mask24 .&. w == f
+      || mask24 .&. w == g
+      || mask24 .&. w == i
+      || mask24 .&. w == j
 
 mask8,mask4,mask12,mask16,mask10,mask24,mask32,mask15 :: Word32
 mask4  = 0xF0000000

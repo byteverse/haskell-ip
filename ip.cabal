@@ -128,7 +128,9 @@ benchmark criterion
     , bytestring
     , criterion
     , ip
+    , primitive
     , text
+    , random
   other-modules:
     IPv4ByteString1
     IPv4DecodeText1

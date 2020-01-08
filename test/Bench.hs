@@ -3,6 +3,9 @@ module Main (main) where
 import Criterion.Main
 import Net.Types (IPv4(..),MacGrouping(..),MacCodec(..))
 import Data.Maybe (fromJust)
+import Data.Primitive (PrimArray,foldlPrimArray')
+import Data.Bool (bool)
+import System.Random (mkStdGen,randoms)
 import qualified Data.Bytes as Bytes
 import qualified Data.Text as Text
 import qualified Net.Mac as Mac
@@ -15,6 +18,7 @@ import qualified IPv4Text2
 import qualified IPv4ByteString1
 import qualified IPv4DecodeText1
 import qualified IPv4DecodeText2
+import qualified GHC.Exts as Exts
 -- import qualified IPv4TextVariableBuilder
 
 main :: IO ()
@@ -36,6 +40,7 @@ main = do
       ip6Skip = fromJust $ IPv6.decode ip6TextSkip
       ip6TextHex = Text.pack "a:b::c:d"
       ip6Hex = fromJust $ IPv6.decode ip6TextHex
+      hundredAddrs = Exts.fromList (map IPv4 (take 100 (randoms (mkStdGen 42)))) :: PrimArray IPv4
   defaultMain
     [ bgroup "Mac to Text"
       [ bench "Current Implementation, pairs" $ whnf Mac.encode mac
@@ -95,4 +100,16 @@ main = do
       , bench "a:b::c:d" $ whnf IPv6.encodeShort ip6Hex
       , bench "2001:db8:ba1:0:aaaa:542c:bb:cc00" $ whnf IPv6.encodeShort ip6Complicated
       ]
+    , bgroup "CIDR Inclusion"
+      [ bench "reserved" $ whnf manyReserved hundredAddrs
+      , bench "private" $ whnf manyPrivate hundredAddrs
+      ]
     ]
+
+manyReserved :: PrimArray IPv4 -> Int
+{-# noinline manyReserved #-}
+manyReserved x = foldlPrimArray' (\acc addr -> bool 0 1 (IPv4.reserved addr) + acc) 0 x
+
+manyPrivate :: PrimArray IPv4 -> Int
+{-# noinline manyPrivate #-}
+manyPrivate x = foldlPrimArray' (\acc addr -> bool 0 1 (IPv4.private addr) + acc) 0 x
