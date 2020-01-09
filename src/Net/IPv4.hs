@@ -110,7 +110,7 @@ import Data.Vector.Generic.Mutable (MVector(..))
 import Data.Word
 import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
-import GHC.Exts (Word#)
+import GHC.Exts (Word#,Int#)
 import GHC.Generics (Generic)
 import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
@@ -240,24 +240,38 @@ private (IPv4 w) =
 -- checks along with several other ranges that are not used
 -- on the public Internet.
 reserved :: IPv4 -> Bool
-reserved !(IPv4 w) = case unsafeShiftR w 29 of
+{-# inline reserved #-}
+reserved (IPv4 (W32# w)) = case reserved# w of
+  1# -> True
+  _ -> False
+
+bool2Int :: Bool -> Int#
+bool2Int True = 1#
+bool2Int _ = 0#
+
+reserved# :: Word# -> Int#
+{-# noinline reserved# #-}
+reserved# w# = case unsafeShiftR w 29 of
   0 ->
     let a = getIPv4 $ fromOctets' 0 0 0 0
         y = getIPv4 $ fromOctets' 10 0 0 0
-     in mask8  .&. w == a
+     in bool2Int
+      $ mask8  .&. w == a
      || mask8  .&. w == y
-  1 -> False
-  2 -> False
+  1 -> 0#
+  2 -> 0#
   3 ->
     let b = getIPv4 $ fromOctets' 100 64 0 0
         c = getIPv4 $ fromOctets' 127 0 0 0
-     in mask8  .&. w == c
+     in bool2Int
+      $ mask8  .&. w == c
      || mask10 .&. w == b
-  4 -> False
+  4 -> 0#
   5 ->
     let d = getIPv4 $ fromOctets' 169 254 0 0
         x = getIPv4 $ fromOctets' 172 16 0 0
-     in mask12 .&. w == x
+     in bool2Int
+      $ mask12 .&. w == x
      || mask16 .&. w == d
   6 ->
     let e = getIPv4 $ fromOctets' 192 0 0 0
@@ -267,14 +281,16 @@ reserved !(IPv4 w) = case unsafeShiftR w 29 of
         i = getIPv4 $ fromOctets' 198 51 100 0
         j = getIPv4 $ fromOctets' 203 0 113 0
         z = getIPv4 $ fromOctets' 192 168 0 0
-     in mask15 .&. w == h
+     in bool2Int
+      $ mask15 .&. w == h
      || mask16 .&. w == z
      || mask24 .&. w == e
      || mask24 .&. w == f
      || mask24 .&. w == g
      || mask24 .&. w == i
      || mask24 .&. w == j
-  _ -> True
+  _ -> 1#
+  where w = W32# w#
 
 mask8,mask12,mask16,mask10,mask24,mask15 :: Word32
 mask8  = 0xFF000000
