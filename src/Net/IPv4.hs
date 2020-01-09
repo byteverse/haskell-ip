@@ -243,7 +243,7 @@ private (IPv4 w) =
 -- on the upper three bits (8 possible values), which GHC will compile
 -- to a jump table. This helps because the reserved ranges of IPv4
 -- addresses are somewhat clustered. Notice that everything in
--- 32.0.0.0/3, 64.0.0.0/3, and 128.0.0.0/3 is publicly routably, and
+-- 32.0.0.0/3, 64.0.0.0/3, and 128.0.0.0/3 is publicly routable, and
 -- everything in 224.0.0.0/3 is reserved. This means that for exactly
 -- half of the IPv4 addresses that exist, this single jump is sufficient
 -- for determining whether or not they are reserved. For the others,
