@@ -252,9 +252,7 @@ reserved !(IPv4 w) =
       i = getIPv4 $ fromOctets' 198 51 100 0
       j = getIPv4 $ fromOctets' 203 0 113 0
       k = getIPv4 $ fromOctets' 224 0 0 0
-      l = getIPv4 $ fromOctets' 240 0 0 0
-   in    mask4  .&. w == k
-      || mask4  .&. w == l
+   in    mask3  .&. w == k
       || mask8  .&. w == p24
       || mask8  .&. w == a
       || mask8  .&. w == c
@@ -269,15 +267,14 @@ reserved !(IPv4 w) =
       || mask24 .&. w == i
       || mask24 .&. w == j
 
-mask8,mask4,mask12,mask16,mask10,mask24,mask32,mask15 :: Word32
-mask4  = 0xF0000000
+mask8,mask3,mask12,mask16,mask10,mask24,mask15 :: Word32
+mask3  = 0xE0000000
 mask8  = 0xFF000000
 mask10 = 0xFFC00000
 mask12 = 0xFFF00000
 mask15 = 0xFFFE0000
 mask16 = 0xFFFF0000
 mask24 = 0xFFFFFF00
-mask32 = 0xFFFFFFFF
 
 -- | Checks to see if the 'IPv4' address is publicly routable.
 --

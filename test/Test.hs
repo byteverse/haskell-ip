@@ -130,6 +130,15 @@ tests = testGroup "tests"
       , PH.testCase "I" $ IPv4.reserved (IPv4.ipv4 226 0 0 0) @=? True
       , PH.testCase "J" $ IPv4.reserved (IPv4.ipv4 255 255 255 254) @=? True
       , PH.testCase "K" $ IPv4.reserved (IPv4.ipv4 255 255 255 255) @=? True
+      , PH.testCase "L" $ IPv4.reserved (IPv4.ipv4 224 0 0 0) @=? True
+      , PH.testCase "M" $ IPv4.reserved (IPv4.ipv4 239 255 255 255) @=? True
+      , PH.testCase "N" $ IPv4.reserved (IPv4.ipv4 223 255 255 255) @=? False
+      , PH.testCase "O" $ IPv4.reserved (IPv4.ipv4 203 0 114 0) @=? False
+      , PH.testCase "P" $ IPv4.reserved (IPv4.ipv4 203 0 112 255) @=? False
+      , PH.testCase "Q" $ IPv4.reserved (IPv4.ipv4 203 0 113 255) @=? True
+      , PH.testCase "R" $ IPv4.reserved (IPv4.ipv4 192 88 100 0) @=? False
+      , PH.testCase "S" $ IPv4.reserved (IPv4.ipv4 192 88 99 0) @=? True
+      , PH.testCase "T" $ IPv4.reserved (IPv4.ipv4 192 0 1 0) @=? False
       ]
     ]
   , testGroup "IPv6 Range Operations"
