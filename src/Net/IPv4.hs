@@ -235,10 +235,27 @@ private (IPv4 w) =
   || mask12 .&. w == p20
   || mask16 .&. w == p16
 
+----------------------------------------
+-- Note [The implementation of reserved]
+----------------------------------------
+-- The @reserved@ function has been optimized to perform well in the
+-- microbenchmark @CIDR Inclusion/reserved@. We perform an inital case
+-- on the upper three bits (8 possible values), which GHC will compile
+-- to a jump table. This helps because the reserved ranges of IPv4
+-- addresses are somewhat clustered. Notice that everything in
+-- 32.0.0.0/3, 64.0.0.0/3, and 128.0.0.0/3 is publicly routably, and
+-- everything in 224.0.0.0/3 is reserved. This means that for exactly
+-- half of the IPv4 addresses that exist, this single jump is sufficient
+-- for determining whether or not they are reserved. For the others,
+-- there is a little more work to do, particularly in the 192.0.0.0/3
+-- range. On the laptop that ran the microbenchmark, this function
+-- decided the reservedness of 100 random IPv4 addresses in 200ns.
+
 -- | Checks to see if the 'IPv4' address belongs to a reserved
 -- network. This includes the three private networks that 'private'
 -- checks along with several other ranges that are not used
--- on the public Internet.
+-- on the public Internet. The implementation of this function
+-- is optimized.
 reserved :: IPv4 -> Bool
 reserved !(IPv4 w) = case unsafeShiftR w 29 of
   0 ->
