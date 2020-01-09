@@ -1,0 +1,6 @@
+packages: .
+
+source-repository-package
+    type: git
+    location: https://github.com/andrewthad/cassava
+    tag: f1ca69a0b2c51ae8caa4ec15f47552767aa63190

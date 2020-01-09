@@ -1,0 +1,112 @@
+
+==================== Asm code ====================
+
+.section .text
+.align 8
+.globl test_reserved
+.type test_reserved, @function
+test_reserved:
+_cj:
+	movl $3405803776,%eax
+	movl $4294967040,%ecx
+	movq %rbx,%rdx
+	andq %rcx,%rdx
+	xorq %rax,%rdx
+	tzcnt %rdx,%rax
+	movl $3325256704,%ecx
+	movl $4294967040,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3227017984,%ecx
+	movl $4294967040,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3221225984,%ecx
+	movl $4294967040,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3221225472,%ecx
+	movl $4294967040,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3232235520,%ecx
+	movl $4294901760,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $2851995648,%ecx
+	movl $4294901760,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3323068416,%ecx
+	movl $4294836224,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $2886729728,%ecx
+	movl $4293918720,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $4290772992,%ecx
+	movq %rbx,%rdx
+	andq %rcx,%rdx
+	xorq $1681915904,%rdx
+	tzcnt %rdx,%rcx
+	orq %rcx,%rax
+	movl $4278190080,%ecx
+	movq %rbx,%rdx
+	andq %rcx,%rdx
+	xorq $2130706432,%rdx
+	tzcnt %rdx,%rcx
+	orq %rcx,%rax
+	movl $4278190080,%ecx
+	movq %rbx,%rdx
+	andq %rcx,%rdx
+	tzcnt %rdx,%rcx
+	orq %rcx,%rax
+	movl $4278190080,%ecx
+	movq %rbx,%rdx
+	andq %rcx,%rdx
+	xorq $167772160,%rdx
+	tzcnt %rdx,%rcx
+	orq %rcx,%rax
+	movl $4026531840,%ecx
+	movl $4026531840,%edx
+	movq %rbx,%rsi
+	andq %rdx,%rsi
+	xorq %rcx,%rsi
+	tzcnt %rsi,%rcx
+	orq %rcx,%rax
+	movl $3758096384,%ecx
+	movl $4026531840,%edx
+	andq %rdx,%rbx
+	xorq %rcx,%rbx
+	tzcnt %rbx,%rbx
+	orq %rbx,%rax
+	shrq $5,%rax
+	movq %rax,%rbx
+	jmp *(%rbp)
+	.size test_reserved, .-test_reserved
+

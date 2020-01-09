@@ -33,6 +33,7 @@ description:
 
 library
   hs-source-dirs: src
+  c-sources: cbits/ip_prim.cmm
   exposed-modules:
     Net.IP
     Net.IPv4

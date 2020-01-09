@@ -9,6 +9,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE GHCForeignImportPrim #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 {-| This module provides the IPv4 data type and functions for working
     with it.
@@ -241,7 +243,7 @@ private (IPv4 w) =
 -- checks along with several other ranges that are not used
 -- on the public Internet.
 reserved :: IPv4 -> Bool
-reserved !(IPv4 (W32# w)) = case reserved# w of
+reserved !(IPv4 (W32# w)) = case primReserved# w of
   0## -> False
   _ -> True
 
@@ -295,7 +297,7 @@ mask24 = 0xFFFFFF00
 --
 -- prop> public x == not (reserved x)
 public :: IPv4 -> Bool
-public (IPv4 (W32# w)) = case reserved# w of
+public (IPv4 (W32# w)) = case primReserved# w of
   0## -> True
   _ -> False
 
@@ -1205,3 +1207,4 @@ rangeToDotDecimalBuilder (IPv4Range addr len) =
   <> TBuilder.singleton '/'
   <> TBI.decimal len
 
+foreign import prim "test_reserved" primReserved# :: Word# -> Word#
