@@ -240,35 +240,43 @@ private (IPv4 w) =
 -- checks along with several other ranges that are not used
 -- on the public Internet.
 reserved :: IPv4 -> Bool
-reserved !(IPv4 w) =
-  let a = getIPv4 $ fromOctets' 0 0 0 0
-      b = getIPv4 $ fromOctets' 100 64 0 0
-      c = getIPv4 $ fromOctets' 127 0 0 0
-      d = getIPv4 $ fromOctets' 169 254 0 0
-      e = getIPv4 $ fromOctets' 192 0 0 0
-      f = getIPv4 $ fromOctets' 192 0 2 0
-      g = getIPv4 $ fromOctets' 192 88 99 0
-      h = getIPv4 $ fromOctets' 198 18 0 0
-      i = getIPv4 $ fromOctets' 198 51 100 0
-      j = getIPv4 $ fromOctets' 203 0 113 0
-      k = getIPv4 $ fromOctets' 224 0 0 0
-   in    mask3  .&. w == k
-      || mask8  .&. w == p24
-      || mask8  .&. w == a
-      || mask8  .&. w == c
-      || mask10 .&. w == b
-      || mask12 .&. w == p20
-      || mask15 .&. w == h
-      || mask16 .&. w == d
-      || mask16 .&. w == p16
-      || mask24 .&. w == e
-      || mask24 .&. w == f
-      || mask24 .&. w == g
-      || mask24 .&. w == i
-      || mask24 .&. w == j
+reserved !(IPv4 w) = case unsafeShiftR w 29 of
+  0 ->
+    let a = getIPv4 $ fromOctets' 0 0 0 0
+        y = getIPv4 $ fromOctets' 10 0 0 0
+     in mask8  .&. w == a
+     || mask8  .&. w == y
+  1 -> False
+  2 -> False
+  3 ->
+    let b = getIPv4 $ fromOctets' 100 64 0 0
+        c = getIPv4 $ fromOctets' 127 0 0 0
+     in mask8  .&. w == c
+     || mask10 .&. w == b
+  4 -> False
+  5 ->
+    let d = getIPv4 $ fromOctets' 169 254 0 0
+        x = getIPv4 $ fromOctets' 172 16 0 0
+     in mask12 .&. w == x
+     || mask16 .&. w == d
+  6 ->
+    let e = getIPv4 $ fromOctets' 192 0 0 0
+        f = getIPv4 $ fromOctets' 192 0 2 0
+        g = getIPv4 $ fromOctets' 192 88 99 0
+        h = getIPv4 $ fromOctets' 198 18 0 0
+        i = getIPv4 $ fromOctets' 198 51 100 0
+        j = getIPv4 $ fromOctets' 203 0 113 0
+        z = getIPv4 $ fromOctets' 192 168 0 0
+     in mask15 .&. w == h
+     || mask16 .&. w == z
+     || mask24 .&. w == e
+     || mask24 .&. w == f
+     || mask24 .&. w == g
+     || mask24 .&. w == i
+     || mask24 .&. w == j
+  _ -> True
 
-mask8,mask3,mask12,mask16,mask10,mask24,mask15 :: Word32
-mask3  = 0xE0000000
+mask8,mask12,mask16,mask10,mask24,mask15 :: Word32
 mask8  = 0xFF000000
 mask10 = 0xFFC00000
 mask12 = 0xFFF00000
