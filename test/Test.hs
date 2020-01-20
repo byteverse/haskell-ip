@@ -118,6 +118,28 @@ tests = testGroup "tests"
     , testProperty "Normalize does not affect membership" propNormalizeMember
     , testProperty "Membership agrees with bounds" propMemberUpperLower
     , testProperty "Range contains self" propRangeSelf
+    , testGroup "reserved"
+      [ PH.testCase "A" $ IPv4.reserved (IPv4.ipv4 0 1 2 3) @=? True
+      , PH.testCase "B" $ IPv4.reserved (IPv4.ipv4 1 0 0 0) @=? False
+      , PH.testCase "C" $ IPv4.reserved (IPv4.ipv4 100 64 0 3) @=? True
+      , PH.testCase "D" $ IPv4.reserved (IPv4.ipv4 127 255 255 255) @=? True
+      , PH.testCase "E" $ IPv4.reserved (IPv4.ipv4 110 0 0 255) @=? False
+      , PH.testCase "F" $ IPv4.reserved (IPv4.ipv4 192 0 2 255) @=? True
+      , PH.testCase "G" $ IPv4.reserved (IPv4.ipv4 203 0 113 0) @=? True
+      , PH.testCase "H" $ IPv4.reserved (IPv4.ipv4 225 0 0 0) @=? True
+      , PH.testCase "I" $ IPv4.reserved (IPv4.ipv4 226 0 0 0) @=? True
+      , PH.testCase "J" $ IPv4.reserved (IPv4.ipv4 255 255 255 254) @=? True
+      , PH.testCase "K" $ IPv4.reserved (IPv4.ipv4 255 255 255 255) @=? True
+      , PH.testCase "L" $ IPv4.reserved (IPv4.ipv4 224 0 0 0) @=? True
+      , PH.testCase "M" $ IPv4.reserved (IPv4.ipv4 239 255 255 255) @=? True
+      , PH.testCase "N" $ IPv4.reserved (IPv4.ipv4 223 255 255 255) @=? False
+      , PH.testCase "O" $ IPv4.reserved (IPv4.ipv4 203 0 114 0) @=? False
+      , PH.testCase "P" $ IPv4.reserved (IPv4.ipv4 203 0 112 255) @=? False
+      , PH.testCase "Q" $ IPv4.reserved (IPv4.ipv4 203 0 113 255) @=? True
+      , PH.testCase "R" $ IPv4.reserved (IPv4.ipv4 192 88 100 0) @=? False
+      , PH.testCase "S" $ IPv4.reserved (IPv4.ipv4 192 88 99 0) @=? True
+      , PH.testCase "T" $ IPv4.reserved (IPv4.ipv4 192 0 1 0) @=? False
+      ]
     ]
   , testGroup "IPv6 Range Operations"
     [ testProperty "Idempotence of normalizing IPv6 range"
