@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -37,6 +39,10 @@ module Net.Mac
   , parserWithUtf8
     -- ** ByteString
   , decodeBytes
+    -- ** UTF-8 Bytes
+  , boundedBuilderUtf8
+  , decodeUtf8Bytes
+  , parserUtf8Bytes
     -- ** Printing
   , print
     -- * Types
@@ -71,11 +77,16 @@ import GHC.Word (Word16(W16#))
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 
+import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString as AB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
+import qualified Data.ByteArray.Builder.Bounded as BBB
+import qualified Data.Bytes as Bytes
+import qualified Data.Bytes.Parser as Parser
+import qualified Data.Bytes.Parser.Latin as Latin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Fixed as BFB
@@ -121,19 +132,25 @@ toOctets (Mac w) =
   , fromIntegral w
   )
 
+-- | This function is deprecated. It will be renamed in a future release
+--   since the name is misleading.
+decodeBytes :: ByteString -> Maybe Mac
+{-# DEPRECATED decodeBytes "Prefer decodeOctets" #-}
+decodeBytes = decodeOctets
+
 -- | Decode a 'Mac' address from a 'ByteString'. Each byte is interpreted
 --   as an octet of the 'Mac' address. Consequently, 'ByteString's
 --   of length 6 successfully decode, and all other 'ByteString's fail
 --   to decode.
 --
---   >>> decodeBytes (B.pack [0x6B,0x47,0x18,0x90,0x55,0xC3])
+--   >>> decodeOctets (B.pack [0x6B,0x47,0x18,0x90,0x55,0xC3])
 --   Just (mac 0x6b47189055c3)
---   >>> decodeBytes (B.replicate 6 0x3A)
+--   >>> decodeOctets (B.replicate 6 0x3A)
 --   Just (mac 0x3a3a3a3a3a3a)
---   >>> decodeBytes (B.replicate 7 0x3A)
+--   >>> decodeOctets (B.replicate 7 0x3A)
 --   Nothing
-decodeBytes :: ByteString -> Maybe Mac
-decodeBytes bs = if B.length bs == 6
+decodeOctets :: ByteString -> Maybe Mac
+decodeOctets bs = if B.length bs == 6
   then Just $ fromOctets
     (BU.unsafeIndex bs 0)
     (BU.unsafeIndex bs 1)
@@ -398,6 +415,74 @@ decodeWithUtf8 codec bs = rightToMaybe (AB.parseOnly (parserWithUtf8 codec <* AB
 
 decodeLenientUtf8 :: ByteString -> Maybe Mac
 decodeLenientUtf8 bs = rightToMaybe (AB.parseOnly (parserLenientUtf8 <* AB.endOfInput) bs)
+
+-- | Encode a 'Mac' address as colon-separated hexadecimal octets,
+--   preferring lowercase for alphabetical characters.
+--
+--   >>> BBB.run Nat.constant $ boundedBuilderUtf8 $ mac 0xDEADBEEF1609
+--   [0x64, 0x65, 0x3a, 0x61, 0x64, 0x3a, 0x62, 0x65, 0x3a, 0x65, 0x66, 0x3a, 0x31, 0x36, 0x3a, 0x30, 0x39]
+boundedBuilderUtf8 :: Mac -> BBB.Builder 17
+boundedBuilderUtf8 !w =
+  BBB.word8PaddedLowerHex w0
+  `BBB.append`
+  BBB.ascii ':'
+  `BBB.append`
+  BBB.word8PaddedLowerHex w1
+  `BBB.append`
+  BBB.ascii ':'
+  `BBB.append`
+  BBB.word8PaddedLowerHex w2
+  `BBB.append`
+  BBB.ascii ':'
+  `BBB.append`
+  BBB.word8PaddedLowerHex w3
+  `BBB.append`
+  BBB.ascii ':'
+  `BBB.append`
+  BBB.word8PaddedLowerHex w4
+  `BBB.append`
+  BBB.ascii ':'
+  `BBB.append`
+  BBB.word8PaddedLowerHex w5
+  where
+  (w0,w1,w2,w3,w4,w5) = toOctets w
+
+-- | Lenient decoding of MAC address. This
+--   is case insensitive and allows either @:@ or @-@ as the separator.
+--   It also allows leading zeroes to be missing.
+--
+--   >>> decodeUtf8Bytes (Bytes.fromAsciiString "A2:DE:AD:BE:EF:67")
+--   Just (mac 0xa2deadbeef67)
+--   >>> decodeUtf8Bytes (Bytes.fromAsciiString "13-a2-FE-A4-17-96")
+--   Just (mac 0x13a2fea41796)
+decodeUtf8Bytes :: Bytes.Bytes -> Maybe Mac
+decodeUtf8Bytes = Parser.parseBytesMaybe (parserUtf8Bytes ())
+
+-- | Leniently parse UTF-8-encoded 'Bytes' as a 'Mac' address. This
+--   is case insensitive and allows either @:@ or @-@ as the separator.
+--   It also allows leading zeroes to be missing.
+--
+--   >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString "de:ad:BE:EF:1:23")
+--   Success (Slice {offset = 16, length = 0, value = mac 0xdeadbeef0123})
+parserUtf8Bytes :: e -> Parser.Parser e s Mac
+parserUtf8Bytes e = do
+  w1 <- Latin.hexWord8 e
+  Latin.any e >>= \case
+    ':' -> do
+      w2 <- Latin.hexWord8 e <* Latin.char e ':'
+      w3 <- Latin.hexWord8 e <* Latin.char e ':'
+      w4 <- Latin.hexWord8 e <* Latin.char e ':'
+      w5 <- Latin.hexWord8 e <* Latin.char e ':'
+      w6 <- Latin.hexWord8 e
+      pure (fromOctets w1 w2 w3 w4 w5 w6)
+    '-' -> do
+      w2 <- Latin.hexWord8 e <* Latin.char e '-'
+      w3 <- Latin.hexWord8 e <* Latin.char e '-'
+      w4 <- Latin.hexWord8 e <* Latin.char e '-'
+      w5 <- Latin.hexWord8 e <* Latin.char e '-'
+      w6 <- Latin.hexWord8 e
+      pure (fromOctets w1 w2 w3 w4 w5 w6)
+    _ -> Parser.fail e
 
 -- | Make a bytestring builder from a 'Mac' address
 --   using a colon as the separator.

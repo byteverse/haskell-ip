@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -76,6 +77,9 @@ module Net.IPv4
   , builderRange
   , parserRange
   , printRange
+    -- ** UTF-8 Bytes
+  , parserRangeUtf8Bytes
+  , parserRangeUtf8BytesLenient
     -- * Types
   , IPv4(..)
   , IPv4#
@@ -467,6 +471,43 @@ parserUtf8Bytes# e = Parser.unboxWord32 $ do
   Latin.char e '.'
   !d <- Latin.decWord8 e
   pure (getIPv4 (fromOctets a b c d))
+
+-- | Parse UTF-8-encoded 'Bytes' into an 'IPv4Range'.
+-- This requires the mask to be present.
+--
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "192.168.0.0/16")
+-- 192.168.0.0/16
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "10.10.10.1")
+-- nope
+--
+-- See 'parserRangeUtf8BytesLenient' for a variant that treats
+-- a missing mask as a @/32@ mask.
+parserRangeUtf8Bytes :: e -> Parser.Parser e s IPv4Range
+parserRangeUtf8Bytes e = do
+  base <- parserUtf8Bytes e
+  Latin.char e '/'
+  theMask <- Latin.decWord8 e
+  if theMask > 32
+    then Parser.fail e
+    else pure $! normalize (IPv4Range base theMask)
+
+-- | Variant of 'parserRangeUtf8Bytes' that allows the mask
+-- to be omitted. An omitted mask is treated as a @/32@ mask.
+--
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "192.168.0.0/16")
+-- 192.168.0.0/16
+-- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "10.10.10.1")
+-- 10.10.10.1/32
+parserRangeUtf8BytesLenient :: e -> Parser.Parser e s IPv4Range
+parserRangeUtf8BytesLenient e = do
+  base <- parserUtf8Bytes e
+  Latin.trySatisfy (=='/') >>= \case
+    True -> do
+      theMask <- Latin.decWord8 e
+      if theMask > 32
+        then Parser.fail e
+        else pure $! normalize (IPv4Range base theMask)
+    False -> pure $! IPv4Range base 32
 
 -- | Encode an 'IPv4' as a bytestring 'Builder.Builder'
 --
