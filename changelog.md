@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## [1.7.1] - 2020-??-??
+## [1.7.1] - 2020-01-22
 - Deprecate 'decodeBytes' in favor of 'decodeOctets'.
 - Add `Bytes`-oriented encode and decode functions to `Net.Mac`:
   `boundedBuilderUtf8`, `decodeUtf8Bytes`, and `parserUtf8Bytes`.
