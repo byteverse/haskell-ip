@@ -96,7 +96,7 @@ import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Attoparsec.Text as Atto
-import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.Bytes.Builder.Bounded as BB
 import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Parser as Parser
 import qualified Data.Bytes.Parser.Latin as Latin

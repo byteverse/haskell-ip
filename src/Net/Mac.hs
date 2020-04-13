@@ -83,7 +83,7 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString as AB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
-import qualified Data.ByteArray.Builder.Bounded as BBB
+import qualified Data.Bytes.Builder.Bounded as BBB
 import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Parser as Parser
 import qualified Data.Bytes.Parser.Latin as Latin

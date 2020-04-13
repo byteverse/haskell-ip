@@ -72,7 +72,7 @@ import Data.Text.Short (ShortText)
 
 import qualified Arithmetic.Lte as Lte
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteArray.Builder.Bounded as BB
+import qualified Data.Bytes.Builder.Bounded as BB
 import qualified Data.Text.IO as TIO
 import qualified Data.Bytes.Parser as Parser
 import qualified Net.IPv4 as IPv4

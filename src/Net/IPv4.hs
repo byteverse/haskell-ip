@@ -127,8 +127,8 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString.Char8 as AB
 import qualified Data.Attoparsec.Text as AT
 import qualified Data.Bits as Bits
-import qualified Data.ByteArray.Builder.Bounded as BB
-import qualified Data.ByteArray.Builder as UB
+import qualified Data.Bytes.Builder.Bounded as BB
+import qualified Data.Bytes.Builder as UB
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Internal as I
