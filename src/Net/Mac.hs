@@ -77,7 +77,6 @@ import GHC.Word (Word16(W16#))
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 
-import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString as AB
@@ -752,7 +751,7 @@ instance Prim Mac where
 macToWord16A# :: Mac -> Word#
 macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of
   W16# x -> x
-  
+
 macToWord16B# :: Mac -> Word#
 macToWord16B# (Mac w) = case word64ToWord16 (unsafeShiftR w 16) of
   W16# x -> x
@@ -760,7 +759,7 @@ macToWord16B# (Mac w) = case word64ToWord16 (unsafeShiftR w 16) of
 macToWord16C# :: Mac -> Word#
 macToWord16C# (Mac w) = case word64ToWord16 w of
   W16# x -> x
-  
+
 macFromWord16# :: Word# -> Word# -> Word# -> Mac
 macFromWord16# a b c = Mac
     $ (unsafeShiftL (word16ToWord64 (W16# a)) 32)
