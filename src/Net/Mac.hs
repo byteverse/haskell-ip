@@ -39,6 +39,7 @@ module Net.Mac
   , parserWithUtf8
     -- ** ByteString
   , decodeBytes
+  , decodeOctets
     -- ** UTF-8 Bytes
   , boundedBuilderUtf8
   , decodeUtf8Bytes
