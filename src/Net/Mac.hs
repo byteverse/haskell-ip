@@ -29,6 +29,8 @@ module Net.Mac
   , builder
   , parser
   , parserWith
+    -- ** ShortText
+  , encodeShort
     -- ** UTF-8 ByteString
   , encodeUtf8
   , encodeWithUtf8
@@ -60,15 +62,18 @@ import Data.Aeson (ToJSONKey(..),FromJSONKey(..))
 import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
 import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
 import Data.ByteString (ByteString)
+import Data.ByteString.Short.Internal (ShortByteString(SBS))
 import Data.Char (ord,chr)
 import Data.Data (Data)
 import Data.Hashable (Hashable)
 import Data.Ix (Ix)
+import Data.Primitive.ByteArray (ByteArray(ByteArray))
 import Data.Primitive.Types (Prim(..))
 #if !MIN_VERSION_base(4,11,0)
 import Data.Semigroup ((<>))
 #endif
 import Data.Text (Text)
+import Data.Text.Short (ShortText)
 import Data.Word
 import Data.Word.Synthetic.Word12 (Word12)
 import GHC.Enum (predError, succError)
@@ -78,6 +83,7 @@ import GHC.Word (Word16(W16#))
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 
+import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString as AB
@@ -94,6 +100,7 @@ import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.Builder as TBuilder
+import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Text as Text ()
 
 -- $setup
@@ -415,6 +422,12 @@ decodeWithUtf8 codec bs = rightToMaybe (AB.parseOnly (parserWithUtf8 codec <* AB
 
 decodeLenientUtf8 :: ByteString -> Maybe Mac
 decodeLenientUtf8 bs = rightToMaybe (AB.parseOnly (parserLenientUtf8 <* AB.endOfInput) bs)
+
+-- | Encode a 'Mac' address as colon-separated hexadecimal octets,
+--   preferring lowercase for alphabetical characters.
+encodeShort :: Mac -> ShortText
+encodeShort !m = case BBB.run Nat.constant (boundedBuilderUtf8 m) of
+  ByteArray x -> TS.fromShortByteStringUnsafe (SBS x)
 
 -- | Encode a 'Mac' address as colon-separated hexadecimal octets,
 --   preferring lowercase for alphabetical characters.

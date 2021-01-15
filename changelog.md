@@ -7,6 +7,7 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 ## [1.7.3] - 2020-??-??
 
 - Export `decodeOctets` from `Net.Mac`.
+- Add `encodeShort` to `Net.Mac`.
 
 ## [1.7.2] - 2020-05-30
 - Fix bug in `doctest` documentation
