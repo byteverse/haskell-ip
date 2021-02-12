@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -46,6 +47,7 @@ module Net.IP
   , decodeShort
   , boundedBuilderUtf8
     -- ** Bytes
+  , decodeUtf8Bytes
   , parserUtf8Bytes
     -- ** Printing
   , print
@@ -72,6 +74,7 @@ import Data.Text.Short (ShortText)
 
 import qualified Arithmetic.Lte as Lte
 import qualified Data.Aeson as Aeson
+import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Builder.Bounded as BB
 import qualified Data.Text.IO as TIO
 import qualified Data.Bytes.Parser as Parser
@@ -178,6 +181,14 @@ decodeShort :: ShortText -> Maybe IP
 decodeShort t
   | Just x <- IPv4.decodeShort t = Just (fromIPv4 x)
   | otherwise = coerce (IPv6.decodeShort t)
+
+-- | Decode UTF-8-encoded 'Bytes' into an 'IP' address.
+decodeUtf8Bytes :: Bytes.Bytes -> Maybe IP
+decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
+  Parser.Success (Parser.Slice _ len addr) -> case len of
+    0 -> Just addr
+    _ -> Nothing
+  Parser.Failure _ -> Nothing
 
 -- | Parse UTF-8-encoded 'Bytes' as an 'IP' address.
 parserUtf8Bytes :: e -> Parser.Parser e s IP
