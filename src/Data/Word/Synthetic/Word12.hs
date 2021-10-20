@@ -33,7 +33,12 @@ import           Data.Maybe
 import           GHC.Arr
 import           GHC.Base
 import           GHC.Enum
+#if MIN_VERSION_base(4,15,0)
+import           GHC.Integer (integerToWord, smallInteger)
+import           GHC.Num hiding (integerToWord)
+#else
 import           GHC.Num
+#endif
 import           GHC.Read
 import           GHC.Real
 import           GHC.Show
