@@ -103,6 +103,10 @@ import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Text as Text ()
 
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as AK
+#endif
+
 -- $setup
 --
 -- These are here to get doctest's property checking to work
@@ -858,8 +862,14 @@ instance ToJSON Mac where
 
 instance ToJSONKey Mac where
   toJSONKey = ToJSONKeyText
-    encode
+    (keyFromText . encode)
     (\m -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 m <> BB.char7 '"')
+    where
+#if MIN_VERSION_aeson(2,0,0)
+      keyFromText = AK.fromText
+#else
+      keyFromText = id
+#endif
 
 instance FromJSONKey Mac where
   fromJSONKey = FromJSONKeyTextParser $ \t -> case decode t of
