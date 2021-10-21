@@ -153,6 +153,10 @@ import qualified Data.Vector.Primitive as PVector
 import qualified Data.Vector.Unboxed as UVector
 import qualified Data.Vector.Unboxed.Mutable as MUVector
 
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.Key as AesonKey
+#endif
+
 -- $setup
 --
 -- These are here to get doctest's property checking to work
@@ -697,8 +701,14 @@ instance FromJSON IPv4 where
 
 instance ToJSONKey IPv4 where
   toJSONKey = ToJSONKeyText
-    encode
+    (keyFromText . encode)
     (\addr -> Aeson.unsafeToEncoding $ Builder.char7 '"' <> builderUtf8 addr <> Builder.char7 '"')
+    where
+#if MIN_VERSION_aeson(2,0,0)
+      keyFromText = AesonKey.fromText
+#else
+      keyFromText = id
+#endif
 
 instance FromJSONKey IPv4 where
   fromJSONKey = FromJSONKeyTextParser aesonParser
