@@ -413,6 +413,7 @@ textBadIPv4 =
   , "1.9.x.2"
   , "1.9.3"
   , "1.9"
+  , "127.0.0.18446744073709551617"
   ]
 
 testDecodeFailures :: [TestTree]

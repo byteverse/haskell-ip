@@ -137,6 +137,7 @@ import qualified Data.ByteString.Short.Internal as BSS
 import qualified Data.Bytes as Bytes
 import qualified Data.Bytes.Parser as Parser
 import qualified Data.Bytes.Parser.Latin as Latin
+import qualified Data.Char as Char
 import qualified Data.Primitive as PM
 import qualified Data.Text as Text
 import qualified Data.Text.Array as TArray
@@ -731,16 +732,48 @@ decodeIPv4TextMaybe t = case decodeIPv4TextReader t of
 
 decodeIPv4TextReader :: TextRead.Reader IPv4
 decodeIPv4TextReader t1' = do
-  (a,t2) <- TextRead.decimal t1'
+  (a,t2) <- readOctet t1'
   t2' <- stripDecimal t2
-  (b,t3) <- TextRead.decimal t2'
+  (b,t3) <- readOctet t2'
   t3' <- stripDecimal t3
-  (c,t4) <- TextRead.decimal t3'
+  (c,t4) <- readOctet t3'
   t4' <- stripDecimal t4
-  (d,t5) <- TextRead.decimal t4'
-  if a > 255 || b > 255 || c > 255 || d > 255
-    then Left ipOctetSizeErrorMsg
-    else Right (fromOctets' a b c d,t5)
+  (d,t5) <- readOctet t4'
+  Right (fromOctets' a b c d,t5)
+
+-- | Read an IPv4 octet (@0 <= n <= 255@)
+--
+-- The input must begin with at least one decimal digit.  Input is consumed
+-- until a non-digit is reached, the end of the input is reached, or the
+-- accumulated value exceeds the maximum bound (255).  As with
+-- 'TextRead.decimal', any number of leading zeros are permitted.
+--
+-- Optimizations:
+--
+-- * The 'Char.isDigit' and 'Char.digitToInt' functions are avoided in order
+--   to avoiding checking the range more than once.  This implementation calls
+--   'Char.ord' (once) and uses the result for both the range check and the
+--   calculation.
+-- * The type of the accumulated value is 'Int', allowing for a single
+--   'fromIntegral' call instead of one for each digit.  This is possible
+--   because the maximum bound (255) is sufficiently less than the maximum
+--   bound of 'Int'.  Specifically: @255 * 10 + Char.ord '9' <= maxBound@
+-- * This implementation does not make use of @UnboxedTuples@ because the
+--   @span_@ function is part of the internal API.  Additional performance
+--   could be gained by using this internal API function.
+readOctet :: TextRead.Reader Word
+readOctet t = do
+  let (digits, rest) = Text.span Char.isDigit t
+  when (Text.null digits) $ Left "octet does not start with a digit"
+  case Text.foldr go Just digits 0 of
+    Just n  -> Right (fromIntegral n, rest)
+    Nothing -> Left ipOctetSizeErrorMsg
+  where
+  go :: Char -> (Int -> Maybe Int) -> Int -> Maybe Int
+  go !d !f !n =
+    let d' = Char.ord d - 48
+        n' = n * 10 + d'
+    in  if d' >= 0 && d' <=9 && n' <= 255 then f n' else Nothing
 
 stripDecimal :: Text -> Either String Text
 stripDecimal t = case Text.uncons t of
