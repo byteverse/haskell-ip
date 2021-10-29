@@ -7,6 +7,7 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 ## [1.7.4] - 2021-??-??
 
 - Add `decodeUtf8Bytes` to `Net.IP`.
+- Fix IPv4 octet overflow bug (#74)
 
 ## [1.7.3] - 2021-01-22
 
