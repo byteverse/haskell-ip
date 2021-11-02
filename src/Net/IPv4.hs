@@ -771,9 +771,8 @@ readOctet t = do
   where
   go :: Char -> (Int -> Maybe Int) -> Int -> Maybe Int
   go !d !f !n =
-    let d' = Char.ord d - 48
-        n' = n * 10 + d'
-    in  if d' >= 0 && d' <=9 && n' <= 255 then f n' else Nothing
+    let n' = n * 10 + Char.ord d - 48
+    in  if n' <= 255 then f n' else Nothing
 
 stripDecimal :: Text -> Either String Text
 stripDecimal t = case Text.uncons t of
