@@ -140,6 +140,12 @@ tests = testGroup "tests"
       , PH.testCase "S" $ IPv4.reserved (IPv4.ipv4 192 88 99 0) @=? True
       , PH.testCase "T" $ IPv4.reserved (IPv4.ipv4 192 0 1 0) @=? False
       ]
+    , testGroup "private"
+      [ PH.testCase "A" $ IPv4.private (IPv4.ipv4 198 73 8 38) @=? False
+      , PH.testCase "B" $ IPv4.private (IPv4.ipv4 192 168 100 5) @=? True
+      , PH.testCase "C" $ IPv4.private (IPv4.ipv4 10 0 0 0) @=? True
+      , PH.testCase "D" $ IPv4.private (IPv4.ipv4 10 255 255 255) @=? True
+      ]
     ]
   , testGroup "IPv6 Range Operations"
     [ testProperty "Idempotence of normalizing IPv6 range"
