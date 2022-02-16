@@ -48,6 +48,9 @@ module Net.IPv4
   , parserUtf8Bytes
   , byteArrayBuilderUtf8
   , boundedBuilderUtf8
+    -- ** Non-textual Bytes
+  , boundedBuilderOctetsBE
+  , boundedBuilderOctetsLE
     -- ** String
     -- $string
   , encodeString
@@ -164,10 +167,16 @@ import qualified Data.Aeson.Key as AesonKey
 --
 -- >>> :set -XOverloadedStrings
 -- >>> import Test.QuickCheck (Arbitrary(..))
+-- >>> import Net.IPv4 (getIPv4)
 -- >>> import qualified Prelude as P
 -- >>> import qualified Data.Text.IO as T
+-- >>> import qualified Data.Bytes.Text.Ascii as Ascii
+-- >>> import qualified Data.Attoparsec.Text as AT
+-- >>> import qualified Data.ByteString.Builder as Builder
+-- >>> import qualified Data.Bytes.Builder as UB
+-- >>> import qualified Data.Attoparsec.ByteString.Char8 as AB
 -- >>> instance Arbitrary IPv4 where { arbitrary = fmap IPv4 arbitrary }
--- >>> instance Arbitrary IPv4Range where { arbitrary = IPv4Range <$> arbitrary <*> arbitrary }
+-- >>> instance Arbitrary IPv4.IPv4Range where { arbitrary = IPv4.IPv4Range <$> arbitrary <*> arbitrary }
 -- >>> import qualified Data.Bytes.Chunks as Chunks
 
 
@@ -178,7 +187,7 @@ import qualified Data.Aeson.Key as AesonKey
 --   Additionally, it is used for the 'Show' and 'Read' instances
 --   of 'IPv4' to help keep things readable in GHCi.
 --
---   >>> let addr = ipv4 192 168 1 1
+--   >>> let addr = IPv4.ipv4 192 168 1 1
 --   >>> addr
 --   ipv4 192 168 1 1
 --   >>> getIPv4 addr
@@ -209,28 +218,28 @@ toOctets (IPv4 w) =
 
 -- | The IP address representing any host.
 --
---   >>> any
+--   >>> IPv4.any
 --   ipv4 0 0 0 0
 any :: IPv4
 any = IPv4 0
 
 -- | The local loopback IP address.
 --
---   >>> loopback
+--   >>> IPv4.loopback
 --   ipv4 127 0 0 1
 loopback :: IPv4
 loopback = fromOctets 127 0 0 1
 
 -- | A useful and common alias for 'loopback'.
 --
---   >>> localhost
+--   >>> IPv4.localhost
 --   ipv4 127 0 0 1
 localhost :: IPv4
 localhost = loopback
 
 -- | The broadcast IP address.
 --
---   >>> broadcast
+--   >>> IPv4.broadcast
 --   ipv4 255 255 255 255
 broadcast :: IPv4
 broadcast = fromOctets 255 255 255 255
@@ -312,57 +321,57 @@ mask24 = 0xFFFFFF00
 
 -- | Checks to see if the 'IPv4' address is publicly routable.
 --
--- prop> public x == not (reserved x)
+-- prop> IPv4.public x == not (IPv4.reserved x)
 public :: IPv4 -> Bool
 public = not . reserved
 
 -- | Encode an 'IPv4' address to 'Text' using dot-decimal notation:
 --
---   >>> T.putStrLn (encode (ipv4 192 168 2 47))
+--   >>> T.putStrLn (IPv4.encode (IPv4.ipv4 192 168 2 47))
 --   192.168.2.47
 encode :: IPv4 -> Text
 encode = toDotDecimalText
 
 -- | Decode an 'IPv4' address.
 --
---   >>> decode "192.168.2.47"
+--   >>> IPv4.decode "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
 --
---   >>> decode "10.100.256.256"
+--   >>> IPv4.decode "10.100.256.256"
 --   Nothing
 decode :: Text -> Maybe IPv4
 decode = decodeIPv4TextMaybe
 
 -- | Encode an 'IPv4' address to a text 'TBuilder.Builder'.
 --
---   >>> builder (ipv4 192 168 2 47)
+--   >>> IPv4.builder (IPv4.ipv4 192 168 2 47)
 --   "192.168.2.47"
 builder :: IPv4 -> TBuilder.Builder
 builder = toDotDecimalBuilder
 
 -- | Parse an 'IPv4' address using a 'TextRead.Reader'.
 --
---   >>> reader "192.168.2.47"
+--   >>> IPv4.reader "192.168.2.47"
 --   Right (ipv4 192 168 2 47,"")
 --
---   >>> reader "192.168.2.470"
+--   >>> IPv4.reader "192.168.2.470"
 --   Left "All octets in an IPv4 address must be between 0 and 255"
 reader :: TextRead.Reader IPv4
 reader = decodeIPv4TextReader
 
 -- | Parse an 'IPv4' address using a 'AT.Parser'.
 --
---   >>> AT.parseOnly parser "192.168.2.47"
+--   >>> AT.parseOnly IPv4.parser "192.168.2.47"
 --   Right (ipv4 192 168 2 47)
 --
---   >>> AT.parseOnly parser "192.168.2.470"
+--   >>> AT.parseOnly IPv4.parser "192.168.2.470"
 --   Left "Failed reading: All octets in an IPv4 address must be between 0 and 255"
 parser :: AT.Parser IPv4
 parser = dotDecimalParser
 
 -- | Encode an 'IPv4' address to a UTF-8 encoded 'ByteString'.
 --
---   >>> encodeUtf8 (ipv4 192 168 2 47)
+--   >>> IPv4.encodeUtf8 (IPv4.ipv4 192 168 2 47)
 --   "192.168.2.47"
 encodeUtf8 :: IPv4 -> ByteString
 encodeUtf8 = toBSPreAllocated
@@ -408,7 +417,7 @@ toBSPreAllocated (IPv4 !w) = I.unsafeCreateUptoN 15 (\ptr1 ->
 
 -- | Decode a UTF8-encoded 'ByteString' into an 'IPv4'.
 --
---   >>> decodeUtf8 "192.168.2.47"
+--   >>> IPv4.decodeUtf8 "192.168.2.47"
 --   Just (ipv4 192 168 2 47)
 --
 --   Currently not terribly efficient since the implementation
@@ -421,7 +430,7 @@ decodeUtf8 = decode <=< rightToMaybe . decodeUtf8'
 
 -- | Decode 'ShortText' as an 'IPv4' address.
 --
---   >>> decodeShort "192.168.3.48"
+--   >>> IPv4.decodeShort "192.168.3.48"
 --   Just (ipv4 192 168 3 48)
 decodeShort :: ShortText -> Maybe IPv4
 decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
@@ -429,7 +438,7 @@ decodeShort t = decodeUtf8Bytes (Bytes.fromByteArray b)
 
 -- | Encode an 'IPv4' address as 'ShortText'.
 --
---   >>> encodeShort (ipv4 192 168 5 99)
+--   >>> IPv4.encodeShort (IPv4.ipv4 192 168 5 99)
 --   "192.168.5.99"
 encodeShort :: IPv4 -> ShortText
 encodeShort !w = id
@@ -447,7 +456,7 @@ byteArrayToShortByteString (PM.ByteArray x) = BSS.SBS x
 
 -- | Decode UTF-8-encoded 'Bytes' into an 'IPv4' address.
 --
---   >>> decodeUtf8Bytes (Bytes.fromAsciiString "127.0.0.1")
+--   >>> IPv4.decodeUtf8Bytes (Ascii.fromString "127.0.0.1")
 --   Just (ipv4 127 0 0 1)
 decodeUtf8Bytes :: Bytes.Bytes -> Maybe IPv4
 decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
@@ -458,7 +467,7 @@ decodeUtf8Bytes !b = case Parser.parseBytes (parserUtf8Bytes ()) b of
 
 -- | Parse UTF-8-encoded 'Bytes' as an 'IPv4' address.
 --
---   >>> Parser.parseBytes (parserUtf8Bytes ()) (Bytes.fromAsciiString "10.0.1.254")
+--   >>> Parser.parseBytes (IPv4.parserUtf8Bytes ()) (Ascii.fromString "10.0.1.254")
 --   Success (Slice {offset = 10, length = 0, value = ipv4 10 0 1 254})
 parserUtf8Bytes :: e -> Parser.Parser e s IPv4
 {-# inline parserUtf8Bytes #-}
@@ -480,9 +489,9 @@ parserUtf8Bytes# e = Parser.unboxWord32 $ do
 -- | Parse UTF-8-encoded 'Bytes' into an 'IPv4Range'.
 -- This requires the mask to be present.
 --
--- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "192.168.0.0/16")
+-- >>> maybe (putStrLn "nope") IPv4.printRange $ Parser.parseBytesMaybe (IPv4.parserRangeUtf8Bytes ()) (Ascii.fromString "192.168.0.0/16")
 -- 192.168.0.0/16
--- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8Bytes ()) (Bytes.fromAsciiString "10.10.10.1")
+-- >>> maybe (putStrLn "nope") IPv4.printRange $ Parser.parseBytesMaybe (IPv4.parserRangeUtf8Bytes ()) (Ascii.fromString "10.10.10.1")
 -- nope
 --
 -- See 'parserRangeUtf8BytesLenient' for a variant that treats
@@ -499,9 +508,9 @@ parserRangeUtf8Bytes e = do
 -- | Variant of 'parserRangeUtf8Bytes' that allows the mask
 -- to be omitted. An omitted mask is treated as a @/32@ mask.
 --
--- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "192.168.0.0/16")
+-- >>> maybe (putStrLn "nope") IPv4.printRange $ Parser.parseBytesMaybe (IPv4.parserRangeUtf8BytesLenient ()) (Ascii.fromString "192.168.0.0/16")
 -- 192.168.0.0/16
--- >>> maybe (putStrLn "nope") printRange $ Parser.parseBytesMaybe (parserRangeUtf8BytesLenient ()) (Bytes.fromAsciiString "10.10.10.1")
+-- >>> maybe (putStrLn "nope") IPv4.printRange $ Parser.parseBytesMaybe (IPv4.parserRangeUtf8BytesLenient ()) (Ascii.fromString "10.10.10.1")
 -- 10.10.10.1/32
 parserRangeUtf8BytesLenient :: e -> Parser.Parser e s IPv4Range
 parserRangeUtf8BytesLenient e = do
@@ -516,14 +525,14 @@ parserRangeUtf8BytesLenient e = do
 
 -- | Encode an 'IPv4' as a bytestring 'Builder.Builder'
 --
--- >>> Builder.toLazyByteString (builderUtf8 (fromOctets 192 168 2 12))
+-- >>> Builder.toLazyByteString (IPv4.builderUtf8 (IPv4.fromOctets 192 168 2 12))
 -- "192.168.2.12"
 builderUtf8 :: IPv4 -> Builder.Builder
 builderUtf8 = Builder.byteString . encodeUtf8
 
 -- | Encode an 'IPv4' address as a unbounded byte array builder.
 --
--- >>> Chunks.concat (UB.run 1 (byteArrayBuilderUtf8 (fromOctets 192 168 2 13)))
+-- >>> Chunks.concat (UB.run 1 (IPv4.byteArrayBuilderUtf8 (IPv4.fromOctets 192 168 2 13)))
 -- [0x31,0x39,0x32,0x2e,0x31,0x36,0x38,0x2e,0x32,0x2e,0x31,0x33]
 --
 -- Note that period is encoded by UTF-8 as @0x2e@.
@@ -532,7 +541,7 @@ byteArrayBuilderUtf8 = UB.fromBounded Nat.constant . boundedBuilderUtf8
 
 -- | Encode an 'IPv4' address as a bounded byte array builder.
 --
--- >>> BB.run Nat.constant (boundedBuilderUtf8 (fromOctets 192 168 2 14))
+-- >>> BB.run Nat.constant (IPv4.boundedBuilderUtf8 (IPv4.fromOctets 192 168 2 14))
 -- [0x31, 0x39, 0x32, 0x2e, 0x31, 0x36, 0x38, 0x2e, 0x32, 0x2e, 0x31, 0x34]
 --
 -- Note that period is encoded by UTF-8 as @0x2e@.
@@ -557,12 +566,56 @@ boundedBuilderUtf8 (IPv4 !w) =
   w3 = fromIntegral (shiftR w 8) :: Word8
   w4 = fromIntegral w :: Word8
 
+-- | Encode 'IPv4' address to a sequence a 4 bytes with the first
+-- byte representing corresponding to the most significant byte in
+-- the address.
+--
+-- >>> BB.run Nat.constant (IPv4.boundedBuilderOctetsBE (IPv4.fromOctets 0xc0 0xa8 0x02 0x1f))
+-- [0xc0, 0xa8, 0x02, 0x1f]
+boundedBuilderOctetsBE :: IPv4 -> BB.Builder 4
+{-# inline boundedBuilderOctetsBE #-}
+boundedBuilderOctetsBE (IPv4 !w) =
+  BB.word8 w1
+  `BB.append`
+  BB.word8 w2
+  `BB.append`
+  BB.word8 w3
+  `BB.append`
+  BB.word8 w4
+  where
+  w1 = fromIntegral (shiftR w 24) :: Word8
+  w2 = fromIntegral (shiftR w 16) :: Word8
+  w3 = fromIntegral (shiftR w 8) :: Word8
+  w4 = fromIntegral w :: Word8
+
+-- | Encode 'IPv4' address to a sequence a 4 bytes with the first
+-- byte representing corresponding to the least significant byte in
+-- the address.
+--
+-- >>> BB.run Nat.constant (IPv4.boundedBuilderOctetsLE (IPv4.fromOctets 0xc0 0xa8 0x02 0x1f))
+-- [0x1f, 0x02, 0xa8, 0xc0]
+boundedBuilderOctetsLE :: IPv4 -> BB.Builder 4
+{-# inline boundedBuilderOctetsLE #-}
+boundedBuilderOctetsLE (IPv4 !w) =
+  BB.word8 w4
+  `BB.append`
+  BB.word8 w3
+  `BB.append`
+  BB.word8 w2
+  `BB.append`
+  BB.word8 w1
+  where
+  w1 = fromIntegral (shiftR w 24) :: Word8
+  w2 = fromIntegral (shiftR w 16) :: Word8
+  w3 = fromIntegral (shiftR w 8) :: Word8
+  w4 = fromIntegral w :: Word8
+
 -- | Parse an 'IPv4' using a 'AB.Parser'.
 --
---   >>> AB.parseOnly parserUtf8 "192.168.2.47"
+--   >>> AB.parseOnly IPv4.parserUtf8 "192.168.2.47"
 --   Right (ipv4 192 168 2 47)
 --
---   >>> AB.parseOnly parserUtf8 "192.168.2.470"
+--   >>> AB.parseOnly IPv4.parserUtf8 "192.168.2.470"
 --   Left "Failed reading: All octets in an ipv4 address must be between 0 and 255"
 parserUtf8 :: AB.Parser IPv4
 parserUtf8 = fromOctets'
@@ -955,9 +1008,9 @@ range addr len = normalize (IPv4Range addr len)
 -- handled. This makes the range broader if it cannot be represented in
 -- CIDR notation.
 --
--- >>> printRange $ fromBounds (fromOctets 192 168 16 0) (fromOctets 192 168 19 255)
+-- >>> IPv4.printRange $ IPv4.fromBounds (IPv4.fromOctets 192 168 16 0) (IPv4.fromOctets 192 168 19 255)
 -- 192.168.16.0/22
--- >>> printRange $ fromBounds (fromOctets 10 0 5 7) (fromOctets 10 0 5 14)
+-- >>> IPv4.printRange $ IPv4.fromBounds (IPv4.fromOctets 10 0 5 7) (IPv4.fromOctets 10 0 5 14)
 -- 10.0.5.0/28
 fromBounds :: IPv4 -> IPv4 -> IPv4Range
 fromBounds (IPv4 a) (IPv4 b) =
@@ -968,10 +1021,10 @@ maskFromBounds lo hi = fromIntegral (Bits.countLeadingZeros (Bits.xor lo hi))
 
 -- | Checks to see if an 'IPv4' address belongs in the 'IPv4Range'.
 --
--- >>> let ip = fromOctets 10 10 1 92
--- >>> contains (IPv4Range (fromOctets 10 0 0 0) 8) ip
+-- >>> let ip = IPv4.fromOctets 10 10 1 92
+-- >>> IPv4.contains (IPv4.IPv4Range (IPv4.fromOctets 10 0 0 0) 8) ip
 -- True
--- >>> contains (IPv4Range (fromOctets 10 11 0 0) 16) ip
+-- >>> IPv4.contains (IPv4.IPv4Range (IPv4.fromOctets 10 11 0 0) 16) ip
 -- False
 --
 -- Typically, element-testing functions are written to take the element
@@ -979,8 +1032,8 @@ maskFromBounds lo hi = fromIntegral (Bits.countLeadingZeros (Bits.xor lo hi))
 -- written the other way for better performance when iterating over a collection.
 -- For example, you might test elements in a list for membership like this:
 --
--- >>> let r = IPv4Range (fromOctets 10 10 10 6) 31
--- >>> mapM_ (P.print . contains r) (take 5 $ iterate succ $ fromOctets 10 10 10 5)
+-- >>> let r = IPv4.IPv4Range (IPv4.fromOctets 10 10 10 6) 31
+-- >>> mapM_ (P.print . IPv4.contains r) (take 5 $ iterate succ $ IPv4.fromOctets 10 10 10 5)
 -- False
 -- True
 -- True
@@ -1002,27 +1055,27 @@ mask = complement . shiftR 0xffffffff . fromIntegral
 -- | This is provided to mirror the interface provided by @Data.Set@. It
 -- behaves just like 'contains' but with flipped arguments.
 --
--- prop> member ip r == contains r ip
+-- prop> IPv4.member ip r == IPv4.contains r ip
 member :: IPv4 -> IPv4Range -> Bool
 member = flip contains
 
 -- | The inclusive lower bound of an 'IPv4Range'. This is conventionally
 --   understood to be the broadcast address of a subnet. For example:
 --
--- >>> T.putStrLn $ encode $ lowerInclusive $ IPv4Range (ipv4 10 10 1 160) 25
+-- >>> T.putStrLn $ IPv4.encode $ IPv4.lowerInclusive $ IPv4.IPv4Range (IPv4.ipv4 10 10 1 160) 25
 -- 10.10.1.128
 --
 -- Note that the lower bound of a normalized 'IPv4Range' is simply the
 -- ip address of the range:
 --
--- prop> lowerInclusive r == ipv4RangeBase (normalize r)
+-- prop> IPv4.lowerInclusive r == IPv4.ipv4RangeBase (IPv4.normalize r)
 lowerInclusive :: IPv4Range -> IPv4
 lowerInclusive (IPv4Range (IPv4 w) len) =
   IPv4 (w .&. mask len)
 
 -- | The inclusive upper bound of an 'IPv4Range'.
 --
---   >>> T.putStrLn $ encode $ upperInclusive $ IPv4Range (ipv4 10 10 1 160) 25
+--   >>> T.putStrLn $ IPv4.encode $ IPv4.upperInclusive $ IPv4.IPv4Range (IPv4.ipv4 10 10 1 160) 25
 --   10.10.1.255
 upperInclusive :: IPv4Range -> IPv4
 upperInclusive (IPv4Range (IPv4 w) len) =
@@ -1054,8 +1107,8 @@ wordSuccessorsM = go where
 -- | Convert an 'IPv4Range' into a list of the 'IPv4' addresses that
 --   are in it.
 --
--- >>> let r = IPv4Range (fromOctets 192 168 1 8) 30
--- >>> mapM_ (T.putStrLn . encode) (toList r)
+-- >>> let r = IPv4.IPv4Range (IPv4.fromOctets 192 168 1 8) 30
+-- >>> mapM_ (T.putStrLn . IPv4.encode) (IPv4.toList r)
 -- 192.168.1.8
 -- 192.168.1.9
 -- 192.168.1.10
@@ -1089,9 +1142,9 @@ private16 = IPv4Range (fromOctets 192 168 0 0) 16
 -- 'IPv4' inside the 'IPv4Range' is changed so that the insignificant
 -- bits are zeroed out. For example:
 --
--- >>> printRange $ normalize $ IPv4Range (fromOctets 192 168 1 19) 24
+-- >>> IPv4.printRange $ IPv4.normalize $ IPv4.IPv4Range (IPv4.fromOctets 192 168 1 19) 24
 -- 192.168.1.0/24
--- >>> printRange $ normalize $ IPv4Range (fromOctets 192 168 1 163) 28
+-- >>> IPv4.printRange $ IPv4.normalize $ IPv4.IPv4Range (IPv4.fromOctets 192 168 1 163) 28
 -- 192.168.1.160/28
 --
 -- The second effect of this is that the mask length is lowered to
@@ -1102,7 +1155,7 @@ private16 = IPv4Range (fromOctets 192 168 0 0) 16
 --
 -- Note that 'normalize' is idempotent, that is:
 --
--- prop> normalize r == (normalize . normalize) r
+-- prop> IPv4.normalize r == (IPv4.normalize . IPv4.normalize) r
 normalize :: IPv4Range -> IPv4Range
 normalize (IPv4Range (IPv4 w) len) =
   let len' = min len 32
@@ -1111,30 +1164,30 @@ normalize (IPv4Range (IPv4 w) len) =
 
 -- | Encode an 'IPv4Range' as 'Text'.
 --
---   >>> encodeRange (IPv4Range (ipv4 172 16 0 0) 12)
+--   >>> IPv4.encodeRange (IPv4.IPv4Range (IPv4.ipv4 172 16 0 0) 12)
 --   "172.16.0.0/12"
 encodeRange :: IPv4Range -> Text
 encodeRange = rangeToDotDecimalText
 
 -- | Decode an 'IPv4Range' from 'Text'.
 --
---   >>> decodeRange "172.16.0.0/12"
+--   >>> IPv4.decodeRange "172.16.0.0/12"
 --   Just (IPv4Range {ipv4RangeBase = ipv4 172 16 0 0, ipv4RangeLength = 12})
---   >>> decodeRange "192.168.25.254/16"
+--   >>> IPv4.decodeRange "192.168.25.254/16"
 --   Just (IPv4Range {ipv4RangeBase = ipv4 192 168 0 0, ipv4RangeLength = 16})
 decodeRange :: Text -> Maybe IPv4Range
 decodeRange = rightToMaybe . AT.parseOnly (parserRange <* AT.endOfInput)
 
 -- | Encode an 'IPv4Range' to a 'TBuilder.Builder'.
 --
---   >>> builderRange (IPv4Range (ipv4 172 16 0 0) 12)
+--   >>> IPv4.builderRange (IPv4.IPv4Range (IPv4.ipv4 172 16 0 0) 12)
 --   "172.16.0.0/12"
 builderRange :: IPv4Range -> TBuilder.Builder
 builderRange = rangeToDotDecimalBuilder
 
 -- | Parse an 'IPv4Range' using a 'AT.Parser'.
 --
---   >>> AT.parseOnly parserRange "192.168.25.254/16"
+--   >>> AT.parseOnly IPv4.parserRange "192.168.25.254/16"
 --   Right (IPv4Range {ipv4RangeBase = ipv4 192 168 0 0, ipv4RangeLength = 16})
 parserRange :: AT.Parser IPv4Range
 parserRange = do

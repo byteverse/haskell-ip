@@ -21,7 +21,7 @@ import qualified Test.Tasty.HUnit as PH
 
 import Net.Types (IP,IPv4(..),IPv4Range(..),Mac(..),IPv6(..),MacGrouping(..),MacCodec(..),IPv6Range(..))
 import Data.WideWord (Word128(..))
-import qualified Data.Bytes as Bytes
+import qualified Data.Bytes.Text.Ascii as Ascii
 import qualified Data.Text as Text
 import qualified Data.Text.Short as TS
 import qualified Data.ByteString.Char8 as BC8
@@ -103,7 +103,7 @@ tests = testGroup "tests"
               (Text.pack str)
             )
       , PH.testCase "Bytes Parser Test Cases" $ testIPv6Parser $ \str ->
-          fmap HexIPv6 (IPv6.decodeUtf8Bytes (Bytes.fromAsciiString str))
+          fmap HexIPv6 (IPv6.decodeUtf8Bytes (Ascii.fromString str))
       , PH.testCase "Encode test cases" (testIPv6Encode IPv6.encode)
       , PH.testCase "Encode ShortText" (testIPv6Encode (TS.toText . IPv6.encodeShort))
       , PH.testCase "Parser Failure Test Cases"
@@ -361,7 +361,7 @@ expectIPv6BytesParserFailure :: String -> Assertion
 expectIPv6BytesParserFailure s =
   Nothing
   @=?
-  IPv6.decodeUtf8Bytes (Bytes.fromAsciiString s)
+  IPv6.decodeUtf8Bytes (Ascii.fromString s)
 
 testIPv6Encode :: (IPv6 -> Text.Text) -> Assertion
 testIPv6Encode enc = do
@@ -521,4 +521,4 @@ arbitraryMacSeparator :: Gen Char
 arbitraryMacSeparator = elements [':','-','.','_']
 
 byteStringToBytes :: BC8.ByteString -> Bytes
-byteStringToBytes = Bytes.fromAsciiString . BC8.unpack
+byteStringToBytes = Ascii.fromString . BC8.unpack
