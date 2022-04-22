@@ -8,6 +8,8 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 
 - Add `boundedBuilderOctetsBE` and `boundedBuilderOctetsLE` to `Net.IPv4`.
 - Make doctests work again. Requires `doctest-0.20` or higher.
+- Bump upper bound on `attoparsec` to `< 0.15`.
+- Bump upper bound on `hashable` to `< 1.5`.
 
 ## [1.7.4] - 2021-12-28
 
