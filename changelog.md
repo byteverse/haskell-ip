@@ -10,6 +10,8 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 - Make doctests work again. Requires `doctest-0.20` or higher.
 - Bump upper bound on `attoparsec` to `< 0.15`.
 - Bump upper bound on `hashable` to `< 1.5`.
+- Derive `Generic` for `Net.IPv6.IPv6`.
+- Bump lower bound on `wide-word` to `>= 0.1.1.2`.
 
 ## [1.7.4] - 2021-12-28
 
