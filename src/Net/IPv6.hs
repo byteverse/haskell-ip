@@ -86,7 +86,6 @@ import Data.Word
 import Foreign.Storable (Storable)
 import GHC.Exts (Int#,Word#,Int(I#))
 import GHC.Generics (Generic)
-import GHC.Word (Word16(W16#))
 import Numeric (showHex)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
@@ -106,6 +105,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Text.Short as TS
+import qualified GHC.Word.Compat as Compat
 import qualified Net.IPv4 as IPv4
 
 -- $setup
@@ -483,7 +483,7 @@ firstPiece !w !start = case start of
 -- this inlining improves performance of encodeShort by 50%.
 piece :: Int -> Word16 -> Int -> Int -> BB.Builder 5
 {-# inline piece #-}
-piece (I# ix) (W16# w) (I# start) (I# end) =
+piece (I# ix) (Compat.W16# w) (I# start) (I# end) =
   piece# ix w start end
 
 piece# :: Int# -> Word# -> Int# -> Int# -> BB.Builder 5
@@ -498,7 +498,7 @@ piece# !ix# !w# !start# !end# = case compare ix start of
   ix = I# ix#
   start = I# start#
   end = I# end#
-  w = W16# w#
+  w = Compat.W16# w#
 
 lastPiece :: Word16 -> Int -> BB.Builder 5
 lastPiece !w !end = case end of

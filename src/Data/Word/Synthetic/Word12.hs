@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PatternSynonyms   #-}
 
 
 -- |
@@ -43,6 +44,7 @@ import           GHC.Read
 import           GHC.Real
 import           GHC.Show
 import           GHC.Word
+import qualified GHC.Word.Compat as Compat
 
 ------------------------------------------------------------------------
 
@@ -183,7 +185,7 @@ instance FiniteBits Word12 where
     countTrailingZeros (W12# x#) = I# (word2Int# (ctz12# x#))
 
 {-# RULES
-"fromIntegral/Word8->Word12"    fromIntegral = \(W8# x#) -> W12# x#
+"fromIntegral/Word8->Word12"    fromIntegral = \x -> case x of { Compat.W8# y -> W12# y }
 "fromIntegral/Word12->Word12"   fromIntegral = id :: Word12 -> Word12
 "fromIntegral/Word12->Integer"  fromIntegral = toInteger :: Word12 -> Integer
 "fromIntegral/a->Word12"        fromIntegral = \x -> case fromIntegral x of W# x# -> W12# (narrow12Word# x#)

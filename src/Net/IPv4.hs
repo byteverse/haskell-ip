@@ -156,6 +156,7 @@ import qualified Data.Vector.Generic.Mutable as MGVector
 import qualified Data.Vector.Primitive as PVector
 import qualified Data.Vector.Unboxed as UVector
 import qualified Data.Vector.Unboxed.Mutable as MUVector
+import qualified GHC.Word.Compat as Compat
 
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as AesonKey
@@ -659,11 +660,13 @@ type IPv4# = Word#
 
 -- | Convert an unboxed IPv4 address to a boxed one.
 box :: IPv4# -> IPv4
-box w = IPv4 (W32# w)
+{-# inline box #-}
+box w = IPv4 (Compat.W32# w)
 
 -- | Convert a boxed IPv4 address to an unboxed one.
 unbox :: IPv4 -> IPv4#
-unbox (IPv4 (W32# w)) = w
+{-# inline unbox #-}
+unbox (IPv4 (Compat.W32# w)) = w
 
 -- | A 32-bit Internet Protocol version 4 address. To use this with the
 --   @network@ library, it is necessary to use @Network.Socket.htonl@ to
