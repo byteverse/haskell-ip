@@ -1,8 +1,9 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
@@ -34,12 +35,13 @@ import Text.Printf
 import Data.ByteString.Internal (ByteString(..))
 import Foreign
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.Semigroup as Semigroup
-import qualified Data.ByteString.Internal as BI
+
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC8
+import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Primitive as PM
+import qualified Data.Semigroup as Semigroup
 
 data Builder a where
   BuilderStatic :: !ByteString -> Builder a
@@ -170,5 +172,3 @@ c2w = fromIntegral . ord
 --   <> contramapBuilder (word8At 8) twoDigitWord8Hex
 --   <> BuilderStatic ":"
 --   <> contramapBuilder (word8At 0) twoDigitWord8Hex
-
-

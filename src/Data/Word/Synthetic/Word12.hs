@@ -43,7 +43,7 @@ import           GHC.Num
 import           GHC.Read
 import           GHC.Real
 import           GHC.Show
-import           GHC.Word
+
 import qualified GHC.Word.Compat as Compat
 
 ------------------------------------------------------------------------

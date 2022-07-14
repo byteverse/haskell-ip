@@ -119,11 +119,11 @@ import Foreign.Ptr (Ptr,plusPtr)
 import Foreign.Storable (Storable, poke)
 import GHC.Exts (Word#)
 import GHC.Generics (Generic)
-import GHC.Word (Word32(W32#))
 import Prelude hiding (any, print, print)
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Printf (printf)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+
 import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
