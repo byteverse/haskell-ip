@@ -2,5 +2,5 @@ packages: .
 
 source-repository-package
     type: git
-    location: https://github.com/edemko/word-compat
-    tag: 452b4ebcfed21dd560dedf55d5031bec184f3698
+    location: https://github.com/fumieval/word-compat.git
+    tag: bf20ee95b82414d96eb83863f50212e6c31b8930
