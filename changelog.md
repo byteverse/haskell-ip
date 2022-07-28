@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## [1.7.5] - 2022-xx-xx
+## [1.7.5] - 2022-07-28
 
 - Add `boundedBuilderOctetsBE` and `boundedBuilderOctetsLE` to `Net.IPv4`.
 - Make doctests work again. Requires `doctest-0.20` or higher.
@@ -12,6 +12,7 @@ and this project adheres to the [Haskell Package Versioning Policy](https://pvp.
 - Bump upper bound on `hashable` to `< 1.5`.
 - Derive `Generic` for `Net.IPv6.IPv6`.
 - Bump lower bound on `wide-word` to `>= 0.1.1.2`.
+- Add compatibility with GHC 9.2.3.
 
 ## [1.7.4] - 2021-12-28
 
