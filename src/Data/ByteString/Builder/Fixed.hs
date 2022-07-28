@@ -1,8 +1,9 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
@@ -34,11 +35,13 @@ import Text.Printf
 import Data.ByteString.Internal (ByteString(..))
 import Foreign
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.Semigroup as Semigroup
-import qualified Data.ByteString.Internal as BI
+
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC8
+import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Short.Internal as SBS
+import qualified Data.Primitive as PM
+import qualified Data.Semigroup as Semigroup
 
 data Builder a where
   BuilderStatic :: !ByteString -> Builder a
@@ -74,6 +77,10 @@ fromByteString :: ByteString -> Builder a
 fromByteString = BuilderStatic
 {-# INLINE fromByteString #-}
 
+unsafeIndexShortByteString :: ShortByteString -> Int -> Word8
+unsafeIndexShortByteString (SBS.SBS x) i = PM.indexByteArray (PM.ByteArray x) i
+{-# INLINE unsafeIndexShortByteString #-}
+
 run :: Builder a -> a -> ByteString
 run x a = case x of
   BuilderStatic t -> t
@@ -87,9 +94,9 @@ word12HexFixedGeneral upper = BuilderFunction (BC8.pack "---") $ \i marr w -> do
   let !wInt = fromIntegral w
       !ix = wInt + wInt + wInt
       !arr = if upper then hexValuesWord12Upper else hexValuesWord12Lower
-  pokeByteOff marr i (SBS.unsafeIndex arr ix)
-  pokeByteOff marr (i + 1) (SBS.unsafeIndex arr (ix + 1))
-  pokeByteOff marr (i + 2) (SBS.unsafeIndex arr (ix + 2))
+  pokeByteOff marr i (unsafeIndexShortByteString arr ix)
+  pokeByteOff marr (i + 1) (unsafeIndexShortByteString arr (ix + 1))
+  pokeByteOff marr (i + 2) (unsafeIndexShortByteString arr (ix + 2))
 {-# INLINE word12HexFixedGeneral #-}
 
 word12HexFixedUpper :: Builder Word12
@@ -124,8 +131,8 @@ word8HexFixedGeneral upper = BuilderFunction (BC8.pack "--") $ \i marr w -> do
   let !ix = unsafeShiftL (fromIntegral w) 1
       !ix2 = ix + 1
       !arr = if upper then hexValuesWord8Upper else hexValuesWord8Lower
-  pokeByteOff marr i (SBS.unsafeIndex arr ix)
-  pokeByteOff marr (i + 1) (SBS.unsafeIndex arr ix2)
+  pokeByteOff marr i (unsafeIndexShortByteString arr ix)
+  pokeByteOff marr (i + 1) (unsafeIndexShortByteString arr ix2)
 {-# INLINE word8HexFixedGeneral #-}
 
 hexValuesWord8Upper :: ShortByteString
@@ -165,5 +172,3 @@ c2w = fromIntegral . ord
 --   <> contramapBuilder (word8At 8) twoDigitWord8Hex
 --   <> BuilderStatic ":"
 --   <> contramapBuilder (word8At 0) twoDigitWord8Hex
-
-

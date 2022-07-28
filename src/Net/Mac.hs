@@ -78,7 +78,6 @@ import Data.Word.Synthetic.Word12 (Word12)
 import GHC.Enum (predError, succError)
 import GHC.Exts
 import GHC.Generics (Generic)
-import GHC.Word (Word16(W16#))
 import Text.ParserCombinators.ReadPrec (prec,step)
 import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
 
@@ -101,6 +100,8 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Short.Unsafe as TS
 import qualified Data.Text as Text ()
+import qualified GHC.Prim.Compat as Compat
+import qualified GHC.Word.Compat as Compat
 
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.Key as AK
@@ -736,32 +737,32 @@ instance Prim Mac where
   sizeOf# _ = 6#
   alignment# _ = 2#
   indexByteArray# arr i0 = macFromWord16#
-    (indexWord16Array# arr i)
-    (indexWord16Array# arr (i +# 1#))
-    (indexWord16Array# arr (i +# 2#))
+    (Compat.indexWord16Array# arr i)
+    (Compat.indexWord16Array# arr (i +# 1#))
+    (Compat.indexWord16Array# arr (i +# 2#))
     where !i = 3# *# i0
-  readByteArray# arr i0 s0 = case readWord16Array# arr i s0 of
-    (# s1, a #) -> case readWord16Array# arr (i +# 1#) s1 of
-      (# s2, b #) -> case readWord16Array# arr (i +# 2#) s2 of
+  readByteArray# arr i0 s0 = case Compat.readWord16Array# arr i s0 of
+    (# s1, a #) -> case Compat.readWord16Array# arr (i +# 1#) s1 of
+      (# s2, b #) -> case Compat.readWord16Array# arr (i +# 2#) s2 of
         (# s3, c #) -> (# s3, macFromWord16# a b c #)
     where !i = 3# *# i0
-  writeByteArray# arr i0 m s0 = case writeWord16Array# arr i (macToWord16A# m) s0 of
-    s1 -> case writeWord16Array# arr (i +# 1#) (macToWord16B# m) s1 of
-      s2 -> writeWord16Array# arr (i +# 2#) (macToWord16C# m) s2
+  writeByteArray# arr i0 m s0 = case Compat.writeWord16Array# arr i (macToWord16A# m) s0 of
+    s1 -> case Compat.writeWord16Array# arr (i +# 1#) (macToWord16B# m) s1 of
+      s2 -> Compat.writeWord16Array# arr (i +# 2#) (macToWord16C# m) s2
     where !i = 3# *# i0
   indexOffAddr# arr i0 = macFromWord16#
-    (indexWord16OffAddr# arr i)
-    (indexWord16OffAddr# arr (i +# 1#))
-    (indexWord16OffAddr# arr (i +# 2#))
+    (Compat.indexWord16OffAddr# arr i)
+    (Compat.indexWord16OffAddr# arr (i +# 1#))
+    (Compat.indexWord16OffAddr# arr (i +# 2#))
     where !i = 3# *# i0
-  readOffAddr# arr i0 s0 = case readWord16OffAddr# arr i s0 of
-    (# s1, a #) -> case readWord16OffAddr# arr (i +# 1#) s1 of
-      (# s2, b #) -> case readWord16OffAddr# arr (i +# 2#) s2 of
+  readOffAddr# arr i0 s0 = case Compat.readWord16OffAddr# arr i s0 of
+    (# s1, a #) -> case Compat.readWord16OffAddr# arr (i +# 1#) s1 of
+      (# s2, b #) -> case Compat.readWord16OffAddr# arr (i +# 2#) s2 of
         (# s3, c #) -> (# s3, macFromWord16# a b c #)
     where !i = 3# *# i0
-  writeOffAddr# arr i0 m s0 = case writeWord16OffAddr# arr i (macToWord16A# m) s0 of
-    s1 -> case writeWord16OffAddr# arr (i +# 1#) (macToWord16B# m) s1 of
-      s2 -> writeWord16OffAddr# arr (i +# 2#) (macToWord16C# m) s2
+  writeOffAddr# arr i0 m s0 = case Compat.writeWord16OffAddr# arr i (macToWord16A# m) s0 of
+    s1 -> case Compat.writeWord16OffAddr# arr (i +# 1#) (macToWord16B# m) s1 of
+      s2 -> Compat.writeWord16OffAddr# arr (i +# 2#) (macToWord16C# m) s2
     where !i = 3# *# i0
   setByteArray# arr# i# len# ident = go 0#
     where
@@ -777,22 +778,25 @@ instance Prim Mac where
         else s0
 
 macToWord16A# :: Mac -> Word#
+{-# inline macToWord16A# #-}
 macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of
-  W16# x -> x
+  Compat.W16# x -> x
 
 macToWord16B# :: Mac -> Word#
+{-# inline macToWord16B# #-}
 macToWord16B# (Mac w) = case word64ToWord16 (unsafeShiftR w 16) of
-  W16# x -> x
+  Compat.W16# x -> x
 
 macToWord16C# :: Mac -> Word#
+{-# inline macToWord16C# #-}
 macToWord16C# (Mac w) = case word64ToWord16 w of
-  W16# x -> x
+  Compat.W16# x -> x
 
 macFromWord16# :: Word# -> Word# -> Word# -> Mac
 macFromWord16# a b c = Mac
-    $ (unsafeShiftL (word16ToWord64 (W16# a)) 32)
-  .|. (unsafeShiftL (word16ToWord64 (W16# b)) 16)
-  .|. (word16ToWord64 (W16# c))
+    $ (unsafeShiftL (word16ToWord64 (Compat.W16# a)) 32)
+  .|. (unsafeShiftL (word16ToWord64 (Compat.W16# b)) 16)
+  .|. (word16ToWord64 (Compat.W16# c))
 
 word16ToWord64 :: Word16 -> Word64
 word16ToWord64 = fromIntegral
