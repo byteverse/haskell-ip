@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -24,6 +25,7 @@ module Data.Text.Builder.Variable
 
 import Data.Word
 import Data.Text (Text)
+import Data.Text.Builder.Common.Compat (Codepoint)
 import Control.Monad.ST
 import Data.Char (ord)
 import Data.Vector (Vector)
@@ -120,15 +122,19 @@ _vector tDef v =
         $ \_ marr i -> do
           let (arr,len) = fromMaybe xDef (xs Vector.!? i)
               finalIx = i + len
+#if MIN_VERSION_text(2, 0, 0)
+          A.copyI finalIx marr i arr 0
+#else
           A.copyI marr i arr 0 finalIx
+#endif
           return finalIx
 {-# INLINE _vector #-}
 
-i2w :: Integral a => a -> Word16
+i2w :: Integral a => a -> Codepoint
 i2w v = asciiZero + fromIntegral v
 {-# INLINE i2w #-}
 
-asciiZero :: Word16
+asciiZero :: Codepoint
 asciiZero = 48
 {-# INLINE asciiZero #-}
 
