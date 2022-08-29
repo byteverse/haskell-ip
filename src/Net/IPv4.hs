@@ -110,6 +110,7 @@ import Data.Hashable
 import Data.Ix (Ix)
 import Data.Primitive.Types (Prim)
 import Data.Text (Text)
+import Data.Text.Builder.Common.Compat (Codepoint)
 import Data.Text.Encoding (decodeUtf8')
 import Data.Text.Internal (Text(..))
 import Data.Text.Short (ShortText)
@@ -939,10 +940,10 @@ threeDigits :: ByteString
 threeDigits = foldMap (BC8.pack . printf "%03d") $ enumFromTo (0 :: Int) 999
 {-# NOINLINE threeDigits #-}
 
-i2w :: Integral a => a -> Word16
+i2w :: Integral a => a -> Codepoint
 i2w v = zero + fromIntegral v
 
-zero :: Word16
+zero :: Codepoint
 zero = 48
 
 putAndCount :: Int -> Word -> TArray.MArray s -> ST s Int

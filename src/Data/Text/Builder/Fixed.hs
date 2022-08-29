@@ -26,9 +26,9 @@ import Control.Monad.ST
 #if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
 #endif
-import Data.Word
 import Data.Bits
 import Data.Char (ord)
+import Data.Word
 import Data.Word.Synthetic.Word12 (Word12)
 import Data.Text (Text)
 import qualified Data.Semigroup as Semigroup
@@ -83,7 +83,11 @@ run x = case x of
      in \a ->
           let outArr = runST $ do
                 marr <- A.new len
+#if MIN_VERSION_text(2, 0, 0)
+                A.copyI len marr 0 inArr 0
+#else
                 A.copyI marr 0 inArr 0 len
+#endif
                 f 0 marr a
                 A.unsafeFreeze marr
            in TI.text outArr 0 len

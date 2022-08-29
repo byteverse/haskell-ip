@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## [Unreleased]
+
+- Bump upper bound on `text` to `< 2.1`.
+
 ## [1.7.5] - 2022-07-28
 
 - Add `boundedBuilderOctetsBE` and `boundedBuilderOctetsLE` to `Net.IPv4`.
