@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## [Unreleased]
+## [1.7.6] - 2022-10-07
 
 - Bump upper bound on `text` to `< 2.1`.
+- Add `Hashable` instances for `IP` and `IPv6`.
 
 ## [1.7.5] - 2022-07-28
 

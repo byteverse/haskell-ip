@@ -76,6 +76,7 @@ import Data.Bits
 import Data.Char (chr)
 import Data.Data (Data)
 import Data.Ix (Ix)
+import Data.Hashable (Hashable,hashWithSalt)
 import Data.List (intercalate, group)
 import Data.Primitive (MutablePrimArray)
 import Data.Primitive.Types (Prim)
@@ -126,6 +127,9 @@ import qualified Net.IPv4 as IPv4
 -- | A 128-bit Internet Protocol version 6 address.
 newtype IPv6 = IPv6 { getIPv6 :: Word128 }
   deriving (Bounded,Enum,Eq,Ord,Storable,Bits,FiniteBits,NFData,Prim,Ix,Data,Generic)
+
+instance Hashable IPv6 where
+  hashWithSalt s (IPv6 (Word128 a b)) = hashWithSalt (hashWithSalt s a) b
 
 instance Show IPv6 where
   showsPrec p addr = showParen (p > 10)

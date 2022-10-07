@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -111,7 +112,8 @@ import qualified Data.Aeson.Key as AK
 --   type. It is not considered part of the stable API, and it
 --   allows you to construct invalid MAC addresses.
 newtype Mac = Mac Word64
-  deriving (Eq,Ord,Generic,Ix,Data)
+  deriving stock (Eq,Ord,Generic,Ix,Data)
+  deriving newtype (Hashable)
 
 instance NFData Mac
 
@@ -868,8 +870,6 @@ data MacGrouping
   | MacGroupingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
   | MacGroupingNoSeparator -- ^ No separator, @24AF4B5B0780@
   deriving (Eq,Ord,Show,Read,Generic,Data)
-
-instance Hashable Mac
 
 instance ToJSON Mac where
   toJSON = Aeson.String . encode

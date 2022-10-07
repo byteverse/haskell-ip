@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -Wall #-}
 
@@ -60,6 +62,7 @@ import Data.Aeson (FromJSON(..),ToJSON(..))
 import Data.Bits
 import Data.Coerce (coerce)
 import Data.Data (Data)
+import Data.Hashable (Hashable)
 import Data.Ix (Ix)
 import Data.Text (Text)
 import Data.WideWord (Word128(..))
@@ -236,7 +239,8 @@ print = TIO.putStrLn . encode
 --   of this type. All functions and typeclass methods that convert
 --   'IP' values to text will display it as an 'IPv4' address if possible.
 newtype IP = IP { getIP :: IPv6 }
-  deriving (Eq,Ord,Generic,Ix,Data)
+  deriving stock (Eq,Ord,Generic,Ix,Data)
+  deriving newtype (Hashable)
 
 instance NFData IP
 
