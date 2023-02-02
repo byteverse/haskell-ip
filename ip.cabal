@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: ip
-version: 1.7.6
+version: 1.7.7
 synopsis: Library for IP and MAC addresses
 homepage: https://github.com/andrewthad/haskell-ip#readme
 license: BSD-3-Clause

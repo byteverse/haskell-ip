@@ -47,6 +47,7 @@ module Net.IPv6
   , fromBounds
   , normalize
   , contains
+  , isSubsetOf
   , member
   , lowerInclusive
   , upperInclusive
@@ -900,6 +901,13 @@ contains (IPv6Range subnet len) =
   let theMask = mask len
       subnetNormalized = subnet .&. theMask
    in \ip -> (ip .&. theMask) == subnetNormalized
+
+-- | Checks if the first range is a subset of the second range.
+isSubsetOf :: IPv6Range -> IPv6Range -> Bool
+isSubsetOf a b =
+  lowerInclusive a >= lowerInclusive b
+  &&
+  upperInclusive a <= upperInclusive b
 
 -- | This is provided to mirror the interface provided by @Data.Set@. It
 -- behaves just like 'contains' but with flipped arguments.

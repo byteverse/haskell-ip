@@ -63,6 +63,7 @@ module Net.IPv4
   , fromBounds
   , normalize
   , contains
+  , isSubsetOf
   , member
   , lowerInclusive
   , upperInclusive
@@ -1052,6 +1053,18 @@ contains (IPv4Range (IPv4 wsubnet) len) =
   let theMask = mask len
       wsubnetNormalized = wsubnet .&. theMask
    in \(IPv4 w) -> (w .&. theMask) == wsubnetNormalized
+
+-- | Checks if the first range is a subset of the second range.
+--
+-- >>> IPv4.isSubsetOf (IPv4.IPv4Range (IPv4.fromOctets 192 0 2 128) 25) (IPv4.IPv4Range (IPv4.fromOctets 192 0 2 0) 24)
+-- True
+-- >>> IPv4.isSubsetOf (IPv4.IPv4Range (IPv4.fromOctets 192 0 2 0) 30) (IPv4.IPv4Range (IPv4.fromOctets 192 0 2 4) 30)
+-- False
+isSubsetOf :: IPv4Range -> IPv4Range -> Bool
+isSubsetOf a b =
+  lowerInclusive a >= lowerInclusive b
+  &&
+  upperInclusive a <= upperInclusive b
 
 mask :: Word8 -> Word32
 mask = complement . shiftR 0xffffffff . fromIntegral
