@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+
 {- | Compatibility module allowing us to support UTF-16 & UTF-8 versions of
 the 'text' package.
 -}

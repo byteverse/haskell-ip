@@ -1,12 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
-
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
-{-| For concatenating fixed-width strings that are only a few
+{- | For concatenating fixed-width strings that are only a few
     characters each, this can be ten times faster than the builder
     that ships with @text@.
 -}
@@ -28,14 +27,14 @@ import Data.Monoid
 #endif
 import Data.Bits
 import Data.Char (ord)
-import Data.Word
-import Data.Word.Synthetic.Word12 (Word12)
-import Data.Text (Text)
 import qualified Data.Semigroup as Semigroup
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Array as A
-import qualified Data.Text.Internal as TI
 import qualified Data.Text.Builder.Common.Internal as I
+import qualified Data.Text.Internal as TI
+import Data.Word
+import Data.Word.Synthetic.Word12 (Word12)
 
 data Builder a where
   BuilderStatic :: Text -> Builder a
@@ -75,6 +74,7 @@ contramapBuilder f x = case x of
   BuilderFunction t g -> BuilderFunction t (\ix marr b -> g ix marr (f b))
 {-# INLINE contramapBuilder #-}
 
+{- FOURMOLU_DISABLE -}
 run :: Builder a -> a -> Text
 run x = case x of
   BuilderStatic t -> \_ -> t
@@ -92,6 +92,7 @@ run x = case x of
                 A.unsafeFreeze marr
            in TI.text outArr 0 len
 {-# INLINE run #-}
+{- FOURMOLU_ENABLE -}
 
 word8HexFixedUpper :: Builder Word8
 word8HexFixedUpper = word8HexFixedGeneral True
@@ -112,9 +113,10 @@ word8HexFixedGeneral upper =
     A.unsafeWrite marr (i + 1) (A.unsafeIndex arr ix2)
 {-# INLINE word8HexFixedGeneral #-}
 
--- | Characters outside the basic multilingual plane are not handled
---   correctly by this function. They will not cause a program to crash;
---   instead, the character will have the upper bits masked out.
+{- | Characters outside the basic multilingual plane are not handled
+  correctly by this function. They will not cause a program to crash;
+  instead, the character will have the upper bits masked out.
+-}
 charBmp :: Builder Char
 charBmp =
   BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
@@ -138,4 +140,3 @@ word12HexFixedUpper = word12HexFixedGeneral True
 word12HexFixedLower :: Builder Word12
 word12HexFixedLower = word12HexFixedGeneral False
 {-# INLINE word12HexFixedLower #-}
-

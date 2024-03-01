@@ -1,17 +1,18 @@
 {-# LANGUAGE CPP #-}
+
 module IPv4Text1 where
 
-import Net.Types (IPv4(..))
-import Data.Text (Text)
-import Data.Text.Internal (Text(..))
-import Data.Word
-import Data.ByteString (ByteString)
 import Control.Monad.ST
-import Data.Bits (shiftR,(.&.))
-import qualified Data.ByteString.Char8  as BC8
-import qualified Data.ByteString        as ByteString
+import Data.Bits (shiftR, (.&.))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Unsafe as ByteString
-import qualified Data.Text.Array        as TArray
+import Data.Text (Text)
+import qualified Data.Text.Array as TArray
+import Data.Text.Internal (Text (..))
+import Data.Word
+import Net.Types (IPv4 (..))
 
 ------------------------
 -- This implementation operates directly on
@@ -27,7 +28,7 @@ encode (IPv4 w) =
       w2 = fromIntegral $ 255 .&. shiftR w 16
       w3 = fromIntegral $ 255 .&. shiftR w 8
       w4 = fromIntegral $ 255 .&. w
-      (arr,len) = runST $ do
+      (arr, len) = runST $ do
         marr <- TArray.new 15
         i1 <- putAndCount 0 w1 marr
         let n1 = i1
@@ -43,15 +44,15 @@ encode (IPv4 w) =
         TArray.unsafeWrite marr n3 dot
         i4 <- putAndCount n3' w4 marr
         theArr <- TArray.unsafeFreeze marr
-        return (theArr,i4 + n3')
-  in Text arr 0 len
+        return (theArr, i4 + n3')
+   in Text arr 0 len
 
 putAndCount :: Int -> Word8 -> TArray.MArray s -> ST s Int
 putAndCount pos w marr
   | w < 10 = TArray.unsafeWrite marr pos (i2w w) >> return 1
   | w < 100 = write2 pos w >> return 2
   | otherwise = write3 pos w >> return 3
-  where
+ where
   write2 off i0 = do
     let i = fromIntegral i0; j = i + i
     TArray.unsafeWrite marr off $ get2 j
@@ -72,7 +73,7 @@ type Codepoint = Word8
 type Codepoint = Word16
 #endif
 
-zero,dot :: Codepoint
+zero, dot :: Codepoint
 zero = 48
 {-# INLINE zero #-}
 dot = 46
@@ -83,6 +84,7 @@ i2w v = zero + fromIntegral v
 {-# INLINE i2w #-}
 
 -- Note: these double backslashes are need here because CPP is enabled.
+{- FOURMOLU_DISABLE -}
 twoDigits :: ByteString
 twoDigits = BC8.pack
   "0001020304050607080910111213141516171819\\
@@ -106,4 +108,4 @@ threeDigits =
   \217218219220221222223224225226227228229\\
   \230231232233234235236237238239240241242\\
   \243244245246247248249250251252253254255"
-
+{- FOURMOLU_ENABLE -}
