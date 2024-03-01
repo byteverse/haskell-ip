@@ -13,7 +13,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-| This module provides the Mac data type and functions for working
+{- | This module provides the Mac data type and functions for working
     with it.
 -}
 module Net.Mac
@@ -21,7 +21,9 @@ module Net.Mac
     mac
   , fromOctets
   , toOctets
+
     -- * Textual Conversion
+
     -- ** Text
   , encode
   , encodeWith
@@ -30,8 +32,10 @@ module Net.Mac
   , builder
   , parser
   , parserWith
+
     -- ** ShortText
   , encodeShort
+
     -- ** UTF-8 ByteString
   , encodeUtf8
   , encodeWithUtf8
@@ -40,38 +44,41 @@ module Net.Mac
   , builderUtf8
   , parserUtf8
   , parserWithUtf8
+
     -- ** ByteString
   , decodeBytes
   , decodeOctets
+
     -- ** UTF-8 Bytes
   , boundedBuilderUtf8
   , decodeUtf8Bytes
   , parserUtf8Bytes
+
     -- ** Printing
   , print
+
     -- * Default Codec
   , defCodec
+
     -- * Types
-  , Mac(..)
-  , MacCodec(..)
-  , MacGrouping(..)
+  , Mac (..)
+  , MacCodec (..)
+  , MacGrouping (..)
   ) where
 
 import Prelude hiding (print)
 
 import Control.DeepSeq (NFData)
-import Data.Aeson (FromJSON(..),ToJSON(..))
-import Data.Aeson (ToJSONKey(..),FromJSONKey(..))
-import Data.Aeson (ToJSONKeyFunction(..),FromJSONKeyFunction(..))
-import Data.Bits ((.|.),unsafeShiftL,unsafeShiftR,(.&.))
+import Data.Aeson (FromJSON (..), FromJSONKey (..), FromJSONKeyFunction (..), ToJSON (..), ToJSONKey (..), ToJSONKeyFunction (..))
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.ByteString (ByteString)
-import Data.ByteString.Short.Internal (ShortByteString(SBS))
-import Data.Char (ord,chr)
+import Data.ByteString.Short.Internal (ShortByteString (SBS))
+import Data.Char (chr, ord)
 import Data.Data (Data)
 import Data.Hashable (Hashable)
 import Data.Ix (Ix)
-import Data.Primitive.ByteArray (ByteArray(ByteArray))
-import Data.Primitive.Types (Prim(..))
+import Data.Primitive.ByteArray (ByteArray (ByteArray))
+import Data.Primitive.Types (Prim (..))
 import Data.Text (Text)
 import Data.Text.Short (ShortText)
 import Data.Word
@@ -79,8 +86,8 @@ import Data.Word.Synthetic.Word12 (Word12)
 import GHC.Enum (predError, succError)
 import GHC.Exts
 import GHC.Generics (Generic)
-import Text.ParserCombinators.ReadPrec (prec,step)
-import Text.Read (Read(..),Lexeme(Ident),lexP,parens)
+import Text.ParserCombinators.ReadPrec (prec, step)
+import Text.Read (Lexeme (Ident), Read (..), lexP, parens)
 
 import qualified Arithmetic.Nat as Nat
 import qualified Data.Aeson as Aeson
@@ -88,19 +95,19 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.Attoparsec.ByteString as AB
 import qualified Data.Attoparsec.ByteString as ABW
 import qualified Data.Attoparsec.Text as AT
-import qualified Data.Bytes.Builder.Bounded as BBB
-import qualified Data.Bytes as Bytes
-import qualified Data.Bytes.Parser as Parser
-import qualified Data.Bytes.Parser.Latin as Latin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Fixed as BFB
 import qualified Data.ByteString.Unsafe as BU
+import qualified Data.Bytes as Bytes
+import qualified Data.Bytes.Builder.Bounded as BBB
+import qualified Data.Bytes.Parser as Parser
+import qualified Data.Bytes.Parser.Latin as Latin
+import qualified Data.Text as Text ()
 import qualified Data.Text.Builder.Fixed as TFB
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Short.Unsafe as TS
-import qualified Data.Text as Text ()
 import qualified GHC.Prim.Compat as Compat
 import qualified GHC.Word.Compat as Compat
 
@@ -108,51 +115,60 @@ import qualified GHC.Word.Compat as Compat
 import qualified Data.Aeson.Key as AK
 #endif
 
--- | A 48-bit MAC address. Do not use the data constructor for this
---   type. It is not considered part of the stable API, and it
---   allows you to construct invalid MAC addresses.
+{- | A 48-bit MAC address. Do not use the data constructor for this
+  type. It is not considered part of the stable API, and it
+  allows you to construct invalid MAC addresses.
+-}
 newtype Mac = Mac Word64
-  deriving stock (Eq,Ord,Generic,Ix,Data)
+  deriving stock (Eq, Ord, Generic, Ix, Data)
   deriving newtype (Hashable)
 
 instance NFData Mac
 
+{- $setup
 
--- $setup
---
--- These are here to get doctest's property checking to work
---
--- >>> :set -XOverloadedStrings
--- >>> import Test.QuickCheck (Arbitrary(..),CoArbitrary(..),coarbitraryEnum)
--- >>> import qualified Data.Text as Text (pack)
--- >>> import qualified Data.Text.IO as T
--- >>> import qualified Data.ByteString.Char8 as BC
--- >>> import qualified Data.ByteString as B
--- >>> import qualified Data.Bytes.Text.Ascii as Ascii
--- >>> import qualified Net.Mac as Mac
--- >>> import qualified Arithmetic.Nat as Nat
--- >>> import qualified Data.Attoparsec.Text as AT
--- >>> import qualified Data.Bytes.Builder.Bounded as BBB
--- >>> import Net.Mac (Mac(Mac))
--- >>> instance Arbitrary Mac where { arbitrary = fmap (Mac . (0xFFFFFFFFFFFF .&.)) arbitrary }
--- >>> instance CoArbitrary Mac where { coarbitrary = coarbitraryEnum }
+These are here to get doctest's property checking to work
 
--- | Construct a 'Mac' address from a 'Word64'. Only the lower
---   48 bits are used.
+>>> :set -XOverloadedStrings
+>>> import Test.QuickCheck (Arbitrary(..),CoArbitrary(..),coarbitraryEnum)
+>>> import qualified Data.Text as Text (pack)
+>>> import qualified Data.Text.IO as T
+>>> import qualified Data.ByteString.Char8 as BC
+>>> import qualified Data.ByteString as B
+>>> import qualified Data.Bytes.Text.Ascii as Ascii
+>>> import qualified Net.Mac as Mac
+>>> import qualified Arithmetic.Nat as Nat
+>>> import qualified Data.Attoparsec.Text as AT
+>>> import qualified Data.Bytes.Builder.Bounded as BBB
+>>> import Net.Mac (Mac(Mac))
+>>> instance Arbitrary Mac where { arbitrary = fmap (Mac . (0xFFFFFFFFFFFF .&.)) arbitrary }
+>>> instance CoArbitrary Mac where { coarbitrary = coarbitraryEnum }
+-}
+
+{- | Construct a 'Mac' address from a 'Word64'. Only the lower
+  48 bits are used.
+-}
 mac :: Word64 -> Mac
 mac w = Mac (w .&. 0xFFFFFFFFFFFF)
 
 -- | Create a 'Mac' address from six octets.
 fromOctets :: Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Word8 -> Mac
-fromOctets a b c d e f = Mac $ unsafeWord48FromOctets
-  (fromIntegral a) (fromIntegral b) (fromIntegral c)
-  (fromIntegral d) (fromIntegral e) (fromIntegral f)
+fromOctets a b c d e f =
+  Mac $
+    unsafeWord48FromOctets
+      (fromIntegral a)
+      (fromIntegral b)
+      (fromIntegral c)
+      (fromIntegral d)
+      (fromIntegral e)
+      (fromIntegral f)
 
--- | Convert a 'Mac' address to the six octets that make it up.
---   This function and 'fromOctets' are inverses:
---
---   prop> m == (let (a,b,c,d,e,f) = Mac.toOctets m in Mac.fromOctets a b c d e f)
-toOctets :: Mac -> (Word8,Word8,Word8,Word8,Word8,Word8)
+{- | Convert a 'Mac' address to the six octets that make it up.
+  This function and 'fromOctets' are inverses:
+
+  prop> m == (let (a,b,c,d,e,f) = Mac.toOctets m in Mac.fromOctets a b c d e f)
+-}
+toOctets :: Mac -> (Word8, Word8, Word8, Word8, Word8, Word8)
 toOctets (Mac w) =
   ( fromIntegral $ unsafeShiftR w 40
   , fromIntegral $ unsafeShiftR w 32
@@ -162,35 +178,40 @@ toOctets (Mac w) =
   , fromIntegral w
   )
 
--- | This function is deprecated. It will be renamed in a future release
---   since the name is misleading.
+{- | This function is deprecated. It will be renamed in a future release
+  since the name is misleading.
+-}
 decodeBytes :: ByteString -> Maybe Mac
 {-# DEPRECATED decodeBytes "Prefer decodeOctets" #-}
 decodeBytes = decodeOctets
 
--- | Decode a 'Mac' address from a 'ByteString'. Each byte is interpreted
---   as an octet of the 'Mac' address. Consequently, 'ByteString's
---   of length 6 successfully decode, and all other 'ByteString's fail
---   to decode.
---
---   >>> Mac.decodeOctets (B.pack [0x6B,0x47,0x18,0x90,0x55,0xC3])
---   Just (mac 0x6b47189055c3)
---   >>> Mac.decodeOctets (B.replicate 6 0x3A)
---   Just (mac 0x3a3a3a3a3a3a)
---   >>> Mac.decodeOctets (B.replicate 7 0x3A)
---   Nothing
---
---   Note that the octets are interpreted in a big-endian fashion.
+{- | Decode a 'Mac' address from a 'ByteString'. Each byte is interpreted
+  as an octet of the 'Mac' address. Consequently, 'ByteString's
+  of length 6 successfully decode, and all other 'ByteString's fail
+  to decode.
+
+  >>> Mac.decodeOctets (B.pack [0x6B,0x47,0x18,0x90,0x55,0xC3])
+  Just (mac 0x6b47189055c3)
+  >>> Mac.decodeOctets (B.replicate 6 0x3A)
+  Just (mac 0x3a3a3a3a3a3a)
+  >>> Mac.decodeOctets (B.replicate 7 0x3A)
+  Nothing
+
+  Note that the octets are interpreted in a big-endian fashion.
+-}
 decodeOctets :: ByteString -> Maybe Mac
-decodeOctets bs = if B.length bs == 6
-  then Just $ fromOctets
-    (BU.unsafeIndex bs 0)
-    (BU.unsafeIndex bs 1)
-    (BU.unsafeIndex bs 2)
-    (BU.unsafeIndex bs 3)
-    (BU.unsafeIndex bs 4)
-    (BU.unsafeIndex bs 5)
-  else Nothing
+decodeOctets bs =
+  if B.length bs == 6
+    then
+      Just $
+        fromOctets
+          (BU.unsafeIndex bs 0)
+          (BU.unsafeIndex bs 1)
+          (BU.unsafeIndex bs 2)
+          (BU.unsafeIndex bs 3)
+          (BU.unsafeIndex bs 4)
+          (BU.unsafeIndex bs 5)
+    else Nothing
 
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe = either (const Nothing) Just
@@ -198,21 +219,23 @@ rightToMaybe = either (const Nothing) Just
 c2w :: Char -> Word8
 c2w = fromIntegral . ord
 
--- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
---
---   >>> T.putStrLn (Mac.encode (Mac 0xA47F247AB423))
---   a4:7f:24:7a:b4:23
+{- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
+
+  >>> T.putStrLn (Mac.encode (Mac 0xA47F247AB423))
+  a4:7f:24:7a:b4:23
+-}
 encode :: Mac -> Text
 encode = encodeWith defCodec
 
--- | Encode a 'Mac' address using the given 'MacCodec'.
---
---   >>> m = Mac 0xA47F247AB423
---   >>> T.putStrLn $ Mac.encodeWith Mac.defCodec m
---   a4:7f:24:7a:b4:23
---
---   >>> T.putStrLn $ Mac.encodeWith (Mac.MacCodec (Mac.MacGroupingTriples '-') True) m
---   A47-F24-7AB-423
+{- | Encode a 'Mac' address using the given 'MacCodec'.
+
+  >>> m = Mac 0xA47F247AB423
+  >>> T.putStrLn $ Mac.encodeWith Mac.defCodec m
+  a4:7f:24:7a:b4:23
+
+  >>> T.putStrLn $ Mac.encodeWith (Mac.MacCodec (Mac.MacGroupingTriples '-') True) m
+  A47-F24-7AB-423
+-}
 encodeWith :: MacCodec -> Mac -> Text
 encodeWith (MacCodec g u) m = case g of
   MacGroupingNoSeparator -> case u of
@@ -221,7 +244,7 @@ encodeWith (MacCodec g u) m = case g of
   MacGroupingPairs c -> case u of
     True -> TFB.run (fixedBuilderPairs TFB.word8HexFixedUpper) (Pair c m)
     False -> TFB.run (fixedBuilderPairs TFB.word8HexFixedLower) (Pair c m)
-    -- withCasedBuilder u $ \bw8 -> TFB.run (fixedBuilderPairs bw8) (Pair c m)
+  -- withCasedBuilder u $ \bw8 -> TFB.run (fixedBuilderPairs bw8) (Pair c m)
   MacGroupingTriples c -> case u of
     True -> TFB.run (fixedBuilderTriples TFB.word12HexFixedUpper) (Pair c m)
     False -> TFB.run (fixedBuilderTriples TFB.word12HexFixedLower) (Pair c m)
@@ -229,23 +252,25 @@ encodeWith (MacCodec g u) m = case g of
     True -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedUpper) (Pair c m)
     False -> TFB.run (fixedBuilderQuadruples TFB.word8HexFixedLower) (Pair c m)
 
--- | Decode a 'Mac' address using the default 'MacCodec' 'defCodec'.
---
---   >>> Mac.decode (Text.pack "a4:7f:24:7a:b4:23")
---   Just (mac 0xa47f247ab423)
---
---   >>> Mac.decode (Text.pack "a47-f24-7ab-423")
---   Nothing
+{- | Decode a 'Mac' address using the default 'MacCodec' 'defCodec'.
+
+  >>> Mac.decode (Text.pack "a4:7f:24:7a:b4:23")
+  Just (mac 0xa47f247ab423)
+
+  >>> Mac.decode (Text.pack "a47-f24-7ab-423")
+  Nothing
+-}
 decode :: Text -> Maybe Mac
 decode = decodeWith defCodec
 
--- | Decode a 'Mac' address from 'Text' using the given 'MacCodec'.
---
--- >>> Mac.decodeWith Mac.defCodec (Text.pack "a4:7f:24:7a:b4:23")
--- Just (mac 0xa47f247ab423)
---
--- >>> Mac.decodeWith (Mac.MacCodec Mac.MacGroupingNoSeparator False) (Text.pack "a47f247ab423")
--- Just (mac 0xa47f247ab423)
+{- | Decode a 'Mac' address from 'Text' using the given 'MacCodec'.
+
+>>> Mac.decodeWith Mac.defCodec (Text.pack "a4:7f:24:7a:b4:23")
+Just (mac 0xa47f247ab423)
+
+>>> Mac.decodeWith (Mac.MacCodec Mac.MacGroupingNoSeparator False) (Text.pack "a47f247ab423")
+Just (mac 0xa47f247ab423)
+-}
 decodeWith :: MacCodec -> Text -> Maybe Mac
 decodeWith codec t = rightToMaybe (AT.parseOnly (parserWith codec <* AT.endOfInput) t)
 
@@ -253,25 +278,27 @@ decodeWith codec t = rightToMaybe (AT.parseOnly (parserWith codec <* AT.endOfInp
 builder :: Mac -> TBuilder.Builder
 builder = TBuilder.fromText . encode
 
--- | Parse a 'Mac' address using a 'AT.Parser'.
---
---   >>> AT.parseOnly Mac.parser (Text.pack "a4:7f:24:7a:b4:23")
---   Right (mac 0xa47f247ab423)
---
---   >>> AT.parseOnly Mac.parser (Text.pack "a47-f24-7ab-423")
---   Left "':': Failed reading: satisfy"
+{- | Parse a 'Mac' address using a 'AT.Parser'.
+
+  >>> AT.parseOnly Mac.parser (Text.pack "a4:7f:24:7a:b4:23")
+  Right (mac 0xa47f247ab423)
+
+  >>> AT.parseOnly Mac.parser (Text.pack "a47-f24-7ab-423")
+  Left "':': Failed reading: satisfy"
+-}
 parser :: AT.Parser Mac
 parser = parserWith defCodec
 
--- | Parser a 'Mac' address using the given 'MacCodec'.
---
---   >>> p1 = Mac.parserWith Mac.defCodec
---   >>> AT.parseOnly p1 (Text.pack "a4:7f:24:7a:b4:23")
---   Right (mac 0xa47f247ab423)
---
---   >>> p2 = Mac.parserWith (Mac.MacCodec Mac.MacGroupingNoSeparator False)
---   >>> AT.parseOnly p2 (Text.pack "a47f247ab423")
---   Right (mac 0xa47f247ab423)
+{- | Parser a 'Mac' address using the given 'MacCodec'.
+
+  >>> p1 = Mac.parserWith Mac.defCodec
+  >>> AT.parseOnly p1 (Text.pack "a4:7f:24:7a:b4:23")
+  Right (mac 0xa47f247ab423)
+
+  >>> p2 = Mac.parserWith (Mac.MacCodec Mac.MacGroupingNoSeparator False)
+  >>> AT.parseOnly p2 (Text.pack "a47f247ab423")
+  Right (mac 0xa47f247ab423)
+-}
 parserWith :: MacCodec -> AT.Parser Mac
 parserWith (MacCodec g _) = case g of
   MacGroupingQuadruples c -> parserQuadruples c
@@ -279,27 +306,40 @@ parserWith (MacCodec g _) = case g of
   MacGroupingPairs c -> parserPairs c
   MacGroupingNoSeparator -> parserNoSeparator
 
--- | The default 'MacCodec': all characters are lowercase hex, separated by colons into pairs.
---
---   >>> T.putStrLn $ Mac.encodeWith Mac.defCodec (Mac 0xa47f247ab423)
---   a4:7f:24:7a:b4:23
+{- | The default 'MacCodec': all characters are lowercase hex, separated by colons into pairs.
+
+  >>> T.putStrLn $ Mac.encodeWith Mac.defCodec (Mac 0xa47f247ab423)
+  a4:7f:24:7a:b4:23
+-}
 defCodec :: MacCodec
 defCodec = MacCodec (MacGroupingPairs ':') False
 
 parserQuadruples :: Char -> AT.Parser Mac
-parserQuadruples s = fromOctets
-  <$> parseTwoHex <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex <*> parseTwoHex
+parserQuadruples s =
+  fromOctets
+    <$> parseTwoHex
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <*> parseTwoHex
 
 parserPairs :: Char -> AT.Parser Mac
-parserPairs s = fromOctets
-  <$> parseTwoHex <* AT.char s
-  <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex <* AT.char s
-  <*> parseTwoHex
+parserPairs s =
+  fromOctets
+    <$> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
+    <* AT.char s
+    <*> parseTwoHex
 
 parserTriples :: Char -> AT.Parser Mac
 parserTriples s = do
@@ -318,22 +358,24 @@ parserTriples s = do
   a10 <- parseOneHex
   a11 <- parseOneHex
   a12 <- parseOneHex
-  return $ fromOctets
-    (unsafeShiftL a1 4 + a2)
-    (unsafeShiftL a3 4 + a4)
-    (unsafeShiftL a5 4 + a6)
-    (unsafeShiftL a7 4 + a8)
-    (unsafeShiftL a9 4 + a10)
-    (unsafeShiftL a11 4 + a12)
+  return $
+    fromOctets
+      (unsafeShiftL a1 4 + a2)
+      (unsafeShiftL a3 4 + a4)
+      (unsafeShiftL a5 4 + a6)
+      (unsafeShiftL a7 4 + a8)
+      (unsafeShiftL a9 4 + a10)
+      (unsafeShiftL a11 4 + a12)
 
 parserNoSeparator :: AT.Parser Mac
-parserNoSeparator = fromOctets
-  <$> parseTwoHex
-  <*> parseTwoHex
-  <*> parseTwoHex
-  <*> parseTwoHex
-  <*> parseTwoHex
-  <*> parseTwoHex
+parserNoSeparator =
+  fromOctets
+    <$> parseTwoHex
+    <*> parseTwoHex
+    <*> parseTwoHex
+    <*> parseTwoHex
+    <*> parseTwoHex
+    <*> parseTwoHex
 
 parseTwoHex :: AT.Parser Word8
 parseTwoHex = do
@@ -347,7 +389,8 @@ tryParseCharHex a c
   | w >= 65 && w <= 70 = return (w - 55)
   | w >= 97 && w <= 102 = return (w - 87)
   | otherwise = a
-  where w = c2w c
+ where
+  w = c2w c
 
 parseOneHex :: AT.Parser Word8
 parseOneHex = AT.anyChar >>= parseCharHex
@@ -362,50 +405,50 @@ data Pair = Pair
 
 fixedBuilderTriples :: TFB.Builder Word12 -> TFB.Builder Pair
 fixedBuilderTriples tripBuilder =
-     TFB.contramapBuilder (word12At 36 . pairMac) tripBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word12At 24 . pairMac) tripBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word12At 12 . pairMac) tripBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word12At 0 . pairMac) tripBuilder
+  TFB.contramapBuilder (word12At 36 . pairMac) tripBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word12At 24 . pairMac) tripBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word12At 12 . pairMac) tripBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word12At 0 . pairMac) tripBuilder
 {-# INLINE fixedBuilderTriples #-}
 
 fixedBuilderNoSeparator :: TFB.Builder Word8 -> TFB.Builder Mac
 fixedBuilderNoSeparator hexBuilder =
-     TFB.contramapBuilder (word8At 40) hexBuilder
-  <> TFB.contramapBuilder (word8At 32) hexBuilder
-  <> TFB.contramapBuilder (word8At 24) hexBuilder
-  <> TFB.contramapBuilder (word8At 16) hexBuilder
-  <> TFB.contramapBuilder (word8At 8) hexBuilder
-  <> TFB.contramapBuilder (word8At 0) hexBuilder
+  TFB.contramapBuilder (word8At 40) hexBuilder
+    <> TFB.contramapBuilder (word8At 32) hexBuilder
+    <> TFB.contramapBuilder (word8At 24) hexBuilder
+    <> TFB.contramapBuilder (word8At 16) hexBuilder
+    <> TFB.contramapBuilder (word8At 8) hexBuilder
+    <> TFB.contramapBuilder (word8At 0) hexBuilder
 {-# INLINE fixedBuilderNoSeparator #-}
 
 fixedBuilderQuadruples :: TFB.Builder Word8 -> TFB.Builder Pair
 fixedBuilderQuadruples pairBuilder =
-     TFB.contramapBuilder (word8At 40 . pairMac) pairBuilder
-  <> TFB.contramapBuilder (word8At 32 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 24 . pairMac) pairBuilder
-  <> TFB.contramapBuilder (word8At 16 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 8 . pairMac) pairBuilder
-  <> TFB.contramapBuilder (word8At 0 . pairMac) pairBuilder
+  TFB.contramapBuilder (word8At 40 . pairMac) pairBuilder
+    <> TFB.contramapBuilder (word8At 32 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 24 . pairMac) pairBuilder
+    <> TFB.contramapBuilder (word8At 16 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 8 . pairMac) pairBuilder
+    <> TFB.contramapBuilder (word8At 0 . pairMac) pairBuilder
 {-# INLINE fixedBuilderQuadruples #-}
 
 fixedBuilderPairs :: TFB.Builder Word8 -> TFB.Builder Pair
 fixedBuilderPairs pairBuilder =
-     TFB.contramapBuilder (word8At 40 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 32 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 24 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 16 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 8 . pairMac) pairBuilder
-  <> TFB.contramapBuilder pairSep TFB.charBmp
-  <> TFB.contramapBuilder (word8At 0 . pairMac) pairBuilder
+  TFB.contramapBuilder (word8At 40 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 32 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 24 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 16 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 8 . pairMac) pairBuilder
+    <> TFB.contramapBuilder pairSep TFB.charBmp
+    <> TFB.contramapBuilder (word8At 0 . pairMac) pairBuilder
 {-# INLINE fixedBuilderPairs #-}
 
 word8At :: Int -> Mac -> Word8
@@ -416,92 +459,89 @@ word12At :: Int -> Mac -> Word12
 word12At i (Mac w) = fromIntegral (unsafeShiftR w i)
 {-# INLINE word12At #-}
 
--- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
---
---   >>> BC.putStrLn (Mac.encodeUtf8 (Mac.mac 0x64255A0F2C47))
---   64:25:5a:0f:2c:47
+{- | Encode a 'Mac' address using the default 'MacCodec' 'defCodec'.
+
+  >>> BC.putStrLn (Mac.encodeUtf8 (Mac.mac 0x64255A0F2C47))
+  64:25:5a:0f:2c:47
+-}
 encodeUtf8 :: Mac -> ByteString
 encodeUtf8 = encodeWithUtf8 defCodec
 
--- | Lenient decoding of MAC address that accepts lowercase, uppercase,
---   and any kind of separator.
---
---   >>> Mac.decodeUtf8 "A2:DE:AD:BE:EF:67"
---   Just (mac 0xa2deadbeef67)
---   >>> Mac.decodeUtf8 "13-a2-fe-a4-17-96"
---   Just (mac 0x13a2fea41796)
---   >>> Mac.decodeUtf8 "0A42.47BA.67C2"
---   Just (mac 0x0a4247ba67c2)
+{- | Lenient decoding of MAC address that accepts lowercase, uppercase,
+  and any kind of separator.
+
+  >>> Mac.decodeUtf8 "A2:DE:AD:BE:EF:67"
+  Just (mac 0xa2deadbeef67)
+  >>> Mac.decodeUtf8 "13-a2-fe-a4-17-96"
+  Just (mac 0x13a2fea41796)
+  >>> Mac.decodeUtf8 "0A42.47BA.67C2"
+  Just (mac 0x0a4247ba67c2)
+-}
 decodeUtf8 :: ByteString -> Maybe Mac
 decodeUtf8 = decodeLenientUtf8
 
--- | Decode a 'ByteString' as a 'Mac' address using the given 'MacCodec'.
---
---   >>> Mac.decodeWithUtf8 Mac.defCodec (BC.pack "64:25:5a:0f:2c:47")
---   Just (mac 0x64255a0f2c47)
---
---   >>> Mac.decodeWithUtf8 (Mac.MacCodec Mac.MacGroupingNoSeparator False) (BC.pack "64255a0f2c47")
---   Just (mac 0x64255a0f2c47)
+{- | Decode a 'ByteString' as a 'Mac' address using the given 'MacCodec'.
+
+  >>> Mac.decodeWithUtf8 Mac.defCodec (BC.pack "64:25:5a:0f:2c:47")
+  Just (mac 0x64255a0f2c47)
+
+  >>> Mac.decodeWithUtf8 (Mac.MacCodec Mac.MacGroupingNoSeparator False) (BC.pack "64255a0f2c47")
+  Just (mac 0x64255a0f2c47)
+-}
 decodeWithUtf8 :: MacCodec -> ByteString -> Maybe Mac
 decodeWithUtf8 codec bs = rightToMaybe (AB.parseOnly (parserWithUtf8 codec <* AB.endOfInput) bs)
 
 decodeLenientUtf8 :: ByteString -> Maybe Mac
 decodeLenientUtf8 bs = rightToMaybe (AB.parseOnly (parserLenientUtf8 <* AB.endOfInput) bs)
 
--- | Encode a 'Mac' address as colon-separated hexadecimal octets,
---   preferring lowercase for alphabetical characters.
+{- | Encode a 'Mac' address as colon-separated hexadecimal octets,
+  preferring lowercase for alphabetical characters.
+-}
 encodeShort :: Mac -> ShortText
 encodeShort !m = case BBB.run Nat.constant (boundedBuilderUtf8 m) of
   ByteArray x -> TS.fromShortByteStringUnsafe (SBS x)
 
--- | Encode a 'Mac' address as colon-separated hexadecimal octets,
---   preferring lowercase for alphabetical characters.
---
---   >>> BBB.run Nat.constant $ Mac.boundedBuilderUtf8 $ Mac.mac 0xDEADBEEF1609
---   [0x64, 0x65, 0x3a, 0x61, 0x64, 0x3a, 0x62, 0x65, 0x3a, 0x65, 0x66, 0x3a, 0x31, 0x36, 0x3a, 0x30, 0x39]
+{- | Encode a 'Mac' address as colon-separated hexadecimal octets,
+  preferring lowercase for alphabetical characters.
+
+  >>> BBB.run Nat.constant $ Mac.boundedBuilderUtf8 $ Mac.mac 0xDEADBEEF1609
+  [0x64, 0x65, 0x3a, 0x61, 0x64, 0x3a, 0x62, 0x65, 0x3a, 0x65, 0x66, 0x3a, 0x31, 0x36, 0x3a, 0x30, 0x39]
+-}
 boundedBuilderUtf8 :: Mac -> BBB.Builder 17
 boundedBuilderUtf8 !w =
   BBB.word8PaddedLowerHex w0
-  `BBB.append`
-  BBB.ascii ':'
-  `BBB.append`
-  BBB.word8PaddedLowerHex w1
-  `BBB.append`
-  BBB.ascii ':'
-  `BBB.append`
-  BBB.word8PaddedLowerHex w2
-  `BBB.append`
-  BBB.ascii ':'
-  `BBB.append`
-  BBB.word8PaddedLowerHex w3
-  `BBB.append`
-  BBB.ascii ':'
-  `BBB.append`
-  BBB.word8PaddedLowerHex w4
-  `BBB.append`
-  BBB.ascii ':'
-  `BBB.append`
-  BBB.word8PaddedLowerHex w5
-  where
-  (w0,w1,w2,w3,w4,w5) = toOctets w
+    `BBB.append` BBB.ascii ':'
+    `BBB.append` BBB.word8PaddedLowerHex w1
+    `BBB.append` BBB.ascii ':'
+    `BBB.append` BBB.word8PaddedLowerHex w2
+    `BBB.append` BBB.ascii ':'
+    `BBB.append` BBB.word8PaddedLowerHex w3
+    `BBB.append` BBB.ascii ':'
+    `BBB.append` BBB.word8PaddedLowerHex w4
+    `BBB.append` BBB.ascii ':'
+    `BBB.append` BBB.word8PaddedLowerHex w5
+ where
+  (w0, w1, w2, w3, w4, w5) = toOctets w
 
--- | Lenient decoding of MAC address. This
---   is case insensitive and allows either @:@ or @-@ as the separator.
---   It also allows leading zeroes to be missing.
---
---   >>> Mac.decodeUtf8Bytes (Ascii.fromString "A2:DE:AD:BE:EF:67")
---   Just (mac 0xa2deadbeef67)
---   >>> Mac.decodeUtf8Bytes (Ascii.fromString "13-a2-FE-A4-17-96")
---   Just (mac 0x13a2fea41796)
+{- | Lenient decoding of MAC address. This
+  is case insensitive and allows either @:@ or @-@ as the separator.
+  It also allows leading zeroes to be missing.
+
+  >>> Mac.decodeUtf8Bytes (Ascii.fromString "A2:DE:AD:BE:EF:67")
+  Just (mac 0xa2deadbeef67)
+  >>> Mac.decodeUtf8Bytes (Ascii.fromString "13-a2-FE-A4-17-96")
+  Just (mac 0x13a2fea41796)
+-}
 decodeUtf8Bytes :: Bytes.Bytes -> Maybe Mac
 decodeUtf8Bytes = Parser.parseBytesMaybe (parserUtf8Bytes ())
 
--- | Leniently parse UTF-8-encoded 'Bytes' as a 'Mac' address. This
---   is case insensitive and allows either @:@ or @-@ as the separator.
---   It also allows leading zeroes to be missing.
---
---   >>> Parser.parseBytes (Mac.parserUtf8Bytes ()) (Ascii.fromString "de:ad:BE:EF:1:23")
---   Success (Slice {offset = 16, length = 0, value = mac 0xdeadbeef0123})
+{- | Leniently parse UTF-8-encoded 'Bytes' as a 'Mac' address. This
+  is case insensitive and allows either @:@ or @-@ as the separator.
+  It also allows leading zeroes to be missing.
+
+  >>> Parser.parseBytes (Mac.parserUtf8Bytes ()) (Ascii.fromString "de:ad:BE:EF:1:23")
+  Success (Slice {offset = 16, length = 0, value = mac 0xdeadbeef0123})
+-}
 parserUtf8Bytes :: e -> Parser.Parser e s Mac
 parserUtf8Bytes e = do
   w1 <- Latin.hexWord8 e
@@ -522,14 +562,16 @@ parserUtf8Bytes e = do
       pure (fromOctets w1 w2 w3 w4 w5 w6)
     _ -> Parser.fail e
 
--- | Make a bytestring builder from a 'Mac' address
---   using a colon as the separator.
+{- | Make a bytestring builder from a 'Mac' address
+  using a colon as the separator.
+-}
 builderUtf8 :: Mac -> BB.Builder
 builderUtf8 = BB.byteString . encodeUtf8
 
--- | Lenient parser for a 'Mac' address using any character
---   as the separator and accepting any digit grouping
---   (i.e. @FA:43:B2:C0:0F:99@ or @A065.647B.87FA@).
+{- | Lenient parser for a 'Mac' address using any character
+  as the separator and accepting any digit grouping
+  (i.e. @FA:43:B2:C0:0F:99@ or @A065.647B.87FA@).
+-}
 parserUtf8 :: AB.Parser Mac
 parserUtf8 = parserLenientUtf8
 
@@ -555,32 +597,39 @@ parserLenientUtf8 = do
   a10 <- parseOneHexLenientUtf8
   a11 <- parseOneHexLenientUtf8
   a12 <- parseOneHexLenientUtf8
-  return $ fromOctets
-    (unsafeShiftL a1 4 + a2)
-    (unsafeShiftL a3 4 + a4)
-    (unsafeShiftL a5 4 + a6)
-    (unsafeShiftL a7 4 + a8)
-    (unsafeShiftL a9 4 + a10)
-    (unsafeShiftL a11 4 + a12)
-
+  return $
+    fromOctets
+      (unsafeShiftL a1 4 + a2)
+      (unsafeShiftL a3 4 + a4)
+      (unsafeShiftL a5 4 + a6)
+      (unsafeShiftL a7 4 + a8)
+      (unsafeShiftL a9 4 + a10)
+      (unsafeShiftL a11 4 + a12)
 
 parserNoSeparatorUtf8 :: AB.Parser Mac
-parserNoSeparatorUtf8 = fromOctets
-  <$> parseTwoHexUtf8
-  <*> parseTwoHexUtf8
-  <*> parseTwoHexUtf8
-  <*> parseTwoHexUtf8
-  <*> parseTwoHexUtf8
-  <*> parseTwoHexUtf8
+parserNoSeparatorUtf8 =
+  fromOctets
+    <$> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
 
 parserPairsUtf8 :: Word8 -> AB.Parser Mac
-parserPairsUtf8 s = fromOctets
-  <$> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8
+parserPairsUtf8 s =
+  fromOctets
+    <$> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
 
 parserTriplesUtf8 :: Word8 -> AB.Parser Mac
 parserTriplesUtf8 s = do
@@ -599,25 +648,33 @@ parserTriplesUtf8 s = do
   a10 <- parseOneHexUtf8
   a11 <- parseOneHexUtf8
   a12 <- parseOneHexUtf8
-  return $ fromOctets
-    (unsafeShiftL a1 4 + a2)
-    (unsafeShiftL a3 4 + a4)
-    (unsafeShiftL a5 4 + a6)
-    (unsafeShiftL a7 4 + a8)
-    (unsafeShiftL a9 4 + a10)
-    (unsafeShiftL a11 4 + a12)
+  return $
+    fromOctets
+      (unsafeShiftL a1 4 + a2)
+      (unsafeShiftL a3 4 + a4)
+      (unsafeShiftL a5 4 + a6)
+      (unsafeShiftL a7 4 + a8)
+      (unsafeShiftL a9 4 + a10)
+      (unsafeShiftL a11 4 + a12)
 
 parserQuadruplesUtf8 :: Word8 -> AB.Parser Mac
-parserQuadruplesUtf8 s  = fromOctets
-  <$> parseTwoHexUtf8 <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <*> parseTwoHexUtf8 <* ABW.word8 s
-  <*> parseTwoHexUtf8 <*> parseTwoHexUtf8
+parserQuadruplesUtf8 s =
+  fromOctets
+    <$> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
+    <* ABW.word8 s
+    <*> parseTwoHexUtf8
+    <*> parseTwoHexUtf8
 
 parseOneHexUtf8 :: AB.Parser Word8
 parseOneHexUtf8 = ABW.anyWord8 >>= parseWord8Hex
 
--- | Parse a single hexidecimal character. This will skip
---   at most one character to do this.
+{- | Parse a single hexidecimal character. This will skip
+  at most one character to do this.
+-}
 parseOneHexLenientUtf8 :: AB.Parser Word8
 parseOneHexLenientUtf8 = do
   a <- ABW.anyWord8
@@ -631,9 +688,10 @@ parseTwoHexUtf8 = do
   b <- ABW.anyWord8 >>= parseWord8Hex
   return (unsafeShiftL a 4 + b)
 
--- | Kind of a confusing type signature. The Word8 that stands
---   alone represented an ascii-encoded value. The others actually
---   describes the numbers that would be decoded from this value.
+{- | Kind of a confusing type signature. The Word8 that stands
+  alone represented an ascii-encoded value. The others actually
+  describes the numbers that would be decoded from this value.
+-}
 tryParseWord8Hex :: AB.Parser Word8 -> Word8 -> AB.Parser Word8
 tryParseWord8Hex a w
   | w >= 48 && w <= 57 = return (w - 48)
@@ -644,14 +702,15 @@ tryParseWord8Hex a w
 parseWord8Hex :: Word8 -> AB.Parser Word8
 parseWord8Hex = tryParseWord8Hex (fail "invalid hexadecimal character")
 
--- | Encode a 'Mac' address as a 'ByteString' using the given 'MacCodec'.
---
---   >>> m = Mac 0xA47F247AB423
---   >>> BC.putStrLn $ Mac.encodeWithUtf8 Mac.defCodec m
---   a4:7f:24:7a:b4:23
---
---   >>> BC.putStrLn $ Mac.encodeWithUtf8 (Mac.MacCodec (Mac.MacGroupingTriples '-') True) m
---   A47-F24-7AB-423
+{- | Encode a 'Mac' address as a 'ByteString' using the given 'MacCodec'.
+
+  >>> m = Mac 0xA47F247AB423
+  >>> BC.putStrLn $ Mac.encodeWithUtf8 Mac.defCodec m
+  a4:7f:24:7a:b4:23
+
+  >>> BC.putStrLn $ Mac.encodeWithUtf8 (Mac.MacCodec (Mac.MacGroupingTriples '-') True) m
+  A47-F24-7AB-423
+-}
 encodeWithUtf8 :: MacCodec -> Mac -> ByteString
 encodeWithUtf8 (MacCodec g u) m = case g of
   MacGroupingNoSeparator -> case u of
@@ -660,7 +719,7 @@ encodeWithUtf8 (MacCodec g u) m = case g of
   MacGroupingPairs c -> case u of
     True -> BFB.run (fixedBuilderPairsUtf8 BFB.word8HexFixedUpper) (PairUtf8 (c2w c) m)
     False -> BFB.run (fixedBuilderPairsUtf8 BFB.word8HexFixedLower) (PairUtf8 (c2w c) m)
-    -- withCasedBuilder u $ \bw8 -> BFB.run (fixedBuilderPairs bw8) (Pair c m)
+  -- withCasedBuilder u $ \bw8 -> BFB.run (fixedBuilderPairs bw8) (Pair c m)
   MacGroupingTriples c -> case u of
     True -> BFB.run (fixedBuilderTriplesUtf8 BFB.word12HexFixedUpper) (PairUtf8 (c2w c) m)
     False -> BFB.run (fixedBuilderTriplesUtf8 BFB.word12HexFixedLower) (PairUtf8 (c2w c) m)
@@ -675,50 +734,50 @@ data PairUtf8 = PairUtf8
 
 fixedBuilderTriplesUtf8 :: BFB.Builder Word12 -> BFB.Builder PairUtf8
 fixedBuilderTriplesUtf8 tripBuilder =
-     BFB.contramapBuilder (word12AtUtf8 36 . pairMacUtf8) tripBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word12AtUtf8 24 . pairMacUtf8) tripBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word12AtUtf8 12 . pairMacUtf8) tripBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word12AtUtf8 0 . pairMacUtf8) tripBuilder
+  BFB.contramapBuilder (word12AtUtf8 36 . pairMacUtf8) tripBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word12AtUtf8 24 . pairMacUtf8) tripBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word12AtUtf8 12 . pairMacUtf8) tripBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word12AtUtf8 0 . pairMacUtf8) tripBuilder
 {-# INLINE fixedBuilderTriplesUtf8 #-}
 
 fixedBuilderQuadruplesUtf8 :: BFB.Builder Word8 -> BFB.Builder PairUtf8
 fixedBuilderQuadruplesUtf8 pairBuilder =
-     BFB.contramapBuilder (word8AtUtf8 40 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 32 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 24 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 16 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 8 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 0 . pairMacUtf8) pairBuilder
+  BFB.contramapBuilder (word8AtUtf8 40 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 32 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 24 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 16 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 8 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 0 . pairMacUtf8) pairBuilder
 {-# INLINE fixedBuilderQuadruplesUtf8 #-}
 
 fixedBuilderPairsUtf8 :: BFB.Builder Word8 -> BFB.Builder PairUtf8
 fixedBuilderPairsUtf8 pairBuilder =
-     BFB.contramapBuilder (word8AtUtf8 40 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 32 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 24 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 16 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 8 . pairMacUtf8) pairBuilder
-  <> BFB.contramapBuilder pairSepUtf8 BFB.word8
-  <> BFB.contramapBuilder (word8AtUtf8 0 . pairMacUtf8) pairBuilder
+  BFB.contramapBuilder (word8AtUtf8 40 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 32 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 24 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 16 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 8 . pairMacUtf8) pairBuilder
+    <> BFB.contramapBuilder pairSepUtf8 BFB.word8
+    <> BFB.contramapBuilder (word8AtUtf8 0 . pairMacUtf8) pairBuilder
 {-# INLINE fixedBuilderPairsUtf8 #-}
 
 fixedBuilderNoSeparatorUtf8 :: BFB.Builder Word8 -> BFB.Builder Mac
 fixedBuilderNoSeparatorUtf8 hexBuilder =
-     BFB.contramapBuilder (word8AtUtf8 40) hexBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 32) hexBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 24) hexBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 16) hexBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 8) hexBuilder
-  <> BFB.contramapBuilder (word8AtUtf8 0) hexBuilder
+  BFB.contramapBuilder (word8AtUtf8 40) hexBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 32) hexBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 24) hexBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 16) hexBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 8) hexBuilder
+    <> BFB.contramapBuilder (word8AtUtf8 0) hexBuilder
 {-# INLINE fixedBuilderNoSeparatorUtf8 #-}
 
 word8AtUtf8 :: Int -> Mac -> Word8
@@ -729,76 +788,88 @@ word12AtUtf8 :: Int -> Mac -> Word12
 word12AtUtf8 i (Mac w) = fromIntegral (unsafeShiftR w i)
 {-# INLINE word12AtUtf8 #-}
 
--- | This only preserves the lower 6 bytes of the 8-byte word that backs a mac address.
--- It runs slower than it would if it used a full 8-byte word, but it consumes less
--- space. When storing millions of mac addresses, this is a good trade to make. When
--- storing a small number of mac address, it might be preferable to make a primitive
--- array of 'Word64' instead and use the mac address data constructor to coerce between
--- the two.
+{- | This only preserves the lower 6 bytes of the 8-byte word that backs a mac address.
+It runs slower than it would if it used a full 8-byte word, but it consumes less
+space. When storing millions of mac addresses, this is a good trade to make. When
+storing a small number of mac address, it might be preferable to make a primitive
+array of 'Word64' instead and use the mac address data constructor to coerce between
+the two.
+-}
 instance Prim Mac where
   sizeOf# _ = 6#
   alignment# _ = 2#
-  indexByteArray# arr i0 = macFromWord16#
-    (Compat.indexWord16Array# arr i)
-    (Compat.indexWord16Array# arr (i +# 1#))
-    (Compat.indexWord16Array# arr (i +# 2#))
-    where !i = 3# *# i0
+  indexByteArray# arr i0 =
+    macFromWord16#
+      (Compat.indexWord16Array# arr i)
+      (Compat.indexWord16Array# arr (i +# 1#))
+      (Compat.indexWord16Array# arr (i +# 2#))
+   where
+    !i = 3# *# i0
   readByteArray# arr i0 s0 = case Compat.readWord16Array# arr i s0 of
     (# s1, a #) -> case Compat.readWord16Array# arr (i +# 1#) s1 of
       (# s2, b #) -> case Compat.readWord16Array# arr (i +# 2#) s2 of
         (# s3, c #) -> (# s3, macFromWord16# a b c #)
-    where !i = 3# *# i0
+   where
+    !i = 3# *# i0
   writeByteArray# arr i0 m s0 = case Compat.writeWord16Array# arr i (macToWord16A# m) s0 of
     s1 -> case Compat.writeWord16Array# arr (i +# 1#) (macToWord16B# m) s1 of
       s2 -> Compat.writeWord16Array# arr (i +# 2#) (macToWord16C# m) s2
-    where !i = 3# *# i0
-  indexOffAddr# arr i0 = macFromWord16#
-    (Compat.indexWord16OffAddr# arr i)
-    (Compat.indexWord16OffAddr# arr (i +# 1#))
-    (Compat.indexWord16OffAddr# arr (i +# 2#))
-    where !i = 3# *# i0
+   where
+    !i = 3# *# i0
+  indexOffAddr# arr i0 =
+    macFromWord16#
+      (Compat.indexWord16OffAddr# arr i)
+      (Compat.indexWord16OffAddr# arr (i +# 1#))
+      (Compat.indexWord16OffAddr# arr (i +# 2#))
+   where
+    !i = 3# *# i0
   readOffAddr# arr i0 s0 = case Compat.readWord16OffAddr# arr i s0 of
     (# s1, a #) -> case Compat.readWord16OffAddr# arr (i +# 1#) s1 of
       (# s2, b #) -> case Compat.readWord16OffAddr# arr (i +# 2#) s2 of
         (# s3, c #) -> (# s3, macFromWord16# a b c #)
-    where !i = 3# *# i0
+   where
+    !i = 3# *# i0
   writeOffAddr# arr i0 m s0 = case Compat.writeWord16OffAddr# arr i (macToWord16A# m) s0 of
     s1 -> case Compat.writeWord16OffAddr# arr (i +# 1#) (macToWord16B# m) s1 of
       s2 -> Compat.writeWord16OffAddr# arr (i +# 2#) (macToWord16C# m) s2
-    where !i = 3# *# i0
+   where
+    !i = 3# *# i0
   setByteArray# arr# i# len# ident = go 0#
-    where
-      go ix# s0 = if isTrue# (ix# <# len#)
+   where
+    go ix# s0 =
+      if isTrue# (ix# <# len#)
         then case writeByteArray# arr# (i# +# ix#) ident s0 of
           s1 -> go (ix# +# 1#) s1
         else s0
   setOffAddr# addr# i# len# ident = go 0#
-    where
-      go ix# s0 = if isTrue# (ix# <# len#)
+   where
+    go ix# s0 =
+      if isTrue# (ix# <# len#)
         then case writeOffAddr# addr# (i# +# ix#) ident s0 of
           s1 -> go (ix# +# 1#) s1
         else s0
 
 macToWord16A# :: Mac -> Word#
-{-# inline macToWord16A# #-}
+{-# INLINE macToWord16A# #-}
 macToWord16A# (Mac w) = case word64ToWord16 (unsafeShiftR w 32) of
   Compat.W16# x -> x
 
 macToWord16B# :: Mac -> Word#
-{-# inline macToWord16B# #-}
+{-# INLINE macToWord16B# #-}
 macToWord16B# (Mac w) = case word64ToWord16 (unsafeShiftR w 16) of
   Compat.W16# x -> x
 
 macToWord16C# :: Mac -> Word#
-{-# inline macToWord16C# #-}
+{-# INLINE macToWord16C# #-}
 macToWord16C# (Mac w) = case word64ToWord16 w of
   Compat.W16# x -> x
 
 macFromWord16# :: Word# -> Word# -> Word# -> Mac
-macFromWord16# a b c = Mac
-    $ (unsafeShiftL (word16ToWord64 (Compat.W16# a)) 32)
-  .|. (unsafeShiftL (word16ToWord64 (Compat.W16# b)) 16)
-  .|. (word16ToWord64 (Compat.W16# c))
+macFromWord16# a b c =
+  Mac $
+    (unsafeShiftL (word16ToWord64 (Compat.W16# a)) 32)
+      .|. (unsafeShiftL (word16ToWord64 (Compat.W16# b)) 16)
+      .|. (word16ToWord64 (Compat.W16# c))
 
 word16ToWord64 :: Word16 -> Word64
 word16ToWord64 = fromIntegral
@@ -812,9 +883,10 @@ word64ToWord16 = fromIntegral
 -- It also uses the smart constructor instead
 -- of the actual constructor
 instance Show Mac where
-  showsPrec p (Mac addr) = showParen (p > 10)
-    $ showString "mac "
-    . showHexWord48 addr
+  showsPrec p (Mac addr) =
+    showParen (p > 10) $
+      showString "mac "
+        . showHexWord48 addr
 
 instance Read Mac where
   readPrec = parens $ prec 10 $ do
@@ -842,43 +914,52 @@ print = TIO.putStrLn . encode
 
 showHexWord48 :: Word64 -> ShowS
 showHexWord48 w = showString "0x" . go 11
-  where
+ where
   go :: Int -> ShowS
-  go !ix = if ix >= 0
-    then showChar (nibbleToHex ((unsafeShiftR (fromIntegral w) (ix * 4)) .&. 0xF)) . go (ix - 1)
-    else id
+  go !ix =
+    if ix >= 0
+      then showChar (nibbleToHex ((unsafeShiftR (fromIntegral w) (ix * 4)) .&. 0xF)) . go (ix - 1)
+      else id
 
 nibbleToHex :: Word -> Char
 nibbleToHex w
   | w < 10 = chr (fromIntegral (w + 48))
   | otherwise = chr (fromIntegral (w + 87))
 
--- | A 'MacCodec' allows users to control the encoding/decoding
---   of their 'Mac' addresses.
+{- | A 'MacCodec' allows users to control the encoding/decoding
+  of their 'Mac' addresses.
+-}
 data MacCodec = MacCodec
   { macCodecGrouping :: !MacGrouping
   , macCodecUpperCase :: !Bool
-  } deriving (Eq,Ord,Show,Read,Generic,Data)
+  }
+  deriving (Eq, Ord, Show, Read, Generic, Data)
 
--- | The format expected by the mac address parser. The 'Word8' taken
---   by some of these constructors is the ascii value of the character
---   to be used as the separator. This is typically a colon, a hyphen, or
---   a space character. All decoding functions are case insensitive.
+{- | The format expected by the mac address parser. The 'Word8' taken
+  by some of these constructors is the ascii value of the character
+  to be used as the separator. This is typically a colon, a hyphen, or
+  a space character. All decoding functions are case insensitive.
+-}
 data MacGrouping
-  = MacGroupingPairs !Char -- ^ Two-character groups, @FA:2B:40:09:8C:11@
-  | MacGroupingTriples !Char -- ^ Three-character groups, @24B-F0A-025-829@
-  | MacGroupingQuadruples !Char -- ^ Four-character groups, @A220.0745.CAC7@
-  | MacGroupingNoSeparator -- ^ No separator, @24AF4B5B0780@
-  deriving (Eq,Ord,Show,Read,Generic,Data)
+  = -- | Two-character groups, @FA:2B:40:09:8C:11@
+    MacGroupingPairs !Char
+  | -- | Three-character groups, @24B-F0A-025-829@
+    MacGroupingTriples !Char
+  | -- | Four-character groups, @A220.0745.CAC7@
+    MacGroupingQuadruples !Char
+  | -- | No separator, @24AF4B5B0780@
+    MacGroupingNoSeparator
+  deriving (Eq, Ord, Show, Read, Generic, Data)
 
 instance ToJSON Mac where
   toJSON = Aeson.String . encode
 
 instance ToJSONKey Mac where
-  toJSONKey = ToJSONKeyText
-    (keyFromText . encode)
-    (\m -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 m <> BB.char7 '"')
-    where
+  toJSONKey =
+    ToJSONKeyText
+      (keyFromText . encode)
+      (\m -> Aeson.unsafeToEncoding $ BB.char7 '"' <> builderUtf8 m <> BB.char7 '"')
+   where
 #if MIN_VERSION_aeson(2,0,0)
       keyFromText = AK.fromText
 #else
@@ -898,7 +979,7 @@ attoparsecParseJSON p v =
   case v of
     Aeson.String t ->
       case AT.parseOnly p t of
-        Left err  -> fail err
+        Left err -> fail err
         Right res -> return res
     _ -> fail "expected a String"
 
@@ -906,11 +987,10 @@ attoparsecParseJSON p v =
 -- than 256.
 unsafeWord48FromOctets :: Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64 -> Word64
 unsafeWord48FromOctets a b c d e f =
-    fromIntegral
-  $ unsafeShiftL a 40
-  .|. unsafeShiftL b 32
-  .|. unsafeShiftL c 24
-  .|. unsafeShiftL d 16
-  .|. unsafeShiftL e 8
-  .|. f
-
+  fromIntegral $
+    unsafeShiftL a 40
+      .|. unsafeShiftL b 32
+      .|. unsafeShiftL c 24
+      .|. unsafeShiftL d 16
+      .|. unsafeShiftL e 8
+      .|. f

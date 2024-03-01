@@ -4,10 +4,9 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-
 {-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
-{-| For concatenating fixed-width strings that are only a few
+{- | For concatenating fixed-width strings that are only a few
     characters each, this can be six times faster than the builder
     that ships with @bytestring@.
 -}
@@ -27,14 +26,14 @@ module Data.ByteString.Builder.Fixed
 #if !MIN_VERSION_base(4,11,0)
 import Data.Monoid
 #endif
+import Data.Bits
+import Data.ByteString.Internal (ByteString (..))
+import Data.ByteString.Short (ShortByteString)
+import Data.Char (ord)
 import Data.Word
 import Data.Word.Synthetic.Word12 (Word12)
-import Data.Bits
-import Data.Char (ord)
-import Text.Printf
-import Data.ByteString.Internal (ByteString(..))
 import Foreign
-import Data.ByteString.Short (ShortByteString)
+import Text.Printf
 
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC8
@@ -109,12 +108,12 @@ word12HexFixedLower = word12HexFixedGeneral False
 
 hexValuesWord12Upper :: ShortByteString
 hexValuesWord12Upper =
-  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%03X") [0 :: Int ..4095]
+  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%03X") [0 :: Int .. 4095]
 {-# NOINLINE hexValuesWord12Upper #-}
 
 hexValuesWord12Lower :: ShortByteString
 hexValuesWord12Lower =
-  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%03x") [0 :: Int ..4095]
+  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%03x") [0 :: Int .. 4095]
 {-# NOINLINE hexValuesWord12Lower #-}
 
 word8HexFixedUpper :: Builder Word8
@@ -137,12 +136,12 @@ word8HexFixedGeneral upper = BuilderFunction (BC8.pack "--") $ \i marr w -> do
 
 hexValuesWord8Upper :: ShortByteString
 hexValuesWord8Upper =
-  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%02X") [0 :: Int ..255]
+  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%02X") [0 :: Int .. 255]
 {-# NOINLINE hexValuesWord8Upper #-}
 
 hexValuesWord8Lower :: ShortByteString
 hexValuesWord8Lower =
-  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%02x") [0 :: Int ..255]
+  SBS.pack $ map (fromIntegral . ord) $ concat $ map (printf "%02x") [0 :: Int .. 255]
 {-# NOINLINE hexValuesWord8Lower #-}
 
 char8 :: Builder Char
@@ -153,8 +152,9 @@ word8 :: Builder Word8
 word8 = BuilderFunction (BC8.pack "-") $ \i marr w -> pokeByteOff marr i w
 {-# INLINE word8 #-}
 
--- | Taken from @Data.ByteString.Internal@. The same warnings
---   apply here.
+{- | Taken from @Data.ByteString.Internal@. The same warnings
+  apply here.
+-}
 c2w :: Char -> Word8
 c2w = fromIntegral . ord
 {-# INLINE c2w #-}

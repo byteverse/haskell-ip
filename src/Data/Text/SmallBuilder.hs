@@ -1,11 +1,10 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
-
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wall -funbox-strict-fields #-}
 
-{-| For concatenating fixed-width strings that are only a few
+{- | For concatenating fixed-width strings that are only a few
     characters each, this can be ten times faster than the builder
     that ships with @text@. The restriction imposed is that all
     of the concatenated textual encoding be fixed-width.
@@ -22,22 +21,22 @@ module Data.Text.SmallBuilder
   , word12HexFixedUpper
   ) where
 
-import Data.Text.Internal (Text(..))
 import Control.Monad.ST
-import Data.Monoid
-import Data.Word
 import Data.Bits
-import Text.Printf (printf)
-import Debug.Trace
 import Data.Char (ord)
-import Data.Word.Synthetic (Word12)
+import Data.Monoid
 import qualified Data.Text as Text
+import qualified Data.Text.Array as A
+import qualified Data.Text.IO as Text
+import Data.Text.Internal (Text (..))
 import qualified Data.Text.Lazy as LText
-import qualified Data.Text.Lazy.IO as LText
 import qualified Data.Text.Lazy.Builder as TBuilder
 import qualified Data.Text.Lazy.Builder.Int as TBuilder
-import qualified Data.Text.IO as Text
-import qualified Data.Text.Array as A
+import qualified Data.Text.Lazy.IO as LText
+import Data.Word
+import Data.Word.Synthetic (Word12)
+import Debug.Trace
+import Text.Printf (printf)
 
 data Builder a where
   BuilderStatic :: !Text -> Builder a
@@ -80,8 +79,9 @@ word8HexFixedUpper :: Builder Word8
 word8HexFixedUpper = word8HexFixedGeneral True
 {-# INLINE word8HexFixedUpper #-}
 
--- | Lowercase fixed-width hexidecimal 'Word8' encoding. The text
---   produced is always two characters in length.
+{- | Lowercase fixed-width hexidecimal 'Word8' encoding. The text
+  produced is always two characters in length.
+-}
 word8HexFixedLower :: Builder Word8
 word8HexFixedLower = word8HexFixedGeneral False
 {-# INLINE word8HexFixedLower #-}
@@ -96,19 +96,20 @@ word8HexFixedGeneral upper = BuilderFunction (Text.pack "--") $ \i marr w -> do
   A.unsafeWrite marr (i + 1) (A.unsafeIndex arr ix2)
 {-# INLINE word8HexFixedGeneral #-}
 
--- | Characters outside the basic multilingual plane are not handled
---   correctly by this function. However, they will not cause a program to crash.
---   Instead, the character will have the upper bits masked out.
+{- | Characters outside the basic multilingual plane are not handled
+  correctly by this function. However, they will not cause a program to crash.
+  Instead, the character will have the upper bits masked out.
+-}
 charBmp :: Builder Char
 charBmp = BuilderFunction (Text.pack "-") $ \i marr c -> A.unsafeWrite marr i (fromIntegral (ord c))
 {-# INLINE charBmp #-}
 
 hexValuesUpper :: A.Array
-hexValuesUpper = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02X") [0 :: Int ..255] in arr
+hexValuesUpper = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02X") [0 :: Int .. 255] in arr
 {-# NOINLINE hexValuesUpper #-}
 
 hexValuesLower :: A.Array
-hexValuesLower = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02x") [0 :: Int ..255] in arr
+hexValuesLower = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%02x") [0 :: Int .. 255] in arr
 {-# NOINLINE hexValuesLower #-}
 
 word12HexFixedGeneral :: Bool -> Builder Word12
@@ -130,10 +131,9 @@ word12HexFixedLower = word12HexFixedGeneral False
 {-# INLINE word12HexFixedLower #-}
 
 hexValuesWord12Upper :: A.Array
-hexValuesWord12Upper = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%03X") [0 :: Int ..4096] in arr
+hexValuesWord12Upper = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%03X") [0 :: Int .. 4096] in arr
 {-# NOINLINE hexValuesWord12Upper #-}
 
 hexValuesWord12Lower :: A.Array
-hexValuesWord12Lower = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%03x") [0 :: Int ..4096] in arr
+hexValuesWord12Lower = let Text arr _ _ = Text.copy $ Text.pack $ concat $ map (printf "%03x") [0 :: Int .. 4096] in arr
 {-# NOINLINE hexValuesWord12Lower #-}
-

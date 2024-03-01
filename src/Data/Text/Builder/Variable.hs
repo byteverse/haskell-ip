@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 
-{-| This is a builder optimized for concatenating short
+{- | This is a builder optimized for concatenating short
     variable-length strings whose length has a known upper
     bound. In these cases, this can be up to ten times faster
     than the builder provided by the @text@ library. However,
@@ -23,18 +23,18 @@ module Data.Text.Builder.Variable
   , word8
   ) where
 
-import Data.Word
-import Data.Text (Text)
-import Data.Text.Builder.Common.Compat (Codepoint)
 import Control.Monad.ST
 import Data.Char (ord)
-import Data.Vector (Vector)
 import Data.Maybe (fromMaybe)
-import qualified Data.Vector as Vector
 import qualified Data.Semigroup as Semigroup
+import Data.Text (Text)
 import qualified Data.Text.Array as A
+import Data.Text.Builder.Common.Compat (Codepoint)
 import qualified Data.Text.Builder.Common.Internal as I
 import qualified Data.Text.Internal as TI
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
+import Data.Word
 
 data Builder a
   = Builder
@@ -60,10 +60,10 @@ instance Monoid (Builder a) where
 
 run :: Builder a -> a -> Text
 run (Builder maxLen f) = \a ->
-  let (outArr,len) = A.run2 $ do
+  let (outArr, len) = A.run2 $ do
         marr <- A.new maxLen
         finalIx <- f 0 marr a
-        return (marr,finalIx)
+        return (marr, finalIx)
    in TI.text outArr 0 len
 {-# INLINE run #-}
 
@@ -90,25 +90,27 @@ staticCharBmp c = Builder 1 $ \i marr _ -> do
 {-# INLINE staticCharBmp #-}
 
 word8 :: Builder Word8
-word8 = Builder 3 $ \pos marr w -> if
-  | w < 10 -> do
-      A.unsafeWrite marr pos (i2w w)
-      return (pos + 1)
-  | w < 100 -> do
-      let wInt = fromIntegral w
-          ix = wInt + wInt
-      A.unsafeWrite marr pos (A.unsafeIndex I.twoDecimalDigits ix)
-      A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.twoDecimalDigits (ix + 1))
-      return (pos + 2)
-  | otherwise -> do
-      let wInt = fromIntegral w
-          ix = wInt + wInt + wInt
-      A.unsafeWrite marr pos (A.unsafeIndex I.threeDecimalDigits ix)
-      A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.threeDecimalDigits (ix + 1))
-      A.unsafeWrite marr (pos + 2) (A.unsafeIndex I.threeDecimalDigits (ix + 2))
-      return (pos + 3)
+word8 = Builder 3 $ \pos marr w ->
+  if
+    | w < 10 -> do
+        A.unsafeWrite marr pos (i2w w)
+        return (pos + 1)
+    | w < 100 -> do
+        let wInt = fromIntegral w
+            ix = wInt + wInt
+        A.unsafeWrite marr pos (A.unsafeIndex I.twoDecimalDigits ix)
+        A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.twoDecimalDigits (ix + 1))
+        return (pos + 2)
+    | otherwise -> do
+        let wInt = fromIntegral w
+            ix = wInt + wInt + wInt
+        A.unsafeWrite marr pos (A.unsafeIndex I.threeDecimalDigits ix)
+        A.unsafeWrite marr (pos + 1) (A.unsafeIndex I.threeDecimalDigits (ix + 1))
+        A.unsafeWrite marr (pos + 2) (A.unsafeIndex I.threeDecimalDigits (ix + 2))
+        return (pos + 3)
 {-# INLINE word8 #-}
 
+{- FOURMOLU_DISABLE -}
 -- This has not yet been tested.
 _vector ::
      Text -- ^ Default, used when index is out of range
@@ -133,8 +135,8 @@ _vector tDef v =
 i2w :: Integral a => a -> Codepoint
 i2w v = asciiZero + fromIntegral v
 {-# INLINE i2w #-}
+{- FOURMOLU_ENABLE -}
 
 asciiZero :: Codepoint
 asciiZero = 48
 {-# INLINE asciiZero #-}
-
