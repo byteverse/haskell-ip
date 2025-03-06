@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to the [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## 1.7.8.1 -- 2025-??-??
+
+* Make sure that case_ is always inlined.
+
 ## 1.7.8 -- 2024-03-01
 
 * Update package metadata.

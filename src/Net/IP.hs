@@ -104,6 +104,7 @@ import qualified Net.IPv6 as IPv6
   "2001:db8::1"
 -}
 case_ :: (IPv4 -> a) -> (IPv6 -> a) -> IP -> a
+{-# inline case_ #-}
 -- Note: rather than performing the masking operations on the 'Word128',
 -- we unwrap the 'Word64's, as that's probably a bit more efficient, and
 -- we might need the lower word anyway.
